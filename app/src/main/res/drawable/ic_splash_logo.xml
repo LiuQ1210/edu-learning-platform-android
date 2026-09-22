@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  启动图标（core-splashscreen 专用）。
+
+  与 launcher 图标共用同一张位图 @drawable/ic_launcher_foreground。
+
+  这里**不要再加 inset**：Android 12+ 会给启动图标套一层带留白的容器
+  （见启动页截图里那个浅蓝圆角底），前景自身也已经为主体预留过安全区。
+  再加 inset 就是双层留白，图标会小得只剩中间一小块。
+-->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/ic_launcher_foreground" />

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 品牌色统一到设计稿实采值，与 Compose 侧 ui/theme/Color.kt 保持一致 -->
+    <color name="primary">#FF3677EF</color>
+    <color name="primary_dark">#FF2A5FD0</color>
+    <color name="primary_light">#FF5B9BFF</color>
+
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+
+    <!-- 启动窗口底色：用纯白，与 Compose 启动页顶部的 #FFFFFF 无缝衔接。
+         不要用品牌蓝 —— 那会造成「蓝底闪一下再变奶油底」的跳色。 -->
+    <color name="splash_background">#FFFFFFFF</color>
+
+    <!-- 状态栏 / 导航栏透明交给 enableEdgeToEdge()，这里只留占位 -->
+    <color name="transparent">#00000000</color>
+</resources>

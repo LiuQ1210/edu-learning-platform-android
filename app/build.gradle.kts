@@ -1,0 +1,147 @@
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt)
+}
+
+android {
+    namespace = "com.github.learningplatform"
+    compileSdk {
+        version = release(37)
+    }
+
+    defaultConfig {
+        applicationId = "com.github.learningplatform"
+        minSdk = 24
+        targetSdk = 37
+        versionCode = 1
+        versionName = "1.0.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // 后端 BaseUrl：由 BuildConfig 注入，code 侧通过 Constants.BASE_URL 读取。
+        // v3.0 的 URL 前缀为 /api/v1（不再是 /api/v1/app）。
+        buildConfigField("String", "BASE_URL", "\"https://api.learnplatform.com/api/v1/\"")
+
+        // UI 预览开关：true 时 Repository 直接返回本地样例数据，不发任何网络请求。
+        // 用途：后端未就绪时先把界面跑起来给人看（四个 Tab、列表、详情、空/错状态）。
+        // 关掉它：./gradlew :app:assembleDebug -PuiPreview=false
+        val uiPreview = (project.findProperty("uiPreview") as String?)?.toBoolean() ?: true
+        buildConfigField("boolean", "UI_PREVIEW", uiPreview.toString())
+    }
+
+    buildTypes {
+        release {
+            // 首轮先关闭压缩，确认编译通过后再开启；R8 规则见 src/main/keepRules/rules.keep
+            optimization {
+                enable = false
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+}
+
+dependencies {
+    // Core / Lifecycle
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.splashscreen)
+
+    // Compose
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.navigation.compose)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
+
+    // Hilt
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
+    implementation(libs.hilt.navigation.compose)
+
+    // Network
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.kotlinx.serialization)
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.logging)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.coroutines.android)
+
+    // Local storage
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    implementation(libs.room.paging)
+    ksp(libs.room.compiler)
+    implementation(libs.datastore.preferences)
+
+    // Image
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
+
+    // Paging
+    implementation(libs.paging.runtime)
+    implementation(libs.paging.compose)
+
+    // Video
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.ui)
+    implementation(libs.media3.session)
+
+    // Log
+    implementation(libs.timber)
+
+    // Test
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+}
+
+// ---------------------------------------------------------------------------
+// 依赖对齐：AGP 9 内置的 Kotlin 编译器为 2.2.x，无法读取 kotlin-stdlib 2.4 的元数据。
+// 而 Coil 3.6.2 与 androidx.collection 1.5.0（Room 2.8.5 传递依赖）会把 stdlib 顶到 2.4.10，
+// 导致 "Class 'kotlin.Unit' was compiled with an incompatible version of Kotlin"。
+// kotlin-stdlib 向后兼容，这里统一压回与编译器一致的版本。
+// 若将来 AGP 内置 Kotlin 升级到 2.4+，可删除此约束。
+// ---------------------------------------------------------------------------
+configurations.configureEach {
+    resolutionStrategy {
+        force("org.jetbrains.kotlin:kotlin-stdlib:2.2.10")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// JVM 目标对齐：toolchain 是 JDK 25，若不做限制 Kotlin 会回退到 JVM_24 目标，
+// 而 compileOptions 指定的是 17，两者不一致（且 Android 不需要 24 字节码）。
+// 这里显式钉到 17，与 Java 保持一致。
+// ---------------------------------------------------------------------------
+kotlin {
+    jvmToolchain(17)
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
+}

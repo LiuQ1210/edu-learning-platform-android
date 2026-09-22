@@ -1,0 +1,37 @@
+# ============================================================
+# R8 keep 规则（AGP 9 使用 src/main/keepRules 目录，取代 proguard-rules.pro）
+# ============================================================
+
+# --- Retrofit ---
+-keepattributes Signature
+-keepattributes *Annotation*
+-keep,allowobfuscation,allowshrinking interface retrofit2.Call
+-keep,allowobfuscation,allowshrinking class retrofit2.Response
+-keep,allowobfuscation,allowshrinking class kotlin.coroutines.Continuation
+
+# --- Kotlinx Serialization ---
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.AnnotationsKt
+-keepclassmembers class kotlinx.serialization.json.** {
+    *** Companion;
+}
+-keepclasseswithmembers class kotlinx.serialization.json.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+-keep,includedescriptorclasses class com.github.learningplatform.**$$serializer { *; }
+-keepclassmembers class com.github.learningplatform.** {
+    *** Companion;
+}
+-keepclasseswithmembers class com.github.learningplatform.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+
+# --- DTO 保持（反射序列化需要）---
+-keep class com.github.learningplatform.data.remote.dto.** { *; }
+
+# --- OkHttp ---
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.openjsse.**

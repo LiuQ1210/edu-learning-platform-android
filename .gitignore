@@ -1,0 +1,21 @@
+# IDE
+*.iml
+/.idea/
+
+# gradle缓存
+.gradle/
+
+# 根目录sdk配置
+/local.properties
+
+# 编译输出目录
+/build
+app/build/
+
+# 截图、NDK相关
+/captures
+.externalNativeBuild/
+.cxx/
+
+# Mac系统垃圾
+.DS_Store

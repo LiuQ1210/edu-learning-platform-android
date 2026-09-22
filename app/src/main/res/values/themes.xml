@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      两套主题的分工：
+        Theme.LearnPlatform          应用主主题，windowBackground 用奶油白
+        Theme.LearnPlatform.Splash   启动主题，只负责「冷启动到第一帧」这段
+
+      为什么必须分开：不做 splash 主题时，系统会用 theme 里的默认窗口背景
+      和我们没指定的图标，结果就是「先闪一下绿色安卓机器人，再进我们的界面」。
+      这里把启动窗口也定成白色，并用品牌图标，视觉上就连贯了。
+    -->
+    <style name="Theme.LearnPlatform" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/white</item>
+        <item name="android:statusBarColor">@color/transparent</item>
+        <item name="android:navigationBarColor">@color/transparent</item>
+    </style>
+
+    <!--
+      core-splashscreen 的启动主题。
+      windowSplashScreenBackground / windowSplashScreenAnimatedIcon 由库在
+      Android 12 以下自行兼容，所以只在 values 里定义一份即可。
+      postSplashScreenTheme 指定启动结束后切回的主主题。
+    -->
+    <style name="Theme.LearnPlatform.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
+        <item name="postSplashScreenTheme">@style/Theme.LearnPlatform</item>
+    </style>
+</resources>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  自适应图标（API 26+）。
+  前景用位图 @drawable/ic_launcher_foreground（由 B 标源图生成，432x432，108dp 视口），
+  背景用纯色 vector。
+
+  为什么没有 <monochrome>：主题图标需要一张单色剪影，而这张 B 标是位图插画，
+  没有对应的矢量剪影。MSYS 里放彩色位图当单色层会渲染成一块色斑，比不放更糟。
+  需要支持主题图标时，补一张 @drawable/ic_launcher_monochrome 的矢量剪影即可。
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>
