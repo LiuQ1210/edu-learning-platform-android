@@ -79,9 +79,6 @@ fun RegisterScreen(
             color = TextSecondary
         )
 
-        Spacer(Modifier.height(14.dp))
-        ThirdPartyRow()
-
         Spacer(Modifier.height(16.dp))
 
         // 通道切换：手机号 / 邮箱
