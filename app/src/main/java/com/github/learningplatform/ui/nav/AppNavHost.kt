@@ -43,6 +43,8 @@ import com.github.learningplatform.ui.mine.BlogHomeScreen
 import com.github.learningplatform.ui.mine.ChangePasswordScreen
 import com.github.learningplatform.ui.mine.EditProfileScreen
 import com.github.learningplatform.ui.mine.FavoritesScreen
+import com.github.learningplatform.ui.mine.DownloadsScreen
+import com.github.learningplatform.ui.mine.LikesScreen
 import com.github.learningplatform.ui.mine.MyCoursesScreen
 import com.github.learningplatform.ui.mine.ProfileScreen
 import com.github.learningplatform.ui.mine.SettingsScreen
@@ -256,6 +258,8 @@ fun MainScaffold(
                     onOpenMyArticles = { navController.navigate(Routes.MY_ARTICLES) },
                     onOpenHistory = { navController.navigate(Routes.WATCH_HISTORY) },
                     onOpenFavorites = { navController.navigate(Routes.MY_FAVORITES) },
+                    onOpenLikes = { navController.navigate(Routes.MY_LIKES) },
+                    onOpenDownloads = { navController.navigate(Routes.MY_DOWNLOADS) },
                     onOpenNotes = { navController.navigate(Routes.NOTES) },
                     onOpenTodos = { navController.navigate(Routes.TODOS) },
                     onOpenSettings = { navController.navigate(Routes.SETTINGS) },
@@ -392,6 +396,28 @@ fun MainScaffold(
             composable(Routes.MY_FAVORITES) {
                 FavoritesScreen(
                     onBack = { navController.popBackStack() },
+                    onOpenTarget = { type, id ->
+                        if (type == 1) navController.navigate(Routes.articleDetail(id))
+                        else navController.navigate(Routes.courseDetail(id))
+                    }
+                )
+            }
+
+            composable(Routes.MY_LIKES) {
+                LikesScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenTarget = { type, id ->
+                        if (type == 1) navController.navigate(Routes.articleDetail(id))
+                        else navController.navigate(Routes.courseDetail(id))
+                    }
+                )
+            }
+
+            composable(Routes.MY_DOWNLOADS) {
+                DownloadsScreen(
+                    onBack = { navController.popBackStack() },
+                    // 下载记录的 resourceType 与点赞的 targetType 是两套语义，
+                    // 但跳转目标一致：文章详情 / 课程详情
                     onOpenTarget = { type, id ->
                         if (type == 1) navController.navigate(Routes.articleDetail(id))
                         else navController.navigate(Routes.courseDetail(id))

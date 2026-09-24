@@ -60,6 +60,8 @@ fun ProfileScreen(
     onOpenMyArticles: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenFavorites: () -> Unit,
+    onOpenLikes: () -> Unit,
+    onOpenDownloads: () -> Unit,
     onOpenNotes: () -> Unit,
     onOpenTodos: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -150,6 +152,10 @@ fun ProfileScreen(
                 MenuRow(NavIcons.History, "观看历史", onOpenHistory)
                 MenuDivider()
                 MenuRow(NavIcons.Star, "我的收藏", onOpenFavorites)
+                MenuDivider()
+                MenuRow(NavIcons.Favorite, "我的点赞", onOpenLikes)
+                MenuDivider()
+                MenuRow(NavIcons.Inbox, "我的下载", onOpenDownloads)
                 MenuDivider()
                 MenuRow(NavIcons.Note, "笔记本", onOpenNotes)
                 MenuDivider()

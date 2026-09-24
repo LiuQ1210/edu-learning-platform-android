@@ -70,9 +70,16 @@ class HomeViewModel @Inject constructor(
         loadCourses(reset = true)
     }
 
+    /**
+     * 下拉刷新。
+     *
+     * 走 forceRefresh 路径：跳过缓存强制回源。
+     * 不这么做的话，5 分钟内的下拉刷新会直接返回缓存，用户会以为「刷新没反应」——
+     * 下拉刷新是用户明确表达「我要最新数据」的动作，必须真的去请求。
+     */
     fun refresh() {
         loadCategories()
-        loadCourses(reset = true)
+        loadCourses(reset = true, forceRefresh = true)
     }
 
     fun selectCategory(categoryId: Long?) {
@@ -117,7 +124,10 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private fun loadCourses(reset: Boolean) {
+    /**
+     * @param forceRefresh 仅在下拉刷新时为 true：跳过缓存强制回源
+     */
+    private fun loadCourses(reset: Boolean, forceRefresh: Boolean = false) {
         val snapshot = _uiState.value
         val nextPage = if (reset) 1 else snapshot.pageNum + 1
         // reset 时开启新一轮：飞行中的旧请求回来后因代次不匹配会被丢弃
@@ -135,13 +145,15 @@ class HomeViewModel @Inject constructor(
                     pageNum = nextPage,
                     pageSize = 20,
                     categoryId = snapshot.selectedCategoryId,
-                    sort = 1
+                    sort = 1,
+                    forceRefresh = forceRefresh
                 )
                 val rank = courseRepository.getCourses(
                     pageNum = 1,
                     pageSize = 10,
                     categoryId = snapshot.selectedCategoryId,
-                    sort = 2
+                    sort = 2,
+                    forceRefresh = forceRefresh
                 ).list
 
                 // 分类在请求飞行途中被切换 → 这份结果属于上一轮

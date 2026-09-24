@@ -41,6 +41,8 @@ object Routes {
     const val EDIT_PROFILE = "edit_profile"
     const val MY_COURSES = "my_courses"
     const val MY_FAVORITES = "my_favorites"
+    const val MY_LIKES = "my_likes"
+    const val MY_DOWNLOADS = "my_downloads"
     const val WATCH_HISTORY = "watch_history"
     const val NOTES = "notes"
     const val NOTE_DETAIL = "note_detail/{noteId}"
@@ -63,7 +65,7 @@ object Routes {
         HOME, VIDEO, COMMUNITY, PROFILE,
         COURSE_DETAIL, SEARCH, CATEGORY_ALL,
         ARTICLE_DETAIL, ARTICLE_PUBLISH, ARTICLE_EDIT, MY_ARTICLES, TAG_ARTICLES, BLOG_HOME,
-        EDIT_PROFILE, MY_COURSES, MY_FAVORITES, WATCH_HISTORY,
+        EDIT_PROFILE, MY_COURSES, MY_FAVORITES, MY_LIKES, MY_DOWNLOADS, WATCH_HISTORY,
         NOTES, NOTE_DETAIL, TODOS, SETTINGS, CHANGE_PASSWORD
     )
 

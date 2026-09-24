@@ -51,6 +51,13 @@ android {
         buildConfig = true
     }
 
+    testOptions {
+        unitTests {
+            // Robolectric 需要真实资源（strings/colors），否则单测里拿不到 theme 属性
+            isIncludeAndroidResources = true
+        }
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -114,7 +121,14 @@ dependencies {
     implementation(libs.timber)
 
     // Test
+    //
+    // 刻意只用 JUnit + coroutines-test，**不引入 Robolectric**。
+    // 原因：Robolectric 会拖一个 100MB+ 的 nativeruntime 包，而在本项目的网络环境下
+    // 从 Maven Central 拉取不稳定（实测 21 分钟超时）。缓存逻辑本身不依赖 Android，
+    // 用「假 DAO」就能测，没必要为了测试引入重型依赖。
+    // 需要真正的 Room 行为验证时（如 SQL 语义），写 instrumented test 更合适。
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

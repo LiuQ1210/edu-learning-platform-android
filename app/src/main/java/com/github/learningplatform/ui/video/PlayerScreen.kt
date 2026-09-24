@@ -4,13 +4,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -20,15 +20,15 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -39,11 +39,14 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import com.github.learningplatform.core.constants.Constants
 import com.github.learningplatform.ui.common.ErrorState
 import com.github.learningplatform.ui.common.LoadingState
+import com.github.learningplatform.ui.common.WriteNoteDialog
 import com.github.learningplatform.ui.nav.NavIcons
-import kotlinx.coroutines.delay
 import java.util.Locale
+import kotlinx.coroutines.delay
+
 
 /**
  * 播放页（接口文档 6.3 播放凭证 / 6.4 进度心跳）。
@@ -63,6 +66,15 @@ fun PlayerScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
+    /*
+     * 打开笔记弹窗那一刻的播放位置。
+     *
+     * 为什么不在弹窗里实时读：视频此时还在播，位置每帧都在变，
+     * 时间戳会一直跳，用户看到「笔记位置」的数字在动会以为是 bug。
+     * 打开时定格一次，语义也更对 —— 这条笔记就是记在这一刻的。
+     */
+    var noteTimestamp by remember { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(courseId, lessonId) { viewModel.load(courseId, lessonId) }
 
@@ -180,6 +192,20 @@ fun PlayerScreen(
                             )
                         }
                     }
+
+                    // 写笔记：视频笔记会带上当前播放位置
+                    IconButton(onClick = {
+                        // 直接取 ExoPlayer 的真实位置，不要用 ViewModel 里缓存的
+                        // lastKnownSeconds —— 那个只在 15-30 秒一次的心跳里更新，会偏
+                        noteTimestamp = (player.currentPosition / 1000).toInt().coerceAtLeast(0)
+                        viewModel.showNoteDialog()
+                    }) {
+                        Icon(
+                            NavIcons.Note,
+                            contentDescription = "写笔记",
+                            tint = Color.White
+                        )
+                    }
                 }
 
                 // 底部进度条
@@ -234,6 +260,21 @@ fun PlayerScreen(
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(color = Color.White)
         }
+    }
+
+    if (uiState.showNoteDialog) {
+        WriteNoteDialog(
+            sourceType = Constants.TARGET_COURSE,
+            sourceTitle = uiState.title,
+            // 位置在弹窗打开时取一次：写笔记期间视频还在播，
+            // 若每帧都重取会导致时间戳跳动，用户看到数字在变
+            videoTimestamp = noteTimestamp,
+            saving = uiState.noteSaving,
+            onDismiss = viewModel::dismissNoteDialog,
+            onSave = { title, content ->
+                viewModel.createNote(title, content, noteTimestamp ?: 0)
+            }
+        )
     }
 }
 

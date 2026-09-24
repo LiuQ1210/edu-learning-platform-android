@@ -90,9 +90,9 @@ fun MyCoursesScreen(
                 uiState.error != null -> ErrorState(message = uiState.error.orEmpty(), onRetry = viewModel::load)
                 uiState.courses.isEmpty() -> EmptyState(message = "还没有加入课程")
                 else -> LazyColumn(
-modifier = Modifier
-    .fillMaxSize()
-    .background(pageGradientBrush(strong = true)),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(pageGradientBrush(strong = true)),
                     contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
                     items(uiState.courses, key = { it.courseId }) { course ->
@@ -196,7 +196,7 @@ private fun MyCourseRow(
     }
 }
 
-private val favoriteTabs = listOf(
+internal val favoriteTabs = listOf(
     null to "全部",
     1 to "文章",
     2 to "视频"
@@ -229,9 +229,9 @@ fun FavoritesScreen(
             uiState.error != null -> ErrorState(message = uiState.error.orEmpty(), onRetry = viewModel::refresh)
             uiState.items.isEmpty() -> EmptyState(message = "还没有收藏内容")
             else -> LazyColumn(
-modifier = Modifier
-    .fillMaxSize()
-    .background(pageGradientBrush(strong = true)),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(pageGradientBrush(strong = true)),
                 contentPadding = PaddingValues(bottom = 24.dp)
             ) {
                 items(uiState.items, key = { "${it.targetType}-${it.targetId}" }) { item ->
@@ -285,9 +285,9 @@ fun WatchHistoryScreen(
             uiState.error != null -> ErrorState(message = uiState.error.orEmpty(), onRetry = viewModel::refresh)
             uiState.items.isEmpty() -> EmptyState(message = "暂无观看记录")
             else -> LazyColumn(
-modifier = Modifier
-    .fillMaxSize()
-    .background(pageGradientBrush(strong = true)),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(pageGradientBrush(strong = true)),
                 contentPadding = PaddingValues(bottom = 24.dp)
             ) {
                 items(uiState.items, key = { "${it.targetType}-${it.targetId}" }) { item ->
@@ -338,7 +338,7 @@ modifier = Modifier
 }
 
 @Composable
-private fun TargetTabs(
+internal fun TargetTabs(
     selected: Int?,
     onSelect: (Int?) -> Unit,
     tabs: List<Pair<Int?, String>>
@@ -368,7 +368,7 @@ private fun TargetTabs(
 }
 
 @Composable
-private fun TargetRow(
+internal fun TargetRow(
     title: String,
     cover: String,
     subtitle: String,
@@ -405,7 +405,7 @@ private fun TargetRow(
 }
 
 @Composable
-private fun LoadMoreFooter(isLoadingMore: Boolean, hasMore: Boolean, onLoadMore: () -> Unit) {
+internal fun LoadMoreFooter(isLoadingMore: Boolean, hasMore: Boolean, onLoadMore: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()

@@ -10,7 +10,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -91,20 +90,31 @@ fun GlowOrb(
     diameter: Dp = 260.dp,
     alpha: Float = 0.85f
 ) {
+    /*
+     * 用「多段径向渐变」而不是 `Modifier.blur`。
+     *
+     * 为什么必须去掉 blur：`Modifier.blur` 底层是 RenderEffect，在软件渲染
+     * （模拟器常见的 swiftshader_indirect）下退化为 CPU 逐像素卷积。
+     * 实测后果：本 App 出现 "Skipped 124 frames"，并让桌面 launcher 掉帧到
+     * Davey duration 732~888ms、QueueBufferDuration 接近 1 秒 —— 表现就是
+     * 「一启动 App 桌面就卡死」。GPU 渲染的设备上 blur 没问题，但不能依赖它。
+     *
+     * 柔光本来就不需要真模糊：把白→透明的过渡拆成多段，视觉上等价，
+     * 而渐变由渲染管线一次插值完成，开销可以忽略。
+     */
     Box(
         modifier = modifier
             .size(diameter)
             .clip(CircleShape)
             .background(
                 Brush.radialGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = alpha),
-                        GlowEdge.copy(alpha = alpha * 0.30f),
-                        Color.Transparent
-                    )
+                    0.00f to Color.White.copy(alpha = alpha),
+                    0.35f to Color.White.copy(alpha = alpha * 0.55f),
+                    0.62f to GlowEdge.copy(alpha = alpha * 0.22f),
+                    0.82f to GlowEdge.copy(alpha = alpha * 0.07f),
+                    1.00f to Color.Transparent
                 )
             )
-            .blur(32.dp)
     )
 }
 

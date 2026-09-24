@@ -79,10 +79,9 @@ fun RegisterScreen(
             color = TextSecondary
         )
 
-        Spacer(Modifier.height(14.dp))
-        ThirdPartyRow()
-
-        Spacer(Modifier.height(16.dp))
+        // 原此处有微信第三方登录入口，已按要求移除。
+        // 间距从 16dp 收到 12dp，理由同登录页：原值是配微信方块留的。
+        Spacer(Modifier.height(12.dp))
 
         // 通道切换：手机号 / 邮箱
         ChannelSwitcher(

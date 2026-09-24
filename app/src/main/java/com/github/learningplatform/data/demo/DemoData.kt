@@ -413,6 +413,25 @@ object DemoData {
         )
     )
 
+    /**
+     * 我的点赞。
+     *
+     * 单独一份而不是复用 [favorites]：两者数据不该相同 ——
+     * 点赞和收藏是独立操作，用户可能只点赞不收藏。
+     * 复用会让「点赞页和收藏页一模一样」，评审时看不出问题，
+     * 真接后端才会发现字段映射接错（getLikes 接到了收藏接口）。
+     */
+    val likes: PageData<UserTargetItemDto> = PageData(
+        total = 5,
+        list = listOf(
+            UserTargetItemDto(2, 1001, "Machine Learning 从入门到实战", cover("course0"), "2026-09-16 20:10:00"),
+            UserTargetItemDto(1, 5002, "结构化并发为什么必须向上抛 CancellationException", cover("article1"), "2026-09-15 22:40:00"),
+            UserTargetItemDto(2, 2002, "Data Science 数据分析实战", cover("short1"), "2026-09-14 19:05:00"),
+            UserTargetItemDto(1, 5003, "Compose 重组优化实战", cover("article2"), "2026-09-13 11:20:00"),
+            UserTargetItemDto(2, 1004, "Android 性能优化", cover("course3"), "2026-09-12 08:45:00")
+        )
+    )
+
     val history: PageData<ViewHistoryItemDto> = PageData(
         total = 4,
         list = listOf(
