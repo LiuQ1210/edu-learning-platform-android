@@ -1,4 +1,4 @@
-package com.github.learningplatform.ui.video
+﻿package com.github.learningplatform.ui.video
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -40,12 +40,15 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.github.learningplatform.core.constants.Constants
+import com.github.learningplatform.ui.ad.AdSlot
 import com.github.learningplatform.ui.common.ErrorState
 import com.github.learningplatform.ui.common.LoadingState
 import com.github.learningplatform.ui.common.WriteNoteDialog
 import com.github.learningplatform.ui.nav.NavIcons
 import java.util.Locale
 import kotlinx.coroutines.delay
+import timber.log.Timber
+
 
 
 /**
@@ -84,9 +87,15 @@ fun PlayerScreen(
     LaunchedEffect(uiState.playInfo?.playUrl) {
         val url = uiState.playInfo?.playUrl
         if (!url.isNullOrBlank()) {
+            Timber.i("播放装载: url=%s", url)
             player.setMediaItem(MediaItem.fromUri(url))
             player.prepare()
             player.playWhenReady = true
+        } else {
+            Timber.w(
+                "播放未装载: playInfo=%s playUrl='%s' error=%s",
+                uiState.playInfo, url, uiState.error
+            )
         }
     }
 
@@ -99,6 +108,35 @@ fun PlayerScreen(
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
                 isPlaying = playing
+            }
+
+            /*
+             * 下面两个回调是排查「画面不动」的关键。
+             *
+             * 只看 UI 上的 00:00 分不清三种情况：正在缓冲、加载失败、解码失败。
+             * 三者的表现都是「位置不动」，但原因和修法完全不同。
+             * onPlaybackStateChanged / onPlayerError 能把它们区分开。
+             */
+            override fun onPlaybackStateChanged(state: Int) {
+                val name = when (state) {
+                    Player.STATE_IDLE -> "IDLE"
+                    Player.STATE_BUFFERING -> "BUFFERING"
+                    Player.STATE_READY -> "READY"
+                    Player.STATE_ENDED -> "ENDED"
+                    else -> "UNKNOWN($state)"
+                }
+                Timber.i(
+                    "播放状态=%s 时长=%dms 位置=%dms",
+                    name, player.duration, player.currentPosition
+                )
+            }
+
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                Timber.e(
+                    error,
+                    "播放失败 errorCode=%d name=%s",
+                    error.errorCode, error.errorCodeName
+                )
             }
         }
         player.addListener(listener)
@@ -206,6 +244,11 @@ fun PlayerScreen(
                             tint = Color.White
                         )
                     }
+                }
+
+                // 暂停时显示广告位（预留）
+                if (!isPlaying) {
+                    AdSlot(slotId = "player_pause", modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 50.dp))
                 }
 
                 // 底部进度条

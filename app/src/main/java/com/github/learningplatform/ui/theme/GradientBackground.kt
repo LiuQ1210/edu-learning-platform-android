@@ -39,20 +39,29 @@ fun GradientBackground(
     glowRadiusRatio: Float = 1.15f,
     content: @Composable BoxScope.() -> Unit
 ) {
+    val dark = LocalAppDarkTheme.current
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(
-                Brush.verticalGradient(
-                    0.00f to GradTop,
-                    0.22f to GradCream,
-                    0.38f to GradPeach,
-                    0.72f to GradBlush,
-                    1.00f to GradBottom
-                )
+                if (dark) {
+                    // 深色：深蓝灰微渐变，顶部略亮，底部沉下去，不叠暖色
+                    Brush.verticalGradient(
+                        0.00f to DarkSurface,
+                        1.00f to DarkBackground
+                    )
+                } else {
+                    Brush.verticalGradient(
+                        0.00f to GradTop,
+                        0.22f to GradCream,
+                        0.38f to GradPeach,
+                        0.72f to GradBlush,
+                        1.00f to GradBottom
+                    )
+                }
             )
     ) {
-        if (showGlow) {
+        if (showGlow && !dark) {
             // 柔光圆：径向渐变，圆心按容器尺寸算，半径取屏宽的比例。
             // 不用固定像素值 —— 不同屏幕密度下会差很多。
             val density = androidx.compose.ui.platform.LocalDensity.current
@@ -111,7 +120,7 @@ fun GlowOrb(
                     0.00f to Color.White.copy(alpha = alpha),
                     0.35f to Color.White.copy(alpha = alpha * 0.55f),
                     0.62f to GlowEdge.copy(alpha = alpha * 0.22f),
-                    0.82f to GlowEdge.copy(alpha = alpha * 0.07f),
+                    0.82f to GlowEdge.copy(alpha * 0.07f),
                     1.00f to Color.Transparent
                 )
             )
@@ -121,16 +130,24 @@ fun GlowOrb(
 /**
  * 可点元素表面的轻柔渐变（卡片、胶囊、列表行）。
  *
- * 强度刻意压得很低 —— 目的是让这些元素融入奶油底色，而不是自己被看见。
+ * 强度刻意压得很低 —— 目的是让这些元素融入底色，而不是自己被看见。
  * 直接用 `Brush.linearGradient` 线性过渡，不用径向，避免在扁长卡片上出现光斑。
  *
- * @param selected 选中态：换成品牌浅蓝到白的过渡，和未选中的暖色形成区分
+ * @param selected 选中态：浅色下换成品牌浅蓝到白，深色下用品牌蓝半透明
  */
 @Composable
-fun surfaceWashBrush(selected: Boolean = false): Brush = if (selected) {
-    Brush.linearGradient(listOf(PrimaryContainer.copy(alpha = 0.70f), Surface))
-} else {
-    Brush.linearGradient(listOf(SurfaceWashStart, SurfaceWashEnd))
+fun surfaceWashBrush(selected: Boolean = false): Brush {
+    val dark = LocalAppDarkTheme.current
+    return when {
+        selected && dark ->
+            Brush.linearGradient(listOf(Primary.copy(alpha = 0.30f), DarkSurface))
+        selected ->
+            Brush.linearGradient(listOf(PrimaryContainer.copy(alpha = 0.70f), Surface))
+        dark ->
+            Brush.linearGradient(listOf(DarkSurfaceVariant, DarkSurface))
+        else ->
+            Brush.linearGradient(listOf(SurfaceWashStart, SurfaceWashEnd))
+    }
 }
 
 /** 轻柔渐变的两个端点，单独导出以便需要纯色时取其一 */
@@ -156,21 +173,31 @@ val SurfaceWashEnd: Color get() = Color(0xFFFEF8F4)
  * @param strong 是否用完整四段。true 用于内容较少的页面（详情、列表空态）；
  *               false 用于长列表页，顶部奶白往下很快回到中性底，避免长时间阅读疲劳
  */
-fun pageGradientBrush(strong: Boolean = true): Brush = if (strong) {
-    Brush.verticalGradient(
-        0.00f to GradTop,
-        0.12f to GradCream,
-        0.34f to GradPeach,
-        0.72f to GradBlush,
-        1.00f to GradBottom
-    )
-} else {
-    Brush.verticalGradient(
-        0.00f to GradPeach,
-        0.10f to GradCream,
-        0.28f to Background,
-        1.00f to Background
-    )
+@Composable
+fun pageGradientBrush(strong: Boolean = true): Brush {
+    val dark = LocalAppDarkTheme.current
+    return if (dark) {
+        // 深色：深蓝灰微渐变，顶部稍亮做层次
+        Brush.verticalGradient(
+            0.00f to DarkSurface,
+            1.00f to DarkBackground
+        )
+    } else if (strong) {
+        Brush.verticalGradient(
+            0.00f to GradTop,
+            0.12f to GradCream,
+            0.34f to GradPeach,
+            0.72f to GradBlush,
+            1.00f to GradBottom
+        )
+    } else {
+        Brush.verticalGradient(
+            0.00f to GradPeach,
+            0.10f to GradCream,
+            0.28f to Background,
+            1.00f to Background
+        )
+    }
 }
 
 // ---------------------------------------------------------------------------

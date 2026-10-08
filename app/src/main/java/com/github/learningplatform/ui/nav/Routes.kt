@@ -40,6 +40,8 @@ object Routes {
     // ---- 我的 ----
     const val EDIT_PROFILE = "edit_profile"
     const val MY_COURSES = "my_courses"
+    const val STUDY_STATS = "study_stats"
+    const val STUDY_PATH = "study_path"
     const val MY_FAVORITES = "my_favorites"
     const val MY_LIKES = "my_likes"
     const val MY_DOWNLOADS = "my_downloads"

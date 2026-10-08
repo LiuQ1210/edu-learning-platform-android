@@ -1,4 +1,4 @@
-package com.github.learningplatform.ui.community
+﻿package com.github.learningplatform.ui.community
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

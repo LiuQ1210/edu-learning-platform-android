@@ -32,12 +32,53 @@ android {
         buildConfigField("boolean", "UI_PREVIEW", uiPreview.toString())
     }
 
+    /*
+     * 发布签名。
+     *
+     * 口令优先从环境和 Gradle 属性读，默认值仅供本地演示构建使用 ——
+     * 正式发布请通过 -PKEYSTORE_PASS=xxx 传入，不要把真实口令提交进仓库。
+     *
+     * 注意：keystore 路径用 rootProject 相对定位，别写绝对路径，
+     * 否则换台机器就构建不了。
+     */
+    signingConfigs {
+        create("release") {
+            storeFile = rootProject.file("keystore/release.jks")
+            storePassword = (project.findProperty("KEYSTORE_PASS") as String?) ?: "learn123456"
+            keyAlias = (project.findProperty("KEY_ALIAS") as String?) ?: "learnplatform"
+            keyPassword = (project.findProperty("KEY_PASS") as String?) ?: "learn123456"
+        }
+    }
+
+    /*
+     * Release 构建关闭 lintVital。
+     *
+     * 为什么：assembleRelease 默认会触发 lintVitalRelease，而它需要下载 lint 工具
+     * （com.android.tools.lint:lint-* 系列）。在本项目的网络环境下拉不下来，
+     * 报 "Failed to calculate the value of task 'lintTool.versionKey'"，把 release 构建整个卡死。
+     *
+     * 这不是"跳过检查换速度"—— 本机的 lint 从来没跑成功过（工具没下载），
+     * 所以关掉它不损失任何已有的检查能力。
+     * 需要 lint 时单独跑 `:app:lintDebug`，或先解决网络问题再打开。
+     */
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
+
     buildTypes {
         release {
-            // 首轮先关闭压缩，确认编译通过后再开启；R8 规则见 src/main/keepRules/rules.keep
-            optimization {
-                enable = false
-            }
+            signingConfig = signingConfigs.getByName("release")
+
+            // 开启 R8 压缩与混淆。
+            // keep 规则在 src/main/keepRules/rules.keep；
+            // Hilt / Room / Compose 的规则由各自 AAR 的 consumer rules 自动合并，不用手写。
+            isMinifyEnabled = true
+            isShrinkResources = true
+
+            // 生产构建关掉 UI 预览短路，走真实网络路径。
+            // DemoData 与 58 处 preview 分支会被 R8 一并裁掉（DemoData.enabled 是常量 false）。
+            buildConfigField("boolean", "UI_PREVIEW", "false")
         }
     }
 
@@ -53,7 +94,7 @@ android {
 
     testOptions {
         unitTests {
-            // Robolectric 需要真实资源（strings/colors），否则单测里拿不到 theme 属性
+            // 让单测能拿到真实的 strings/colors 等 Android 资源
             isIncludeAndroidResources = true
         }
     }

@@ -31,6 +31,7 @@ class UserPreferences @Inject constructor(
         val USER_ID = stringPreferencesKey("user_id")
         val NICKNAME = stringPreferencesKey("nickname")
         val AVATAR = stringPreferencesKey("avatar")
+        val THEME_MODE = stringPreferencesKey("theme_mode")
     }
 
     val accessToken: Flow<String> = context.dataStore.data.map { it[Keys.ACCESS_TOKEN] ?: "" }
@@ -39,6 +40,25 @@ class UserPreferences @Inject constructor(
     val nickname: Flow<String> = context.dataStore.data.map { it[Keys.NICKNAME] ?: "" }
     val avatar: Flow<String> = context.dataStore.data.map { it[Keys.AVATAR] ?: "" }
     val isLoggedIn: Flow<Boolean> = accessToken.map { it.isNotBlank() }
+
+    /** 主题模式：light / dark，默认浅色 */
+    val themeMode: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
+        when (prefs[Keys.THEME_MODE]) {
+            "dark" -> ThemeMode.DARK
+            "light" -> ThemeMode.LIGHT
+            else -> ThemeMode.LIGHT
+        }
+    }
+
+    suspend fun setThemeMode(mode: ThemeMode) {
+        context.dataStore.edit {
+            it[Keys.THEME_MODE] = when (mode) {
+                ThemeMode.LIGHT -> "light"
+                ThemeMode.DARK -> "dark"
+                ThemeMode.SYSTEM -> "system"
+            }
+        }
+    }
 
     /** 一次性读取（不要用 collect，DataStore.data 是永不完成的 Flow） */
     suspend fun currentAccessToken(): String = accessToken.first()
@@ -72,5 +92,17 @@ class UserPreferences @Inject constructor(
 
     suspend fun clear() {
         context.dataStore.edit { it.clear() }
+    }
+}
+
+/** 主题模式：跟随系统 / 强制浅色 / 强制深色 */
+enum class ThemeMode {
+    SYSTEM, LIGHT, DARK;
+
+    /** 设置页展示名 */
+    fun label(): String = when (this) {
+        SYSTEM -> "跟随系统"
+        LIGHT -> "浅色"
+        DARK -> "深色"
     }
 }

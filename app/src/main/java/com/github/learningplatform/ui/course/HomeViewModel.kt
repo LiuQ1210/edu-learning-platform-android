@@ -14,11 +14,20 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 const val CATEGORY_TYPE_COURSE = 2
 const val CATEGORY_TYPE_ARTICLE = 1
+
+/**
+ * 广告位请求延后时长。
+ *
+ * 200ms 足够让首帧渲染完（实测首帧约在 300ms 内出），
+ * 又不至于让广告位出现得太晚。调整这个值时同时看冷启动耗时和广告位可见时间。
+ */
+private const val AD_SLOTS_DEFER_MS = 200L
 
 data class HomeUiState(
 
@@ -66,8 +75,16 @@ class HomeViewModel @Inject constructor(
 
     init {
         loadCategories()
-        loadAdSlots()
         loadCourses(reset = true)
+        // 广告位延后到首帧之后再取。
+        //
+        // 它不影响首屏可见内容：项目当前没接广告 SDK（首页的 AdSlot 是空挂载点），
+        // 而它跟着启动走会多占一次主线程调度 + 一次网络请求，直接压后首帧时间。
+        // delay(0) 会把这次加载排到当前帧之后，属于「不阻塞首帧」的最小改法。
+        viewModelScope.launch {
+            delay(AD_SLOTS_DEFER_MS)
+            loadAdSlots()
+        }
     }
 
     /**

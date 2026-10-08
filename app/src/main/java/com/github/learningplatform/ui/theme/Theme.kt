@@ -9,8 +9,19 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+
+/**
+ * App 内当前是否深色模式。
+ *
+ * 不能用 [isSystemInDarkTheme] 判断：用户可能在设置里选了"浅色"但系统是深色。
+ * 这个 Local 由 [LearnPlatformTheme] 根据传入的 darkTheme 参数提供，
+ * 所有业务色（TextPrimary、pageGradientBrush 等）都读它。
+ */
+val LocalAppDarkTheme = compositionLocalOf { false }
 
 /**
  * 浅色配色。
@@ -83,24 +94,25 @@ private val DarkColorScheme = darkColorScheme(
     onTertiaryContainer = TertiaryContainer,
 
     background = DarkBackground,
-    onBackground = Color(0xFFE3E3E3),
+    onBackground = DarkTextPrimary,
     surface = DarkSurface,
-    onSurface = Color(0xFFE3E3E3),
+    onSurface = DarkTextPrimary,
     surfaceVariant = DarkSurfaceVariant,
-    onSurfaceVariant = Color(0xFFC4C7CB),
+    onSurfaceVariant = DarkTextSecondary,
 
     surfaceTint = Primary,
-    surfaceContainerLowest = Color(0xFF0D0D0D),
-    surfaceContainerLow = Color(0xFF191A1C),
-    surfaceContainer = Color(0xFF1D1E20),
-    surfaceContainerHigh = Color(0xFF282A2C),
-    surfaceContainerHighest = Color(0xFF333537),
+    // surfaceContainer 层级跟着 DarkSurface 走深蓝灰调，不用纯灰黑
+    surfaceContainerLowest = Color(0xFF0F1320),
+    surfaceContainerLow = Color(0xFF161C2C),
+    surfaceContainer = Color(0xFF1E2536),
+    surfaceContainerHigh = Color(0xFF262E44),
+    surfaceContainerHighest = Color(0xFF303A56),
 
-    inverseSurface = Color(0xFFE3E3E3),
-    inverseOnSurface = Color(0xFF2E3134),
-    inversePrimary = PrimaryDark,
+    inverseSurface = DarkTextPrimary,
+    inverseOnSurface = DarkBackground,
+    inversePrimary = BrandBlueLight,
 
-    outline = Color(0xFF8E9196),
+    outline = DarkOutline,
     outlineVariant = DarkOutlineVariant,
 
     error = Color(0xFFFFB4AB),
@@ -136,6 +148,9 @@ fun LearnPlatformTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography(),
-        content = content
-    )
+    ) {
+        CompositionLocalProvider(LocalAppDarkTheme provides darkTheme) {
+            content()
+        }
+    }
 }

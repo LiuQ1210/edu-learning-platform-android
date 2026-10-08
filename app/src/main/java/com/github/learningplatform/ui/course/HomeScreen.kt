@@ -1,4 +1,4 @@
-package com.github.learningplatform.ui.course
+﻿package com.github.learningplatform.ui.course
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.lazy.LazyRow
@@ -227,6 +227,17 @@ private fun CourseFeed(
                         .background(Divider)
                 )
             }
+        }
+
+        // 为你推荐（占位，等后端推荐接口）
+        item { SectionHeader(title = "为你推荐") }
+        item {
+            Text(
+                text = "推荐内容即将上线",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextHint,
+                modifier = Modifier.padding(16.dp)
+            )
         }
 
         if (uiState.hasMore) {

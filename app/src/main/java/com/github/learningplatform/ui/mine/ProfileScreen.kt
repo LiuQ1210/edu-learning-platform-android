@@ -1,4 +1,4 @@
-package com.github.learningplatform.ui.mine
+﻿package com.github.learningplatform.ui.mine
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -38,6 +38,7 @@ import com.github.learningplatform.ui.common.Avatar
 import com.github.learningplatform.ui.common.MetaText
 import com.github.learningplatform.ui.nav.NavIcons
 import com.github.learningplatform.ui.theme.Primary
+import com.github.learningplatform.ui.theme.TextHint
 import com.github.learningplatform.ui.theme.WarmYellowGradient
 import com.github.learningplatform.ui.theme.surfaceWashBrush
 import com.github.learningplatform.ui.theme.pageGradientBrush
@@ -57,6 +58,7 @@ fun ProfileScreen(
     onOpenCheckin: () -> Unit,
     onOpenEditProfile: () -> Unit,
     onOpenMyCourses: () -> Unit,
+    onOpenStudyStats: () -> Unit,
     onOpenMyArticles: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenFavorites: () -> Unit,
@@ -127,6 +129,24 @@ fun ProfileScreen(
                 onOpenEditProfile = onOpenEditProfile
             )
 
+            /*
+             * 加载态。
+             *
+             * 为什么只给资料区加提示、不用整页 LoadingState：
+             * 下面的菜单是纯静态入口，加载资料期间也能点进「我的课程」「设置」等页面，
+             * 整页 loading 会把它们一起遮住，反而降低可用性。
+             *
+             * 判据用「昵称为空」而不是只看 isLoading：已有缓存资料时刷新不该再闪一下加载提示。
+             */
+            if (uiState.isLoading && uiState.nickname.isBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "正在加载资料…",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextHint
+                )
+            }
+
             // 资料拉取失败时明确告知，否则页面只显示空昵称，用户不知道是没登录还是网络问题
             if (uiState.error != null) {
                 Spacer(Modifier.height(8.dp))
@@ -146,6 +166,8 @@ fun ProfileScreen(
                     .background(surfaceWashBrush())
             ) {
                 MenuRow(NavIcons.Video, "我的课程", onOpenMyCourses)
+                MenuDivider()
+                MenuRow(NavIcons.Calendar, "学习数据", onOpenStudyStats)
                 MenuDivider()
                 MenuRow(NavIcons.Community, "我的文章", onOpenMyArticles)
                 MenuDivider()

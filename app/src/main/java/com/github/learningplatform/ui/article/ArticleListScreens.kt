@@ -68,7 +68,8 @@ private val myArticleTabs = listOf(
     3 to "已驳回"
 )
 
-/** 纯函数：不能在非 @Composable 上下文读取 MaterialTheme，驳回色用常量 */
+/** 状态标签与其颜色（TextHint 是 @Composable getter，本函数也得是） */
+@androidx.compose.runtime.Composable
 private fun statusLabel(status: Int): Pair<String, Color> = when (status) {
     0 -> "草稿" to TextHint
     1 -> "待审核" to Color(0xFFF57C00)

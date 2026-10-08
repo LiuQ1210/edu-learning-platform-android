@@ -355,9 +355,9 @@ private fun RichContent(html: String, modifier: Modifier = Modifier) {
         return
     }
 
-    val dark = androidx.compose.foundation.isSystemInDarkTheme()
-    val textColor = if (dark) "#E0E0E0" else "#1A1A1A"
-    val bgColor = if (dark) "#121212" else "#FFFFFF"
+    val dark = com.github.learningplatform.ui.theme.LocalAppDarkTheme.current
+    val textColor = if (dark) "#E8EAF0" else "#1A1A1A"
+    val bgColor = if (dark) "#1E2536" else "#FFFFFF"
 
     val document = remember(html, dark) {
         """

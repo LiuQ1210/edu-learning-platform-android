@@ -197,11 +197,17 @@ object DemoData {
     fun playInfo(courseId: Long, lessonId: Long?) = PlayInfoDto(
         courseId = courseId,
         lessonId = lessonId ?: 0L,
-        // 公开测试流，播放器有真实内容可播
-        playUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+        // 公开测试流。
+        //
+        // 用 W3C 的示例视频，**不要用 Google 的 gtv-videos-bucket**：
+        // 后者是 commondatastorage.googleapis.com，国内网络访问不通。
+        // 实测症状是「画面不动、位置一直 00:00」——ExoPlayer 停在 BUFFERING、
+        // duration 始终是 TIME_UNSET，但**代码链路完全正常**，很容易误判成播放器有问题。
+        // W3C 这个源支持 Range 请求，进度条可以拖动。
+        playUrl = "https://media.w3.org/2010/05/sintel/trailer.mp4",
         expireTime = System.currentTimeMillis() / 1000 + 3600,
         watermarkText = "DemoUser1001",
-        duration = 596
+        duration = 52
     )
 
     fun rateResult(score: Double) = RatingResultDto(averageScore = score, ratingCount = 129)
