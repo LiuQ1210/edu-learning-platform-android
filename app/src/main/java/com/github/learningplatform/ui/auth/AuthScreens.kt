@@ -33,7 +33,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -46,15 +45,14 @@ import com.github.learningplatform.ui.theme.Primary
 import com.github.learningplatform.ui.theme.surfaceWashBrush
 import com.github.learningplatform.ui.theme.GlowOrb
 import com.github.learningplatform.ui.theme.GradientBackground
-import com.github.learningplatform.ui.theme.Surface
 import com.github.learningplatform.ui.theme.TextHint
 import com.github.learningplatform.ui.theme.TextPrimary
 import com.github.learningplatform.ui.theme.TextSecondary
 
 /**
- * 登录页（对齐 UI 稿「登录」，去掉抖音/QQ 第三方入口）。
+ * 登录页（对齐 UI 稿「登录」）。
  *
- * 页面语义：3 个第三方入口只保留微信，其余账号体系走用户名密码。
+ * 页面语义：不接第三方登录入口，账号体系只走用户名 / 手机号 / 邮箱 + 密码。
  * 背景使用与 UI 稿一致的浅暖渐变，主色沿用品牌蓝。
  */
 @Composable
@@ -81,9 +79,6 @@ fun LoginScreen(
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondary
         )
-
-        Spacer(Modifier.height(14.dp))
-        ThirdPartyRow()
 
         Spacer(Modifier.height(24.dp))
 
@@ -230,45 +225,6 @@ internal fun AuthBrand(title: String, subtitle: String) {
         style = MaterialTheme.typography.bodyMedium,
         color = TextSecondary
     )
-}
-
-/**
- * 第三方登录入口。
- *
- * 只保留微信：抖音 / QQ 登录需要各自的开放平台资质，本阶段不接。
- * 微信登录需要开放平台 AppID + SDK + 真机调试，当前点击给出明确提示，不做假跳转。
- */
-@Composable
-internal fun ThirdPartyRow() {
-    var notice by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-
-    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Box(
-            modifier = Modifier
-                // 与上方品牌图标保持同级视觉重量：品牌图 52dp、微信方块 44dp
-                .size(44.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color(0xFF07C160))
-                .clickable { notice = true },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                NavIcons.Wechat,
-                contentDescription = "微信登录",
-                tint = Color.White,
-                modifier = Modifier.size(24.dp)
-            )
-        }
-    }
-
-    if (notice) {
-        Text(
-            text = "微信登录需先申请开放平台 AppID 并接入 SDK，本阶段暂未开放",
-            style = MaterialTheme.typography.labelSmall,
-            color = TextHint,
-            modifier = Modifier.padding(top = 8.dp)
-        )
-    }
 }
 
 /** 圆角输入框（与 UI 稿的浅色胶囊输入框一致） */

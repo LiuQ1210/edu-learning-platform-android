@@ -45,10 +45,8 @@ object Constants {
     /** v3.1 增补 2.2：邮箱已被注册（与 1008 区分，便于客户端把错误定位到对应输入框） */
     const val CODE_EMAIL_BOUND = 1009
 
-    /** 第三方账号已绑定（v3.0 原文占 1009，v3.1 让位给 CODE_EMAIL_BOUND，后端按需重编） */
-    const val CODE_THIRD_PARTY_BOUND = 1012
-    const val CODE_NEED_BIND_PHONE = 1010
-    const val CODE_PLATFORM_INVALID = 1011
+    // 1010 需绑定手机号 / 1011 平台参数不合法 / 1012 第三方账号已绑定
+    // 随第三方（微信）登录一并移除，不再接入。
 
     // ---- 文件上传（v3.1 增补 15.1）----
     // 暂借 7001-7003；若后端已把 7001+ 编给笔记/待办，请整段挪到 9101-9103
