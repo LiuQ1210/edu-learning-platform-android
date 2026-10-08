@@ -1,4 +1,4 @@
-package com.github.learningplatform.data.demo
+﻿package com.github.learningplatform.data.demo
 
 import com.github.learningplatform.BuildConfig
 import com.github.learningplatform.data.remote.dto.AdSlotDto
@@ -44,7 +44,7 @@ import com.github.learningplatform.data.remote.dto.ViewHistoryItemDto
  *
  * 图片用 picsum 的稳定占位图（同一 seed 每次返回同一张），断网时会自动落到
  * NetImage 的灰底占位，不影响布局检查。
- */
+**/
 object DemoData {
 
     val enabled: Boolean get() = BuildConfig.UI_PREVIEW

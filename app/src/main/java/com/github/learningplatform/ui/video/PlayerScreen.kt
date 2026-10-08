@@ -248,7 +248,7 @@ fun PlayerScreen(
 
                 // 暂停时显示广告位（预留）
                 if (!isPlaying) {
-                    AdSlot(slotId = "player_pause", modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 50.dp))
+                    AdSlot(slotId = "video_pause_banner", modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 50.dp))
                 }
 
                 // 底部进度条

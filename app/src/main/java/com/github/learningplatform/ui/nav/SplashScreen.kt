@@ -90,7 +90,7 @@ fun SplashScreen(minDurationMs: Long = 700L) {
         }
 
         // 开屏广告位（预留）
-        AdSlot(slotId = "splash", modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp))
+        AdSlot(slotId = "startup_splash", modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp))
 
         // 底部品牌行
         Row(
