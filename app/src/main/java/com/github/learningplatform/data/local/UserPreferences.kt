@@ -65,7 +65,7 @@ class UserPreferences @Inject constructor(
 
     suspend fun currentRefreshToken(): String = refreshToken.first()
 
-    /** 登录/注册/微信登录成功后写入 */
+    /** 登录 / 注册成功后写入 */
     suspend fun saveLoginInfo(
         accessToken: String,
         refreshToken: String,

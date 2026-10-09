@@ -13,9 +13,6 @@ import com.github.learningplatform.data.remote.dto.ResetPasswordRequest
 import com.github.learningplatform.data.remote.dto.SendCodeRequest
 import com.github.learningplatform.data.remote.dto.TokenResponse
 import com.github.learningplatform.data.remote.dto.UserBriefDto
-import com.github.learningplatform.data.remote.dto.WechatBindPhoneRequest
-import com.github.learningplatform.data.remote.dto.WechatLoginRequest
-import com.github.learningplatform.data.remote.dto.WechatLoginResponse
 import com.github.learningplatform.domain.model.User
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -86,36 +83,6 @@ class AuthRepository @Inject constructor(
     /** @param scene register/login/reset_password/change_phone/change_email */
     suspend fun sendCode(target: String, targetType: Int, scene: String): Int =
         safeApiCall { authApi.sendCode(SendCodeRequest(target, targetType, scene)) }.expireSeconds
-
-    /** 微信登录：可能返回 needBindPhone，需再走 bindPhone 流程 */
-    suspend fun wechatLogin(code: String): WechatLoginResponse {
-        val data = safeApiCall { authApi.wechatLogin(WechatLoginRequest(code)) }
-        if (!data.needBindPhone && data.accessToken.isNotBlank()) {
-            persist(
-                TokenResponse(
-                    accessToken = data.accessToken,
-                    refreshToken = data.refreshToken,
-                    expiresIn = data.expiresIn,
-                    user = data.user
-                )
-            )
-        }
-        return data
-    }
-
-    /** 微信新用户绑定手机号完成注册 */
-    suspend fun wechatBindPhone(
-        tempToken: String,
-        phone: String,
-        code: String,
-        nickname: String? = null
-    ): User {
-        val data = safeApiCall {
-            authApi.wechatBindPhone(WechatBindPhoneRequest(tempToken, phone, code, nickname))
-        }
-        persist(data)
-        return data.toUser()
-    }
 
     suspend fun changePassword(oldPassword: String, newPassword: String) =
         safeApiCallForUnit { authApi.changePassword(ChangePasswordRequest(oldPassword, newPassword)) }

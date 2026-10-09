@@ -58,7 +58,7 @@ data class UserBriefDto(
     val phone: String = ""
 )
 
-/** 登录 / 注册 / 微信绑定手机号的成功响应（双 Token） */
+/** 登录 / 注册 的成功响应（双 Token） */
 @Serializable
 data class TokenResponse(
     val accessToken: String = "",
@@ -81,37 +81,6 @@ data class RefreshTokenResponse(
 /** 2.5 登出（需携带 refreshToken 以便作废） */
 @Serializable
 data class LogoutRequest(val refreshToken: String)
-
-/** 2.6 微信登录 */
-@Serializable
-data class WechatLoginRequest(val code: String)
-
-/** 已绑定返回双 Token；未绑定返回 needBindPhone + tempToken */
-@Serializable
-data class WechatLoginResponse(
-    val accessToken: String = "",
-    val refreshToken: String = "",
-    val expiresIn: Long = 0,
-    val user: UserBriefDto? = null,
-    val needBindPhone: Boolean = false,
-    val tempToken: String = ""
-)
-
-/** 2.7 微信登录绑定手机号 */
-@Serializable
-data class WechatBindPhoneRequest(
-    val tempToken: String,
-    val phone: String,
-    val code: String,
-    val nickname: String? = null
-)
-
-/** 2.8 绑定第三方账号 */
-@Serializable
-data class BindThirdPartyRequest(val platform: String, val code: String)
-
-@Serializable
-data class BindResultDto(val bound: Boolean = false)
 
 /** 2.10 修改密码 */
 @Serializable

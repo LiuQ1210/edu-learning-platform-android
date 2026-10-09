@@ -1,4 +1,4 @@
-package com.github.learningplatform.ui.auth
+﻿package com.github.learningplatform.ui.auth
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -82,11 +82,10 @@ fun LoginScreen(
             color = TextSecondary
         )
 
-        // 原此处有微信第三方登录入口，已按要求移除。
-        // 间距从 24dp 收到 12dp：原来的 24dp 是给微信方块留的，
-        // 去掉方块后这段空白达到 76px，而页面上其他元素间距都是 48px，
-        // 明显比别处空。需要恢复微信入口时把这个值调回 24dp。
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(14.dp))
+        ThirdPartyRow()
+
+        Spacer(Modifier.height(24.dp))
 
         AuthField(
             value = uiState.username,
@@ -231,6 +230,45 @@ internal fun AuthBrand(title: String, subtitle: String) {
         style = MaterialTheme.typography.bodyMedium,
         color = TextSecondary
     )
+}
+
+/**
+ * 第三方登录入口。
+ *
+ * 只保留微信：抖音 / QQ 登录需要各自的开放平台资质，本阶段不接。
+ * 微信登录需要开放平台 AppID + SDK + 真机调试，当前点击给出明确提示，不做假跳转。
+ */
+@Composable
+internal fun ThirdPartyRow() {
+    var notice by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Box(
+            modifier = Modifier
+                // 与上方品牌图标保持同级视觉重量：品牌图 52dp、微信方块 44dp
+                .size(44.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0xFF07C160))
+                .clickable { notice = true },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                NavIcons.Wechat,
+                contentDescription = "微信登录",
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+    }
+
+    if (notice) {
+        Text(
+            text = "微信登录需先申请开放平台 AppID 并接入 SDK，本阶段暂未开放",
+            style = MaterialTheme.typography.labelSmall,
+            color = TextHint,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+    }
 }
 
 /** 圆角输入框（与 UI 稿的浅色胶囊输入框一致） */
