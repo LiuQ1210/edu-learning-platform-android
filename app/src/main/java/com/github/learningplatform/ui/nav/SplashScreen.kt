@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.github.learningplatform.ui.ad.AdSlot
 import com.github.learningplatform.ui.theme.BrandGradient
 import com.github.learningplatform.ui.theme.GlowOrb
 import com.github.learningplatform.ui.theme.GradientBackground
@@ -87,6 +88,9 @@ fun SplashScreen(minDurationMs: Long = 700L) {
                 color = TextSecondary
             )
         }
+
+        // 开屏广告位（预留）
+        AdSlot(slotId = "startup_splash", modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp))
 
         // 底部品牌行
         Row(

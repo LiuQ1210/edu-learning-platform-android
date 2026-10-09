@@ -88,7 +88,9 @@ class UserRepository @Inject constructor(
         pageSize: Int = 20,
         targetType: Int? = null
     ): PageData<UserTargetItemDto> {
-        preview { return DemoData.favorites }
+        // 用独立的 likes 样例，不要复用 favorites：
+        // 复用会让点赞页与收藏页显示完全相同的内容，掩盖「接口映射接错」这类问题
+        preview { return DemoData.likes }
         return safeApiCall {
             userApi.getLikes(pageNum, pageSize, targetType)
         }

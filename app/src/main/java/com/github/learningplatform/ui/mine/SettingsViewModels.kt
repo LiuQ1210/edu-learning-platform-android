@@ -2,6 +2,8 @@ package com.github.learningplatform.ui.mine
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.learningplatform.data.local.ThemeMode
+import com.github.learningplatform.data.local.UserPreferences
 import com.github.learningplatform.data.repository.AuthRepository
 import com.github.learningplatform.ui.readableMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -12,15 +14,34 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class SettingsUiState(val loggedOut: Boolean = false)
+data class SettingsUiState(
+    val loggedOut: Boolean = false,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM
+)
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val userPreferences: UserPreferences
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+    init {
+        // 把 DataStore 里的主题模式接到 UI 状态；用 stateIn 让设置页一打开就有当前值
+        viewModelScope.launch {
+            userPreferences.themeMode.collect { mode ->
+                _uiState.value = _uiState.value.copy(themeMode = mode)
+            }
+        }
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch {
+            userPreferences.setThemeMode(mode)
+        }
+    }
 
     fun logout() {
         viewModelScope.launch {

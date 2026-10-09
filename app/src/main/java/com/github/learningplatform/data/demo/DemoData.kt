@@ -1,4 +1,4 @@
-package com.github.learningplatform.data.demo
+﻿package com.github.learningplatform.data.demo
 
 import com.github.learningplatform.BuildConfig
 import com.github.learningplatform.data.remote.dto.AdSlotDto
@@ -44,7 +44,7 @@ import com.github.learningplatform.data.remote.dto.ViewHistoryItemDto
  *
  * 图片用 picsum 的稳定占位图（同一 seed 每次返回同一张），断网时会自动落到
  * NetImage 的灰底占位，不影响布局检查。
- */
+**/
 object DemoData {
 
     val enabled: Boolean get() = BuildConfig.UI_PREVIEW
@@ -197,11 +197,17 @@ object DemoData {
     fun playInfo(courseId: Long, lessonId: Long?) = PlayInfoDto(
         courseId = courseId,
         lessonId = lessonId ?: 0L,
-        // 公开测试流，播放器有真实内容可播
-        playUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+        // 公开测试流。
+        //
+        // 用 W3C 的示例视频，**不要用 Google 的 gtv-videos-bucket**：
+        // 后者是 commondatastorage.googleapis.com，国内网络访问不通。
+        // 实测症状是「画面不动、位置一直 00:00」——ExoPlayer 停在 BUFFERING、
+        // duration 始终是 TIME_UNSET，但**代码链路完全正常**，很容易误判成播放器有问题。
+        // W3C 这个源支持 Range 请求，进度条可以拖动。
+        playUrl = "https://media.w3.org/2010/05/sintel/trailer.mp4",
         expireTime = System.currentTimeMillis() / 1000 + 3600,
         watermarkText = "DemoUser1001",
-        duration = 596
+        duration = 52
     )
 
     fun rateResult(score: Double) = RatingResultDto(averageScore = score, ratingCount = 129)
@@ -410,6 +416,25 @@ object DemoData {
             UserTargetItemDto(2, 1003, "Java 高并发编程", cover("course2"), "2026-09-09 09:00:00"),
             UserTargetItemDto(1, 5004, "后端接口设计中的 10 个常见错误", cover("article3"), "2026-09-08 21:00:00"),
             UserTargetItemDto(2, 2001, "Machine Learning 从入门到实战", cover("short0"), "2026-09-07 18:00:00")
+        )
+    )
+
+    /**
+     * 我的点赞。
+     *
+     * 单独一份而不是复用 [favorites]：两者数据不该相同 ——
+     * 点赞和收藏是独立操作，用户可能只点赞不收藏。
+     * 复用会让「点赞页和收藏页一模一样」，评审时看不出问题，
+     * 真接后端才会发现字段映射接错（getLikes 接到了收藏接口）。
+     */
+    val likes: PageData<UserTargetItemDto> = PageData(
+        total = 5,
+        list = listOf(
+            UserTargetItemDto(2, 1001, "Machine Learning 从入门到实战", cover("course0"), "2026-09-16 20:10:00"),
+            UserTargetItemDto(1, 5002, "结构化并发为什么必须向上抛 CancellationException", cover("article1"), "2026-09-15 22:40:00"),
+            UserTargetItemDto(2, 2002, "Data Science 数据分析实战", cover("short1"), "2026-09-14 19:05:00"),
+            UserTargetItemDto(1, 5003, "Compose 重组优化实战", cover("article2"), "2026-09-13 11:20:00"),
+            UserTargetItemDto(2, 1004, "Android 性能优化", cover("course3"), "2026-09-12 08:45:00")
         )
     )
 

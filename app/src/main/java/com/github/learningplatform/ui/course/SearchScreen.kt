@@ -1,4 +1,4 @@
-package com.github.learningplatform.ui.course
+﻿package com.github.learningplatform.ui.course
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -260,14 +260,46 @@ fun SearchScreen(
                     }
                 }
             }
-            else -> HotWords(
-                words = uiState.hotWords,
-                onPick = { word ->
-                    viewModel.onKeywordChange(word)
-                    keyboard?.hide()
-                    viewModel.search()
+            else -> {
+                SearchHistory(
+                    history = listOf("Java", "Python", "机器学习", "前端", "SQL"),
+                    onPick = { word ->
+                        viewModel.onKeywordChange(word)
+                        keyboard?.hide()
+                        viewModel.search()
+                    }
+                )
+                HotWords(
+                    words = uiState.hotWords,
+                    onPick = { word ->
+                        viewModel.onKeywordChange(word)
+                        keyboard?.hide()
+                        viewModel.search()
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchHistory(history: List<String>, onPick: (String) -> Unit) {
+    if (history.isEmpty()) return
+    Column(modifier = Modifier.padding(16.dp)) {
+        Text("搜索历史", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = TextPrimary)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            history.take(5).forEach { word ->
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(AppSurface)
+                        .clickable { onPick(word) }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(word, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                 }
-            )
+            }
         }
     }
 }

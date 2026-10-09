@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.learningplatform.BuildConfig
+import com.github.learningplatform.data.local.ThemeMode
 import com.github.learningplatform.ui.common.BackTopBar
 import com.github.learningplatform.ui.common.CommonTextField
 import com.github.learningplatform.ui.nav.NavIcons
@@ -58,6 +59,7 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var showThemeDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.loggedOut) {
         if (uiState.loggedOut) onLoggedOut()
@@ -85,6 +87,13 @@ fun SettingsScreen(
                 SettingRow(NavIcons.Person, "个人资料", onClick = { })
                 Divider()
                 SettingRow(NavIcons.Notifications, "消息通知", onClick = { })
+                Divider()
+                SettingRow(
+                    icon = NavIcons.Bookmark,
+                    title = "主题模式",
+                    trailing = uiState.themeMode.label(),
+                    onClick = { showThemeDialog = true }
+                )
             }
 
             Spacer(Modifier.height(14.dp))
@@ -149,6 +158,58 @@ fun SettingsScreen(
                 TextButton(onClick = { showLogoutDialog = false }) { Text("取消") }
             }
         )
+    }
+
+    if (showThemeDialog) {
+        AlertDialog(
+            onDismissRequest = { showThemeDialog = false },
+            title = { Text("主题模式") },
+            text = {
+                Column {
+                    ThemeOption(
+                        label = ThemeMode.LIGHT.label(),
+                        selected = uiState.themeMode == ThemeMode.LIGHT,
+                        onClick = {
+                            viewModel.setThemeMode(ThemeMode.LIGHT)
+                            showThemeDialog = false
+                        }
+                    )
+                    ThemeOption(
+                        label = ThemeMode.DARK.label(),
+                        selected = uiState.themeMode == ThemeMode.DARK,
+                        onClick = {
+                            viewModel.setThemeMode(ThemeMode.DARK)
+                            showThemeDialog = false
+                        }
+                    )
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showThemeDialog = false }) { Text("关闭") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun ThemeOption(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = TextPrimary,
+            modifier = Modifier.weight(1f)
+        )
+        if (selected) {
+            Icon(NavIcons.Bookmark, contentDescription = null, tint = Primary, modifier = Modifier.size(20.dp))
+        }
     }
 }
 

@@ -6,9 +6,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.github.learningplatform.data.local.ThemeMode
+import com.github.learningplatform.data.local.UserPreferences
 import com.github.learningplatform.ui.nav.AppNavHost
 import com.github.learningplatform.ui.theme.LearnPlatformTheme
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 /**
  * 系统启动窗口的驻留时间。
@@ -21,6 +25,9 @@ private const val SPLASH_MIN_MS = 700L
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject lateinit var userPreferences: UserPreferences
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -33,7 +40,16 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         setContent {
-            LearnPlatformTheme {
+            // 设置页改主题后 DataStore 会推新值，这里重组即切主题，不需要重启 Activity。
+            // 冷启动时给个默认值 SYSTEM，第一帧后由 collect 覆盖。
+            val themeMode = userPreferences.themeMode
+                .collectAsStateWithLifecycle(initialValue = ThemeMode.LIGHT).value
+            val darkTheme = when (themeMode) {
+                ThemeMode.DARK -> true
+                ThemeMode.LIGHT -> false
+                ThemeMode.SYSTEM -> false
+            }
+            LearnPlatformTheme(darkTheme = darkTheme) {
                 AppNavHost()
             }
         }

@@ -1,4 +1,4 @@
-package com.github.learningplatform.ui.nav
+﻿package com.github.learningplatform.ui.nav
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
@@ -43,8 +43,12 @@ import com.github.learningplatform.ui.mine.BlogHomeScreen
 import com.github.learningplatform.ui.mine.ChangePasswordScreen
 import com.github.learningplatform.ui.mine.EditProfileScreen
 import com.github.learningplatform.ui.mine.FavoritesScreen
+import com.github.learningplatform.ui.mine.DownloadsScreen
+import com.github.learningplatform.ui.mine.LikesScreen
 import com.github.learningplatform.ui.mine.MyCoursesScreen
 import com.github.learningplatform.ui.mine.ProfileScreen
+import com.github.learningplatform.ui.mine.StudyStatsScreen
+import com.github.learningplatform.ui.mine.StudyPathScreen
 import com.github.learningplatform.ui.mine.SettingsScreen
 import com.github.learningplatform.ui.mine.WatchHistoryScreen
 import com.github.learningplatform.ui.note.NoteDetailScreen
@@ -253,9 +257,12 @@ fun MainScaffold(
                     onOpenCheckin = onOpenCheckin,
                     onOpenEditProfile = { navController.navigate(Routes.EDIT_PROFILE) },
                     onOpenMyCourses = { navController.navigate(Routes.MY_COURSES) },
+                    onOpenStudyStats = { navController.navigate(Routes.STUDY_STATS) },
                     onOpenMyArticles = { navController.navigate(Routes.MY_ARTICLES) },
                     onOpenHistory = { navController.navigate(Routes.WATCH_HISTORY) },
                     onOpenFavorites = { navController.navigate(Routes.MY_FAVORITES) },
+                    onOpenLikes = { navController.navigate(Routes.MY_LIKES) },
+                    onOpenDownloads = { navController.navigate(Routes.MY_DOWNLOADS) },
                     onOpenNotes = { navController.navigate(Routes.NOTES) },
                     onOpenTodos = { navController.navigate(Routes.TODOS) },
                     onOpenSettings = { navController.navigate(Routes.SETTINGS) },
@@ -389,9 +396,39 @@ fun MainScaffold(
                 )
             }
 
+            composable(Routes.STUDY_STATS) {
+                StudyStatsScreen(onBack = { navController.popBackStack() })
+            }
+
+            composable(Routes.STUDY_PATH) {
+                StudyPathScreen(onBack = { navController.popBackStack() })
+            }
+
             composable(Routes.MY_FAVORITES) {
                 FavoritesScreen(
                     onBack = { navController.popBackStack() },
+                    onOpenTarget = { type, id ->
+                        if (type == 1) navController.navigate(Routes.articleDetail(id))
+                        else navController.navigate(Routes.courseDetail(id))
+                    }
+                )
+            }
+
+            composable(Routes.MY_LIKES) {
+                LikesScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenTarget = { type, id ->
+                        if (type == 1) navController.navigate(Routes.articleDetail(id))
+                        else navController.navigate(Routes.courseDetail(id))
+                    }
+                )
+            }
+
+            composable(Routes.MY_DOWNLOADS) {
+                DownloadsScreen(
+                    onBack = { navController.popBackStack() },
+                    // 下载记录的 resourceType 与点赞的 targetType 是两套语义，
+                    // 但跳转目标一致：文章详情 / 课程详情
                     onOpenTarget = { type, id ->
                         if (type == 1) navController.navigate(Routes.articleDetail(id))
                         else navController.navigate(Routes.courseDetail(id))

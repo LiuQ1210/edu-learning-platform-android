@@ -56,6 +56,8 @@ import com.github.learningplatform.data.remote.dto.ArticleDetailDto
 import com.github.learningplatform.data.remote.dto.CommentDto
 import com.github.learningplatform.ui.common.Avatar
 import com.github.learningplatform.ui.common.BackTopBar
+import com.github.learningplatform.ui.common.WriteNoteDialog
+import com.github.learningplatform.core.constants.Constants
 import com.github.learningplatform.ui.common.EmptyState
 import com.github.learningplatform.ui.common.ErrorState
 import com.github.learningplatform.ui.common.LoadingState
@@ -122,6 +124,13 @@ fun ArticleDetailScreen(
                             expanded = menuExpanded,
                             onDismissRequest = { menuExpanded = false }
                         ) {
+                            DropdownMenuItem(
+                                text = { Text("写笔记") },
+                                onClick = {
+                                    menuExpanded = false
+                                    viewModel.showNoteDialog()
+                                }
+                            )
                             DropdownMenuItem(
                                 text = { Text("举报") },
                                 onClick = {
@@ -257,6 +266,16 @@ fun ArticleDetailScreen(
             onSubmit = viewModel::submitReport
         )
     }
+
+    if (uiState.showNoteDialog) {
+        WriteNoteDialog(
+            sourceType = Constants.TARGET_ARTICLE,
+            sourceTitle = uiState.detail?.title.orEmpty(),
+            saving = uiState.noteSaving,
+            onDismiss = viewModel::dismissNoteDialog,
+            onSave = viewModel::createNote
+        )
+    }
 }
 
 @Composable
@@ -336,9 +355,9 @@ private fun RichContent(html: String, modifier: Modifier = Modifier) {
         return
     }
 
-    val dark = androidx.compose.foundation.isSystemInDarkTheme()
-    val textColor = if (dark) "#E0E0E0" else "#1A1A1A"
-    val bgColor = if (dark) "#121212" else "#FFFFFF"
+    val dark = com.github.learningplatform.ui.theme.LocalAppDarkTheme.current
+    val textColor = if (dark) "#E8EAF0" else "#1A1A1A"
+    val bgColor = if (dark) "#1E2536" else "#FFFFFF"
 
     val document = remember(html, dark) {
         """

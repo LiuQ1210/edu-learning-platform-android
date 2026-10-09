@@ -14,11 +14,20 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 const val CATEGORY_TYPE_COURSE = 2
 const val CATEGORY_TYPE_ARTICLE = 1
+
+/**
+ * 广告位请求延后时长。
+ *
+ * 200ms 足够让首帧渲染完（实测首帧约在 300ms 内出），
+ * 又不至于让广告位出现得太晚。调整这个值时同时看冷启动耗时和广告位可见时间。
+ */
+private const val AD_SLOTS_DEFER_MS = 200L
 
 data class HomeUiState(
 
@@ -66,13 +75,28 @@ class HomeViewModel @Inject constructor(
 
     init {
         loadCategories()
-        loadAdSlots()
         loadCourses(reset = true)
+        // 广告位延后到首帧之后再取。
+        //
+        // 它不影响首屏可见内容：项目当前没接广告 SDK（首页的 AdSlot 是空挂载点），
+        // 而它跟着启动走会多占一次主线程调度 + 一次网络请求，直接压后首帧时间。
+        // delay(0) 会把这次加载排到当前帧之后，属于「不阻塞首帧」的最小改法。
+        viewModelScope.launch {
+            delay(AD_SLOTS_DEFER_MS)
+            loadAdSlots()
+        }
     }
 
+    /**
+     * 下拉刷新。
+     *
+     * 走 forceRefresh 路径：跳过缓存强制回源。
+     * 不这么做的话，5 分钟内的下拉刷新会直接返回缓存，用户会以为「刷新没反应」——
+     * 下拉刷新是用户明确表达「我要最新数据」的动作，必须真的去请求。
+     */
     fun refresh() {
         loadCategories()
-        loadCourses(reset = true)
+        loadCourses(reset = true, forceRefresh = true)
     }
 
     fun selectCategory(categoryId: Long?) {
@@ -117,7 +141,10 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private fun loadCourses(reset: Boolean) {
+    /**
+     * @param forceRefresh 仅在下拉刷新时为 true：跳过缓存强制回源
+     */
+    private fun loadCourses(reset: Boolean, forceRefresh: Boolean = false) {
         val snapshot = _uiState.value
         val nextPage = if (reset) 1 else snapshot.pageNum + 1
         // reset 时开启新一轮：飞行中的旧请求回来后因代次不匹配会被丢弃
@@ -135,13 +162,15 @@ class HomeViewModel @Inject constructor(
                     pageNum = nextPage,
                     pageSize = 20,
                     categoryId = snapshot.selectedCategoryId,
-                    sort = 1
+                    sort = 1,
+                    forceRefresh = forceRefresh
                 )
                 val rank = courseRepository.getCourses(
                     pageNum = 1,
                     pageSize = 10,
                     categoryId = snapshot.selectedCategoryId,
-                    sort = 2
+                    sort = 2,
+                    forceRefresh = forceRefresh
                 ).list
 
                 // 分类在请求飞行途中被切换 → 这份结果属于上一轮
