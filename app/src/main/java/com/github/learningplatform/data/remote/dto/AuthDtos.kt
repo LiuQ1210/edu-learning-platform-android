@@ -20,34 +20,28 @@ data class SendCodeRequest(
 data class SendCodeResponse(val expireSeconds: Int = 300)
 
 /**
- * 2.2 注册（v3.1 增补：双通道）。
+ * 2.2 注册（后端为若依框架：图形验证码，无短信/邮箱通道）。
  *
- * v3.0 只支持「手机号 + 短信验证码」；增补后统一用 `account` + `accountType`
- * 承载账号标识，手机号走短信、邮箱走邮件。
- *
- * 兼容性：服务端仍需接受旧调用方的 `phone` 字段（有 `phone` 且无 `account` 时
- * 等价于 `account=phone, accountType=1`）。新代码一律用 [account]。
- *
- * @param accountType 1-手机号（默认）2-邮箱
+ * 【登录注册联调】按若依 RegisterDTO 适配：
+ *   username + password + nickname + code + uuid（uuid 来自 GET /captchaImage）
  */
 @Serializable
 data class RegisterRequest(
-    val account: String,
+    val username: String,
+    val password: String,
+    val nickname: String? = null,
+    val code: String,
+    val uuid: String
+)
+
+/** 2.3 登录（若依 LoginDTO：username/password + 图形验证码 code + uuid） */
+@Serializable
+data class LoginRequest(
+    val username: String,
     val password: String,
     val code: String,
-    val accountType: Int = ACCOUNT_TYPE_PHONE,
-    val nickname: String? = null,
-    val email: String? = null
-) {
-    companion object {
-        const val ACCOUNT_TYPE_PHONE = 1
-        const val ACCOUNT_TYPE_EMAIL = 2
-    }
-}
-
-/** 2.3 登录（v3.1：username 允许传用户名 / 手机号 / 邮箱） */
-@Serializable
-data class LoginRequest(val username: String, val password: String)
+    val uuid: String
+)
 
 @Serializable
 data class UserBriefDto(
@@ -65,6 +59,55 @@ data class TokenResponse(
     val refreshToken: String = "",
     val expiresIn: Long = 0,
     val user: UserBriefDto? = null
+)
+
+// ---------------------------------------------------------------------------
+// 【登录注册联调】若依框架认证扩展 DTO
+// ---------------------------------------------------------------------------
+
+/**
+ * 若依统一响应（认证链路专用，不经过全局 ApiResponse）。
+ *
+ * 实测响应（2026-10-09 联调）：
+ *   {"code":200,"msg":"操作成功","data":{
+ *     "token":"Bearer eyJ...","refreshToken":"Bearer eyJ...",
+ *     "userId":9,"username":"test002","nickname":"测试用户002","avatar":null}}
+ * 注意：成功码是 code==200（不是全局约定的 0）、字段是 msg（不是 message）、
+ * Token 在 **data.token**（不是顶层 token、不是 data.accessToken），且自带 "Bearer " 前缀。
+ */
+@Serializable
+data class AuthResultDto(
+    val code: Int = 0,
+    val msg: String = "",
+    val token: String = "",
+    val data: AuthResultDataDto? = null
+)
+
+@Serializable
+data class AuthResultDataDto(
+    val token: String = "",
+    val refreshToken: String = "",
+    val accessToken: String = "",
+    val userId: Long = 0,
+    val username: String = "",
+    val nickname: String = "",
+    val avatar: String? = null
+)
+
+/**
+ * 若依图形验证码（GET /captchaImage）。
+ *
+ * 返回 { code:200, msg, uuid, img, captchaEnabled }：
+ *  - uuid：验证码标识，登录/注册时原样带回
+ *  - img：base64 图片（可能带 data:image/png;base64, 前缀）
+ */
+@Serializable
+data class CaptchaImageDto(
+    val code: Int = 0,
+    val msg: String = "",
+    val uuid: String = "",
+    val img: String = "",
+    val captchaEnabled: Boolean = true
 )
 
 /** 2.4 刷新 Token（refreshToken 轮转） */

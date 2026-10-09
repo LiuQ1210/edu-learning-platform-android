@@ -2,7 +2,7 @@ package com.github.learningplatform.data.repository
 
 import com.github.learningplatform.core.network.safeApiCall
 import com.github.learningplatform.data.demo.DemoData
-import com.github.learningplatform.data.demo.preview
+import com.github.learningplatform.data.demo.contentPreview
 import com.github.learningplatform.data.local.CacheDao
 import com.github.learningplatform.data.local.CacheEntry
 import com.github.learningplatform.data.local.CacheKeys
@@ -39,7 +39,7 @@ class CategoryRepository @Inject constructor(
      */
     suspend fun getTree(type: Int): List<CategoryNodeDto> {
         // 按接口 4.1 的原始 type 值分派，不引入 UI 层常量
-        preview { return DemoData.categoryTree(type) }
+        contentPreview { return DemoData.categoryTree(type) }
 
         val key = CacheKeys.categoryTree(type)
 
@@ -76,7 +76,7 @@ class CategoryRepository @Inject constructor(
         pageSize: Int = 20,
         sort: Int? = null
     ): PageData<ContentItemDto> {
-        preview { return DemoData.searchResult(null, type, pageNum) }
+        contentPreview { return DemoData.searchResult(null, type, pageNum) }
         return safeApiCall { categoryApi.getContentList(categoryId, type, pageNum, pageSize, sort) }
     }
 

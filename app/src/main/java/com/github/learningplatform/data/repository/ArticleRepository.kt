@@ -3,8 +3,8 @@ package com.github.learningplatform.data.repository
 import com.github.learningplatform.core.network.safeApiCall
 import com.github.learningplatform.core.network.safeApiCallForUnit
 import com.github.learningplatform.data.demo.DemoData
-import com.github.learningplatform.data.demo.preview
-import com.github.learningplatform.data.demo.previewUnit
+import com.github.learningplatform.data.demo.contentPreview
+import com.github.learningplatform.data.demo.contentPreviewUnit
 import com.github.learningplatform.data.remote.ArticleApi
 import com.github.learningplatform.data.remote.dto.ArticleDetailDto
 import com.github.learningplatform.data.remote.dto.ArticleDto
@@ -31,51 +31,51 @@ class ArticleRepository @Inject constructor(
         tagId: Long? = null,
         sort: Int? = null
     ): PageData<ArticleDto> {
-        preview { return DemoData.articlePage(pageNum, pageSize) }
+        contentPreview { return DemoData.articlePage(pageNum, pageSize) }
         return safeApiCall {
             articleApi.getArticles(pageNum, pageSize, categoryId, tagId, sort)
         }
     }
 
     suspend fun getArticleDetail(articleId: Long): ArticleDetailDto {
-        preview { return DemoData.articleDetail(articleId) }
+        contentPreview { return DemoData.articleDetail(articleId) }
         return safeApiCall { articleApi.getArticleDetail(articleId) }
     }
 
     /** @param publish 0-存草稿 1-提交发布 */
     suspend fun createArticle(request: CreateArticleRequest): CreateArticleResponse {
-        preview { return CreateArticleResponse(articleId = 5999L, status = request.publish) }
+        contentPreview { return CreateArticleResponse(articleId = 5999L, status = request.publish) }
         return safeApiCall { articleApi.createArticle(request) }
     }
 
     suspend fun updateArticle(articleId: Long, request: UpdateArticleRequest) {
-        previewUnit { return }
+        contentPreviewUnit { return }
         safeApiCallForUnit { articleApi.updateArticle(articleId, request) }
     }
 
     suspend fun deleteArticle(articleId: Long) {
-        previewUnit { return }
+        contentPreviewUnit { return }
         safeApiCallForUnit { articleApi.deleteArticle(articleId) }
     }
 
     /** 我的发布。status: 0草稿 1待审核 2已发布 3驳回 4下架 */
     suspend fun getMyArticles(pageNum: Int = 1, pageSize: Int = 20, status: Int? = null): PageData<ArticleDto> {
-        preview { return DemoData.myArticles(status) }
+        contentPreview { return DemoData.myArticles(status) }
         return safeApiCall { articleApi.getMyArticles(pageNum, pageSize, status) }
     }
 
     suspend fun withdrawArticle(articleId: Long) {
-        previewUnit { return }
+        contentPreviewUnit { return }
         safeApiCallForUnit { articleApi.withdrawArticle(articleId) }
     }
 
     suspend fun getTags(): List<ArticleTagDto> {
-        preview { return DemoData.articleTags }
+        contentPreview { return DemoData.articleTags }
         return safeApiCall { articleApi.getTags() }
     }
 
     suspend fun reportArticle(articleId: Long, request: ReportRequest) {
-        previewUnit { return }
+        contentPreviewUnit { return }
         safeApiCallForUnit { articleApi.reportArticle(articleId, request) }
     }
 }

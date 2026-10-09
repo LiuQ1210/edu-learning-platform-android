@@ -1,5 +1,7 @@
 package com.github.learningplatform.data.demo
 
+import com.github.learningplatform.BuildConfig
+
 /**
  * 预览模式短路器。
  *
@@ -22,6 +24,32 @@ inline fun <T : Any> preview(block: () -> T): T? =
 /** 无返回值的写操作：预览模式下直接当成功处理。 */
 inline fun previewUnit(block: () -> Unit): Boolean {
     if (DemoData.enabled) {
+        block()
+        return true
+    }
+    return false
+}
+
+/**
+ * 【任务⑦ 混合模式】内容域独立预览短路器。
+ *
+ * 与 [preview] 的区别：它跟随 `BuildConfig.CONTENT_PREVIEW`（默认 true），
+ * 与 `UI_PREVIEW` 解耦——认证域（登录/注册）走真实后端时，
+ * 内容域（分类树/课程/文章/个人中心）仍可返回本地死数据，避免「登录成功但主页全红」。
+ *
+ * 用法与 [preview] 一致（Repository 方法开头一行）：
+ * ```
+ * fun getCourses(...): PageData<CourseDto> = contentPreview { DemoData.coursePage(...) }
+ *     ?: safeApiCall { courseApi.getCourses(...) }
+ * ```
+ * 后端内容域接口就绪后，用 `-PcontentPreview=false` 构建即切回真实接口。
+ */
+inline fun <T : Any> contentPreview(block: () -> T): T? =
+    if (BuildConfig.CONTENT_PREVIEW) block() else null
+
+/** 内容域写操作：CONTENT_PREVIEW=true 时直接当成功处理。 */
+inline fun contentPreviewUnit(block: () -> Unit): Boolean {
+    if (BuildConfig.CONTENT_PREVIEW) {
         block()
         return true
     }

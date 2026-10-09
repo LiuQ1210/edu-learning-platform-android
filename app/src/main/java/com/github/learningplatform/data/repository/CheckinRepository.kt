@@ -2,7 +2,7 @@ package com.github.learningplatform.data.repository
 
 import com.github.learningplatform.core.network.safeApiCall
 import com.github.learningplatform.data.demo.DemoData
-import com.github.learningplatform.data.demo.preview
+import com.github.learningplatform.data.demo.contentPreview
 import com.github.learningplatform.data.remote.CheckinApi
 import com.github.learningplatform.data.remote.dto.CheckinRecordDto
 import com.github.learningplatform.data.remote.dto.CheckinResultDto
@@ -26,7 +26,7 @@ class CheckinRepository @Inject constructor(
 
     /** 今日待签到任务 */
     suspend fun getTodayTasks(): List<CheckinTaskDto> {
-        preview { return DemoData.checkinTasks }
+        contentPreview { return DemoData.checkinTasks }
         return safeApiCall { checkinApi.getTodayTasks() }
     }
 
@@ -37,7 +37,7 @@ class CheckinRepository @Inject constructor(
         gesturePattern: String? = null,
         photoUrl: String? = null
     ): CheckinResultDto {
-        preview { return DemoData.checkinResult("签到任务") }
+        contentPreview { return DemoData.checkinResult("签到任务") }
         return safeApiCall {
             checkinApi.submit(
                 CheckinSubmitRequest(
@@ -56,7 +56,7 @@ class CheckinRepository @Inject constructor(
         pageSize: Int = 20,
         taskId: Long? = null
     ): PageData<CheckinRecordDto> {
-        preview { return DemoData.checkinRecords }
+        contentPreview { return DemoData.checkinRecords }
         return safeApiCall {
             checkinApi.getRecords(pageNum = pageNum, pageSize = pageSize, taskId = taskId)
         }
@@ -64,7 +64,7 @@ class CheckinRepository @Inject constructor(
 
     /** 3.12 签到日历（月度统计） */
     suspend fun getSignCalendar(year: Int, month: Int): SignCalendarDto {
-        preview { return DemoData.signCalendar }
+        contentPreview { return DemoData.signCalendar }
         return safeApiCall { userApi.getSignCalendar(year, month) }
     }
 }

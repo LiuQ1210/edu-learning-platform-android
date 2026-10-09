@@ -22,14 +22,22 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // 后端 BaseUrl：由 BuildConfig 注入，code 侧通过 Constants.BASE_URL 读取。
-        // v3.0 的 URL 前缀为 /api/v1（不再是 /api/v1/app）。
-        buildConfigField("String", "BASE_URL", "\"https://api.learnplatform.com/api/v1/\"")
+        // 【登录注册联调】切到若依真实后端。认证接口为 /api/user/*（带 /api 前缀），
+        // 图形验证码接口为根路径 /captchaImage，故 BASE_URL 用根路径、接口注解写相对前缀。
+        buildConfigField("String", "BASE_URL", "\"http://43.142.9.214:8080/\"")
 
         // UI 预览开关：true 时 Repository 直接返回本地样例数据，不发任何网络请求。
         // 用途：后端未就绪时先把界面跑起来给人看（四个 Tab、列表、详情、空/错状态）。
         // 关掉它：./gradlew :app:assembleDebug -PuiPreview=false
         val uiPreview = (project.findProperty("uiPreview") as String?)?.toBoolean() ?: true
         buildConfigField("boolean", "UI_PREVIEW", uiPreview.toString())
+
+        // 【任务⑦ 混合模式】内容域（分类树/课程/文章/个人中心内容）独立预览开关：
+        //  - UI_PREVIEW=false 时，登录/注册等认证接口走真实后端（若依已就绪），
+        //    而内容域接口后端尚未提供 → CONTENT_PREVIEW 默认 true，内容域继续返回本地死数据；
+        //  - 后端内容域接口做好后，关闭它即可切回真实接口：./gradlew :app:assembleDebug -PuiPreview=false -PcontentPreview=false
+        val contentPreview = (project.findProperty("contentPreview") as String?)?.toBoolean() ?: true
+        buildConfigField("boolean", "CONTENT_PREVIEW", contentPreview.toString())
     }
 
     buildTypes {
@@ -121,24 +129,18 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
 }
 
-// ---------------------------------------------------------------------------
-// 依赖对齐：AGP 9 内置的 Kotlin 编译器为 2.2.x，无法读取 kotlin-stdlib 2.4 的元数据。
-// 而 Coil 3.6.2 与 androidx.collection 1.5.0（Room 2.8.5 传递依赖）会把 stdlib 顶到 2.4.10，
-// 导致 "Class 'kotlin.Unit' was compiled with an incompatible version of Kotlin"。
-// kotlin-stdlib 向后兼容，这里统一压回与编译器一致的版本。
-// 若将来 AGP 内置 Kotlin 升级到 2.4+，可删除此约束。
-// ---------------------------------------------------------------------------
+/**
+ * 将kotlin标准库版本控制防止编译错误
+ */
 configurations.configureEach {
     resolutionStrategy {
         force("org.jetbrains.kotlin:kotlin-stdlib:2.2.10")
     }
 }
 
-// ---------------------------------------------------------------------------
-// JVM 目标对齐：toolchain 是 JDK 25，若不做限制 Kotlin 会回退到 JVM_24 目标，
-// 而 compileOptions 指定的是 17，两者不一致（且 Android 不需要 24 字节码）。
-// 这里显式钉到 17，与 Java 保持一致。
-// ---------------------------------------------------------------------------
+/**
+ * 编译一致性，消除警告和错误
+ */
 kotlin {
     jvmToolchain(17)
     compilerOptions {

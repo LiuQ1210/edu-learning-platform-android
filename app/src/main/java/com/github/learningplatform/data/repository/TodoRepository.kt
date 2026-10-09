@@ -3,8 +3,8 @@ package com.github.learningplatform.data.repository
 import com.github.learningplatform.core.network.safeApiCall
 import com.github.learningplatform.core.network.safeApiCallForUnit
 import com.github.learningplatform.data.demo.DemoData
-import com.github.learningplatform.data.demo.preview
-import com.github.learningplatform.data.demo.previewUnit
+import com.github.learningplatform.data.demo.contentPreview
+import com.github.learningplatform.data.demo.contentPreviewUnit
 import com.github.learningplatform.data.remote.TodoApi
 import com.github.learningplatform.data.remote.dto.CreateTodoRequest
 import com.github.learningplatform.data.remote.dto.PageData
@@ -26,7 +26,7 @@ class TodoRepository @Inject constructor(
         status: Int? = null,
         priority: Int? = null
     ): PageData<TodoDto> {
-        preview { return DemoData.todos }
+        contentPreview { return DemoData.todos }
         return safeApiCall {
             todoApi.getTodos(pageNum, pageSize, status, priority)
         }
@@ -34,23 +34,23 @@ class TodoRepository @Inject constructor(
 
     /** @return 新建待办 ID */
     suspend fun createTodo(request: CreateTodoRequest): Long {
-        preview { return 8999L }
+        contentPreview { return 8999L }
         return safeApiCall { todoApi.createTodo(request) }.todoId
     }
 
     suspend fun updateTodo(todoId: Long, request: UpdateTodoRequest) {
-        previewUnit { return }
+        contentPreviewUnit { return }
         safeApiCallForUnit { todoApi.updateTodo(todoId, request) }
     }
 
     suspend fun deleteTodo(todoId: Long) {
-        previewUnit { return }
+        contentPreviewUnit { return }
         safeApiCallForUnit { todoApi.deleteTodo(todoId) }
     }
 
     /** @param status 0未完成 1已完成 */
     suspend fun updateStatus(todoId: Long, status: Int) {
-        previewUnit { return }
+        contentPreviewUnit { return }
         safeApiCallForUnit { todoApi.updateStatus(todoId, TodoStatusRequest(status)) }
     }
 }

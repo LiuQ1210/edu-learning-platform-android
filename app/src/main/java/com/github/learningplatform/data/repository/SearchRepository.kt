@@ -2,7 +2,7 @@ package com.github.learningplatform.data.repository
 
 import com.github.learningplatform.core.network.safeApiCall
 import com.github.learningplatform.data.demo.DemoData
-import com.github.learningplatform.data.demo.preview
+import com.github.learningplatform.data.demo.contentPreview
 import com.github.learningplatform.data.remote.SearchApi
 import com.github.learningplatform.data.remote.dto.ContentItemDto
 import com.github.learningplatform.data.remote.dto.HotWordDto
@@ -24,7 +24,7 @@ class SearchRepository @Inject constructor(
         pageNum: Int = 1,
         pageSize: Int = 20
     ): PageData<ContentItemDto> {
-        preview { return DemoData.searchResult(keyword, type, pageNum) }
+        contentPreview { return DemoData.searchResult(keyword, type, pageNum) }
         return safeApiCall {
             searchApi.search(keyword, type, categoryId, pageNum, pageSize)
         }
@@ -43,14 +43,14 @@ class SearchRepository @Inject constructor(
         pageNum: Int = 1,
         pageSize: Int = 20
     ): PageData<ContentItemDto> {
-        preview { return DemoData.searchResult(keyword, type, pageNum) }
+        contentPreview { return DemoData.searchResult(keyword, type, pageNum) }
         return safeApiCall {
             searchApi.search(keyword, type, categoryId, pageNum, pageSize)
         }
     }
 
     suspend fun getHotWords(size: Int = 10): List<HotWordDto> {
-        preview { return DemoData.hotWords }
+        contentPreview { return DemoData.hotWords }
         return safeApiCall { searchApi.getHotWords(size) }.hotWordList
     }
 }

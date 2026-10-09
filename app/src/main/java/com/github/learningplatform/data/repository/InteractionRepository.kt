@@ -3,8 +3,8 @@ package com.github.learningplatform.data.repository
 import com.github.learningplatform.core.network.safeApiCall
 import com.github.learningplatform.core.network.safeApiCallForUnit
 import com.github.learningplatform.data.demo.DemoData
-import com.github.learningplatform.data.demo.preview
-import com.github.learningplatform.data.demo.previewUnit
+import com.github.learningplatform.data.demo.contentPreview
+import com.github.learningplatform.data.demo.contentPreviewUnit
 import com.github.learningplatform.data.remote.InteractionApi
 import com.github.learningplatform.data.remote.dto.CommentDto
 import com.github.learningplatform.data.remote.dto.CreateCommentRequest
@@ -37,7 +37,7 @@ class InteractionRepository @Inject constructor(
         size: Int = 20,
         sort: Int? = null
     ): CursorPage<CommentDto> {
-        preview {
+        contentPreview {
             // 必须按 cursor 切页。之前固定返回同一页，ViewModel 累加后出现重复
             // commentId，LazyColumn 直接抛 "Key 88009 was already used"。
             // cursor 语义沿用后端：上一页最后一条的 ID；第一页传 null。
@@ -65,7 +65,7 @@ class InteractionRepository @Inject constructor(
     }
 
     suspend fun getReplies(rootId: Long, cursor: String? = null, size: Int = 20): CursorPage<ReplyDto> {
-        preview {
+        contentPreview {
             // 同样按 cursor 切页，理由见 getComments
             val all = DemoData.replies(rootId)
             val startIndex = if (cursor.isNullOrBlank()) {
@@ -88,40 +88,40 @@ class InteractionRepository @Inject constructor(
 
     /** 盖新楼：rootId/parentId 传 0 */
     suspend fun createComment(request: CreateCommentRequest): CreateCommentResponse {
-        preview { return CreateCommentResponse(commentId = 88999L, status = 1, createTime = "2026-09-18 10:00:00") }
+        contentPreview { return CreateCommentResponse(commentId = 88999L, status = 1, createTime = "2026-09-18 10:00:00") }
         return safeApiCall { interactionApi.createComment(request) }
     }
 
     suspend fun deleteComment(commentId: Long) {
-        previewUnit { return }
+        contentPreviewUnit { return }
         safeApiCallForUnit { interactionApi.deleteComment(commentId) }
     }
 
     suspend fun toggleCommentLike(commentId: Long): LikeToggleResultDto {
-        preview { return LikeToggleResultDto(isLiked = true, likeCount = 13) }
+        contentPreview { return LikeToggleResultDto(isLiked = true, likeCount = 13) }
         return safeApiCall { interactionApi.toggleCommentLike(commentId) }
     }
 
     suspend fun reportComment(commentId: Long, request: ReportRequest) {
-        previewUnit { return }
+        contentPreviewUnit { return }
         safeApiCallForUnit { interactionApi.reportComment(commentId, request) }
     }
 
     /** 统一收藏切换：targetType 1文章 2视频/课程 */
     suspend fun toggleFavorite(targetType: Int, targetId: Long): FavoriteToggleResultDto {
-        preview { return FavoriteToggleResultDto(isFavorited = true) }
+        contentPreview { return FavoriteToggleResultDto(isFavorited = true) }
         return safeApiCall { interactionApi.toggleFavorite(ToggleRequest(targetType, targetId)) }
     }
 
     /** 统一点赞切换：targetType 1文章 2视频/课程 3评论 */
     suspend fun toggleLike(targetType: Int, targetId: Long): LikeToggleResultDto {
-        preview { return LikeToggleResultDto(isLiked = true, likeCount = 51) }
+        contentPreview { return LikeToggleResultDto(isLiked = true, likeCount = 51) }
         return safeApiCall { interactionApi.toggleLike(ToggleRequest(targetType, targetId)) }
     }
 
     /** 转发成功后上报。platform: 1微信 2QQ 3微博 4复制链接 5其他 */
     suspend fun recordShare(targetType: Int, targetId: Long, platform: Int) {
-        previewUnit { return }
+        contentPreviewUnit { return }
         safeApiCallForUnit { interactionApi.recordShare(ShareRequest(targetType, targetId, platform)) }
     }
 }

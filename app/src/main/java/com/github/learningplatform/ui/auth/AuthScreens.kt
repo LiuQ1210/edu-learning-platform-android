@@ -29,10 +29,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -42,6 +45,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.learningplatform.ui.common.PrimaryButton
 import com.github.learningplatform.ui.nav.NavIcons
 import com.github.learningplatform.ui.theme.Primary
+import com.github.learningplatform.ui.theme.Surface
 import com.github.learningplatform.ui.theme.surfaceWashBrush
 import com.github.learningplatform.ui.theme.GlowOrb
 import com.github.learningplatform.ui.theme.GradientBackground
@@ -101,6 +105,19 @@ fun LoginScreen(
             isPassword = true,
             isError = uiState.passwordError != null,
             errorMessage = uiState.passwordError.orEmpty()
+        )
+
+        Spacer(Modifier.height(10.dp))
+
+        // 【登录注册联调】若依图形验证码：输入 + 图片（点击图片刷新）
+        CaptchaField(
+            imageBase64 = uiState.captchaImg,
+            codeValue = uiState.captchaCode,
+            onCodeChange = viewModel::onCaptchaCodeChange,
+            onRefresh = viewModel::loadCaptcha,
+            loading = uiState.captchaLoading,
+            isError = uiState.captchaError != null,
+            errorMessage = uiState.captchaError.orEmpty()
         )
 
         Spacer(Modifier.height(10.dp))
@@ -303,4 +320,100 @@ internal fun AuthField(
             )
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// 【登录注册联调】若依图形验证码组件（登录/注册共用）
+// ---------------------------------------------------------------------------
+
+/**
+ * 若依图形验证码行：左侧验证码输入框，右侧图片（点击可刷新）。
+ * 图片为 base64（可能带 data:image/png;base64, 前缀）。
+ */
+@Composable
+internal fun CaptchaField(
+    imageBase64: String?,
+    codeValue: String,
+    onCodeChange: (String) -> Unit,
+    onRefresh: () -> Unit,
+    loading: Boolean,
+    isError: Boolean,
+    errorMessage: String
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+                .clip(RoundedCornerShape(50))
+                .background(surfaceWashBrush())
+                .padding(start = 18.dp, end = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                NavIcons.Lock,
+                contentDescription = null,
+                tint = TextHint,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(12.dp))
+            androidx.compose.foundation.text.BasicTextField(
+                value = codeValue,
+                // 【修复】若依图形验证码是字母+数字混合（如 r5mge），
+                // 不能像短信验证码那样过滤数字，这里仅做长度限制
+                onValueChange = { input -> onCodeChange(input.take(6)) },
+                singleLine = true,
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(Primary),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
+                modifier = Modifier.weight(1f),
+                decorationBox = { inner ->
+                    if (codeValue.isEmpty()) {
+                        Text("验证码", color = TextHint, style = MaterialTheme.typography.bodyLarge)
+                    }
+                    inner()
+                }
+            )
+
+            val bitmap = remember(imageBase64) { decodeBase64Image(imageBase64) }
+            Box(
+                modifier = Modifier
+                    .size(width = 92.dp, height = 40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Surface)
+                    .clickable(enabled = !loading, onClick = onRefresh),
+                contentAlignment = Alignment.Center
+            ) {
+                when {
+                    loading -> Text("加载中", color = TextHint, style = MaterialTheme.typography.bodySmall)
+                    bitmap != null -> Image(
+                        bitmap = bitmap,
+                        contentDescription = "验证码图片，点击刷新",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    else -> Text("点击刷新", color = TextHint, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+
+        if (isError && errorMessage.isNotBlank()) {
+            Text(
+                text = errorMessage,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(start = 18.dp, top = 4.dp)
+            )
+        }
+    }
+}
+
+/** base64（可能带 data: 前缀）→ ImageBitmap，解码失败返回 null */
+internal fun decodeBase64Image(base64: String?): ImageBitmap? {
+    if (base64.isNullOrBlank()) return null
+    val clean = base64.substringAfter("base64,", base64)
+    return runCatching {
+        val bytes = android.util.Base64.decode(clean, android.util.Base64.DEFAULT)
+        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            ?.asImageBitmap()
+    }.getOrNull()
 }

@@ -3,8 +3,8 @@ package com.github.learningplatform.data.repository
 import com.github.learningplatform.core.network.safeApiCall
 import com.github.learningplatform.core.network.safeApiCallForUnit
 import com.github.learningplatform.data.demo.DemoData
-import com.github.learningplatform.data.demo.preview
-import com.github.learningplatform.data.demo.previewUnit
+import com.github.learningplatform.data.demo.contentPreview
+import com.github.learningplatform.data.demo.contentPreviewUnit
 import com.github.learningplatform.data.local.CacheDao
 import com.github.learningplatform.data.local.CacheEntry
 import com.github.learningplatform.data.local.CacheKeys
@@ -50,7 +50,7 @@ class CourseRepository @Inject constructor(
         videoType: Int? = null,
         sort: Int? = null
     ): PageData<CourseDto> {
-        preview { return DemoData.coursePage(pageNum, pageSize, videoType) }
+        contentPreview { return DemoData.coursePage(pageNum, pageSize, videoType) }
 
         val key = CacheKeys.courseHome(pageNum, pageSize, categoryId, videoType, sort)
 
@@ -98,7 +98,7 @@ class CourseRepository @Inject constructor(
      *    供详情页下拉刷新手势调用（见 CourseDetailViewModel.refresh）。
      */
     suspend fun getCourseDetail(courseId: Long, forceRefresh: Boolean = false): CourseDetailDto {
-        preview { return DemoData.courseDetail(courseId) }
+        contentPreview { return DemoData.courseDetail(courseId) }
 
         val key = CacheKeys.courseDetail(courseId)
 
@@ -132,23 +132,23 @@ class CourseRepository @Inject constructor(
 
     /** 播放凭证：校验权限后返回带签名的限时播放地址 */
     suspend fun getPlayInfo(courseId: Long, lessonId: Long? = null): PlayInfoDto {
-        preview { return DemoData.playInfo(courseId, lessonId) }
+        contentPreview { return DemoData.playInfo(courseId, lessonId) }
         return safeApiCall { courseApi.getPlayInfo(courseId, lessonId) }
     }
 
     /** 播放进度心跳（建议 15-30 秒一次） */
     suspend fun syncProgress(request: ProgressSyncRequest) {
-        previewUnit { return }
+        contentPreviewUnit { return }
         safeApiCallForUnit { courseApi.syncProgress(request) }
     }
 
     suspend fun rateCourse(courseId: Long, score: Double): RatingResultDto {
-        preview { return DemoData.rateResult(score) }
+        contentPreview { return DemoData.rateResult(score) }
         return safeApiCall { courseApi.rateCourse(courseId, com.github.learningplatform.data.remote.dto.RatingRequest(score)) }
     }
 
     suspend fun getRatings(courseId: Long, pageNum: Int = 1, pageSize: Int = 20): PageData<RatingDto> {
-        preview { return DemoData.ratings(courseId) }
+        contentPreview { return DemoData.ratings(courseId) }
         return safeApiCall { courseApi.getRatings(courseId, pageNum, pageSize) }
     }
 

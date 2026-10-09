@@ -2,7 +2,7 @@ package com.github.learningplatform.data.repository
 
 import com.github.learningplatform.core.network.safeApiCall
 import com.github.learningplatform.data.demo.DemoData
-import com.github.learningplatform.data.demo.preview
+import com.github.learningplatform.data.demo.contentPreview
 import com.github.learningplatform.data.remote.AppApi
 import com.github.learningplatform.data.remote.dto.AdSlotDto
 import com.github.learningplatform.data.remote.dto.AppConfigDto
@@ -21,12 +21,12 @@ class AppRepository @Inject constructor(
 ) {
 
     suspend fun getAdSlots(scene: String? = null): List<AdSlotDto> {
-        preview { return DemoData.adSlots }
+        contentPreview { return DemoData.adSlots }
         return safeApiCall { appApi.getAdSlots(scene) }
     }
 
     suspend fun getAppConfig(): AppConfigDto {
-        preview { return DemoData.appConfig }
+        contentPreview { return DemoData.appConfig }
         return safeApiCall { appApi.getAppConfig() }
     }
 }

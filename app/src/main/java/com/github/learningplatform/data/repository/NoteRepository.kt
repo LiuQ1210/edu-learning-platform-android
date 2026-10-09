@@ -3,8 +3,8 @@ package com.github.learningplatform.data.repository
 import com.github.learningplatform.core.network.safeApiCall
 import com.github.learningplatform.core.network.safeApiCallForUnit
 import com.github.learningplatform.data.demo.DemoData
-import com.github.learningplatform.data.demo.preview
-import com.github.learningplatform.data.demo.previewUnit
+import com.github.learningplatform.data.demo.contentPreview
+import com.github.learningplatform.data.demo.contentPreviewUnit
 import com.github.learningplatform.data.remote.NoteApi
 import com.github.learningplatform.data.remote.dto.CreateNoteRequest
 import com.github.learningplatform.data.remote.dto.NoteDto
@@ -25,7 +25,7 @@ class NoteRepository @Inject constructor(
         sourceType: Int? = null,
         keyword: String? = null
     ): PageData<NoteDto> {
-        preview { return DemoData.notes }
+        contentPreview { return DemoData.notes }
         return safeApiCall {
             noteApi.getNotes(pageNum, pageSize, sourceType, keyword)
         }
@@ -33,23 +33,23 @@ class NoteRepository @Inject constructor(
 
     /** @return 新建笔记 ID */
     suspend fun createNote(request: CreateNoteRequest): Long {
-        preview { return 7999L }
+        contentPreview { return 7999L }
         return safeApiCall { noteApi.createNote(request) }.noteId
     }
 
     suspend fun updateNote(noteId: Long, request: UpdateNoteRequest) {
-        previewUnit { return }
+        contentPreviewUnit { return }
         safeApiCallForUnit { noteApi.updateNote(noteId, request) }
     }
 
     suspend fun deleteNote(noteId: Long) {
-        previewUnit { return }
+        contentPreviewUnit { return }
         safeApiCallForUnit { noteApi.deleteNote(noteId) }
     }
 
     /** 某内容下的我的笔记（不分页） */
     suspend fun getNotesBySource(sourceType: Int, sourceId: Long): List<NoteDto> {
-        preview { return DemoData.notes.list }
+        contentPreview { return DemoData.notes.list }
         return safeApiCall { noteApi.getNotesBySource(sourceType, sourceId) }
     }
 }

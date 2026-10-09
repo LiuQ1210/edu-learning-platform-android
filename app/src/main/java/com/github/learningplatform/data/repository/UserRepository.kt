@@ -3,8 +3,8 @@ package com.github.learningplatform.data.repository
 import com.github.learningplatform.core.network.safeApiCall
 import com.github.learningplatform.core.network.safeApiCallForUnit
 import com.github.learningplatform.data.demo.DemoData
-import com.github.learningplatform.data.demo.preview
-import com.github.learningplatform.data.demo.previewUnit
+import com.github.learningplatform.data.demo.contentPreview
+import com.github.learningplatform.data.demo.contentPreviewUnit
 import com.github.learningplatform.data.remote.UserApi
 import com.github.learningplatform.data.remote.dto.BlogHomeDto
 import com.github.learningplatform.data.remote.dto.DownloadRecordDto
@@ -24,18 +24,18 @@ class UserRepository @Inject constructor(
 ) {
 
     suspend fun getProfile(): UserProfileDto {
-        preview { return DemoData.profile }
+        contentPreview { return DemoData.profile }
         return safeApiCall { userApi.getProfile() }
     }
 
     suspend fun updateProfile(request: UpdateProfileRequest) {
-        previewUnit { return }
+        contentPreviewUnit { return }
         safeApiCallForUnit { userApi.updateProfile(request) }
     }
 
     /** 他人博客主页（公开） */
     suspend fun getBlogHome(userId: Long, pageNum: Int = 1, pageSize: Int = 20): BlogHomeDto {
-        preview {
+        contentPreview {
             return BlogHomeDto(
                 userId = userId,
                 nickname = "张三",
@@ -56,18 +56,18 @@ class UserRepository @Inject constructor(
         pageSize: Int = 20,
         keyword: String? = null
     ): PageData<MyCourseDto> {
-        preview { return DemoData.myCourses }
+        contentPreview { return DemoData.myCourses }
         return safeApiCall { userApi.getMyCourses(pageNum, pageSize, keyword) }
     }
 
     /** @return 是否加入成功 */
     suspend fun joinCourse(courseId: Long): Boolean {
-        preview { return true }
+        contentPreview { return true }
         return safeApiCall { userApi.joinCourse(courseId) }.joined
     }
 
     suspend fun quitCourse(courseId: Long) {
-        previewUnit { return }
+        contentPreviewUnit { return }
         safeApiCallForUnit { userApi.quitCourse(courseId) }
     }
 
@@ -77,7 +77,7 @@ class UserRepository @Inject constructor(
         pageSize: Int = 20,
         targetType: Int? = null
     ): PageData<UserTargetItemDto> {
-        preview { return DemoData.favorites }
+        contentPreview { return DemoData.favorites }
         return safeApiCall {
             userApi.getFavorites(pageNum, pageSize, targetType)
         }
@@ -88,7 +88,7 @@ class UserRepository @Inject constructor(
         pageSize: Int = 20,
         targetType: Int? = null
     ): PageData<UserTargetItemDto> {
-        preview { return DemoData.favorites }
+        contentPreview { return DemoData.favorites }
         return safeApiCall {
             userApi.getLikes(pageNum, pageSize, targetType)
         }
@@ -99,7 +99,7 @@ class UserRepository @Inject constructor(
         pageSize: Int = 20,
         targetType: Int? = null
     ): PageData<ViewHistoryItemDto> {
-        preview { return DemoData.history }
+        contentPreview { return DemoData.history }
         return safeApiCall {
             userApi.getViewHistory(pageNum, pageSize, targetType)
         }
@@ -107,7 +107,7 @@ class UserRepository @Inject constructor(
 
     /** 不传 targetType 则清空全部 */
     suspend fun clearViewHistory(targetType: Int? = null) {
-        previewUnit { return }
+        contentPreviewUnit { return }
         safeApiCallForUnit { userApi.clearViewHistory(targetType) }
     }
 
@@ -116,7 +116,7 @@ class UserRepository @Inject constructor(
         pageSize: Int = 20,
         resourceType: Int? = null
     ): PageData<DownloadRecordDto> {
-        preview { return DemoData.downloads }
+        contentPreview { return DemoData.downloads }
         return safeApiCall {
             userApi.getDownloadRecords(pageNum, pageSize, resourceType)
         }
