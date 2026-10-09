@@ -19,6 +19,8 @@ import javax.inject.Inject
 
 data class CourseDetailUiState(
     val isLoading: Boolean = false,
+    /** 【任务④】下拉刷新中（内容仍显示，仅顶部转圈） */
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val detail: CourseDetailDto? = null,
     val tab: Int = 0,
@@ -76,6 +78,38 @@ class CourseDetailViewModel @Inject constructor(
 
     fun selectTab(index: Int) {
         _uiState.value = _uiState.value.copy(tab = index)
+    }
+
+    /**
+     * 【任务④：下拉强制回源】
+     *
+     * 详情页下拉手势触发：跳过缓存（forceRefresh = true）直接回源并覆盖写缓存。
+     * 与首次加载（[load]）的区别：
+     *  - 已有内容时保持显示，只开顶部下拉转圈（isRefreshing），不整页 Loading；
+     *  - 失败时不清空已有内容，改为 Snackbar 提示（error 字段整页错误只用于首次加载）。
+     */
+    fun refresh() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isRefreshing = true, message = null)
+            try {
+                val detail = courseRepository.getCourseDetail(courseId, forceRefresh = true)
+                val ratings = runCatching { courseRepository.getRatings(courseId).list }
+                    .getOrDefault(_uiState.value.ratings)
+                _uiState.value = _uiState.value.copy(
+                    isRefreshing = false,
+                    detail = detail,
+                    ratings = ratings,
+                    isFavorited = _uiState.value.isFavorited
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                _uiState.value = _uiState.value.copy(
+                    isRefreshing = false,
+                    message = e.readableMessage()
+                )
+            }
+        }
     }
 
     fun consumeMessage() {

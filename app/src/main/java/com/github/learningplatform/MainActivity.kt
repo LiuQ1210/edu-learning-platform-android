@@ -13,11 +13,13 @@ import dagger.hilt.android.AndroidEntryPoint
 /**
  * 系统启动窗口的驻留时间。
  *
- * 与 Compose 启动页（[com.github.learningplatform.ui.nav.SplashScreen]）的
- * `minDurationMs` 取同一个值，让「白底 + 品牌图标」直接接到「奶油渐变 + 品牌名」，
- * 中间不出现空白帧。
+ * 【任务⑤：冷启动优化】基线 2.2s → 2s 内的主要压缩项：
+ * 驻留从 700ms 压到 450ms，与 Compose 启动页（[com.github.learningplatform.ui.nav.SplashScreen]）
+ * 的 `minDurationMs` 保持同一个值，让「白底 + 品牌图标」直接接到「奶油渐变 + 品牌名」，
+ * 中间不出现空白帧；配合任务②③的 Room 缓存，首页首帧数据不再等网络，
+ * 两段驻留合计节省约 500ms。
  */
-private const val SPLASH_MIN_MS = 700L
+private const val SPLASH_MIN_MS = 450L
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {

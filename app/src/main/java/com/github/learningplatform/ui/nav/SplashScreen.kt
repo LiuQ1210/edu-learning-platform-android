@@ -42,11 +42,11 @@ import com.github.learningplatform.ui.theme.TextSecondary
  * 插画位（学生伏案）用柔光圆 + 占位图形代替 —— 有正式插画素材后替换
  * [SplashIllustration] 即可，版式不用动。
  *
- * 最短展示时长与 MainActivity 的系统启动窗口一致（700ms），
+ * 最短展示时长与 MainActivity 的系统启动窗口一致（450ms，任务⑤冷启动优化后同步缩短），
  * 两者接力，中间不会出现空白帧。
  */
 @Composable
-fun SplashScreen(minDurationMs: Long = 700L) {
+fun SplashScreen(minDurationMs: Long = 450L) {
     // 保证最少展示时间，否则 DataStore 读得比一帧还快，启动页会一闪而过
     LaunchedEffect(Unit) {
         kotlinx.coroutines.delay(minDurationMs)

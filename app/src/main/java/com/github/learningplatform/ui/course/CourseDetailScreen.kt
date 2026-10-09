@@ -21,12 +21,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -79,6 +81,7 @@ import java.util.Locale
  *  - 加入课程（3.4）与收藏（8.9）都需登录，未登录时后端返回 401，由拦截器统一处理。
  *  - 评分提交后覆盖更新，故分段选择器没有「取消评分」入口。
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CourseDetailScreen(
     courseId: Long,
@@ -136,7 +139,17 @@ fun CourseDetailScreen(
             uiState.detail == null -> EmptyState(message = "课程不存在", modifier = m)
             else -> {
                 val detail = uiState.detail!!
-                LazyColumn(modifier = m.background(pageGradientBrush(strong = true)), contentPadding = PaddingValues(bottom = 24.dp)) {
+                // 【任务④：下拉强制回源】内容外层包 Material3 下拉刷新手势：
+                // 下拉触发 viewModel.refresh()（forceRefresh=true，跳过缓存直接回源并覆盖缓存）。
+                PullToRefreshBox(
+                    isRefreshing = uiState.isRefreshing,
+                    onRefresh = viewModel::refresh,
+                    modifier = m.background(pageGradientBrush(strong = true))
+                ) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 24.dp)
+                    ) {
                     item {
                         Box {
                             NetImage(
@@ -185,6 +198,7 @@ fun CourseDetailScreen(
                             }
                         })
                         else -> ratingSection(uiState.ratings, uiState.myScore, viewModel::rate)
+                    }
                     }
                 }
             }
@@ -379,7 +393,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.ratingSection(
             )
             Spacer(Modifier.height(8.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items((1..10).map { it * 0.5 }) { score ->
+                // 【任务⑤：key 稳定】静态常量列表也补上稳定 key（评分值本身即唯一键）
+                items((1..10).map { it * 0.5 }, key = { it }) { score ->
                     val selected = myScore > 0 && kotlin.math.abs(myScore - score) < 0.01
                     Surface(
                         shape = RoundedCornerShape(50),

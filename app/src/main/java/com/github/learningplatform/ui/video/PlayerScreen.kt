@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,8 +35,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
@@ -81,12 +86,27 @@ fun PlayerScreen(
     var positionSec by remember { mutableFloatStateOf(0f) }
     var durationSec by remember { mutableFloatStateOf(0f) }
     var isPlaying by remember { mutableStateOf(true) }
+    /** 【任务⑥：中断与恢复】播放异常时置非空，覆盖层提示 + 重试；就绪后自动清空 */
+    var playbackError by remember { mutableStateOf<String?>(null) }
 
     // 进度采样 + 心跳：只在播放中推进，暂停时不上报
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
                 isPlaying = playing
+            }
+
+            // 【任务⑥】播放中断兜底：断网 / 源不可用 / 凭证过期时进入错误态，
+            // 展示覆盖层提示并支持重试（见 retryPlayback），不再无声卡死。
+            override fun onPlayerError(error: PlaybackException) {
+                playbackError = error.message?.takeIf { it.isNotBlank() } ?: "播放中断"
+            }
+
+            // 错误清除后（重试成功 / ExoPlayer 自动恢复）自动收起覆盖层
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY && playbackError != null) {
+                    playbackError = null
+                }
             }
         }
         player.addListener(listener)
@@ -101,6 +121,38 @@ fun PlayerScreen(
             )
             player.removeListener(listener)
             player.release()
+        }
+    }
+
+    // 【任务⑥】中断与恢复：切后台（来电/Home 键）自动暂停，回前台自动恢复播放。
+    // 记录切出前的播放态，回来时仅当之前正在播放才恢复。
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var wasPlayingBeforeStop by remember { mutableStateOf(true) }
+    DisposableEffect(player, lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> {
+                    wasPlayingBeforeStop = player.isPlaying
+                    player.pause()
+                }
+                Lifecycle.Event.ON_START ->
+                    if (wasPlayingBeforeStop && playbackError == null) player.play()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // 【任务⑥】中断后的重试：重新装载同一地址并起播；失败会再次触发 onPlayerError
+    fun retryPlayback() {
+        playbackError = null
+        val url = uiState.playInfo?.playUrl
+        if (!url.isNullOrBlank()) {
+            player.clearMediaItems()
+            player.setMediaItem(MediaItem.fromUri(url))
+            player.prepare()
+            player.playWhenReady = true
         }
     }
 
@@ -223,6 +275,38 @@ fun PlayerScreen(
                         color = Color.White,
                         style = MaterialTheme.typography.labelSmall
                     )
+                }
+
+                // 【任务⑥】播放中断覆盖层：出错时提示原因并提供重试，避免无声卡死
+                playbackError?.let { err ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.78f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "播放中断",
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                text = err,
+                                color = Color.White.copy(alpha = 0.72f),
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 2,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 24.dp)
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            Button(onClick = ::retryPlayback) {
+                                Text("重试")
+                            }
+                        }
+                    }
                 }
 
 

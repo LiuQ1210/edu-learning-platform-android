@@ -197,11 +197,14 @@ object DemoData {
     fun playInfo(courseId: Long, lessonId: Long?) = PlayInfoDto(
         courseId = courseId,
         lessonId = lessonId ?: 0L,
-        // 公开测试流，播放器有真实内容可播
-        playUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+        // 【任务⑥】公开测试流：w3.org 的 Sintel 预告片。
+        // 原 BigBuckBunny 挂在 Google GCS（commondatastorage.googleapis.com），
+        // 在当前网络环境实测不可达（curl 超时、ExoPlayer 一直缓冲黑屏），已换源。
+        // 曾临时指向 404 地址验证 onPlayerError→覆盖层→重试闭环（build/e2,e3 截图），验证完已恢复。
+        playUrl = "https://media.w3.org/2010/05/sintel/trailer.mp4",
         expireTime = System.currentTimeMillis() / 1000 + 3600,
         watermarkText = "DemoUser1001",
-        duration = 596
+        duration = 52
     )
 
     fun rateResult(score: Double) = RatingResultDto(averageScore = score, ratingCount = 129)

@@ -12,6 +12,13 @@ interface CacheDao {
     @Query("SELECT value FROM cache_kv WHERE `key` = :key LIMIT 1")
     suspend fun get(key: String): String?
 
+    /**
+     * 【任务②：定缓存键规则与 TTL；分类树接 Room 缓存】
+     * 取完整缓存条目（含 updatedAt），供 Repository 做 TTL 过期判断后决定是否回源。
+     */
+    @Query("SELECT * FROM cache_kv WHERE `key` = :key LIMIT 1")
+    suspend fun getEntry(key: String): CacheEntry?
+
     @Query("SELECT * FROM cache_kv WHERE `key` = :key LIMIT 1")
     fun observe(key: String): Flow<CacheEntry?>
 

@@ -37,19 +37,28 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
 import com.github.learningplatform.data.remote.dto.ArticleDto
 import com.github.learningplatform.data.remote.dto.CourseDto
 import com.github.learningplatform.ui.nav.NavIcons
@@ -71,6 +80,11 @@ import com.github.learningplatform.ui.theme.TextSecondary
  *
  * Coil 3 的 AsyncImage 已内置跨平台 loader，OkHttp 网络层由
  * coil-network-okhttp 提供（见 build.gradle.kts）。
+ *
+ * 【任务⑤：图片按尺寸裁剪】布局完成后用 onSizeChanged 拿到容器真实像素尺寸，
+ * 构造带 size 的 ImageRequest，让 Coil 按目标尺寸采样解码（inSampleSize），
+ * 而不是整张原图解码后再缩小 —— 列表滚动时内存占用与解码开销显著下降。
+ * 布局完成前尺寸为 0，此时按原尺寸加载，不阻塞首帧；布局一到位自动切换到裁剪尺寸。
  */
 @Composable
 fun NetImage(
@@ -79,14 +93,28 @@ fun NetImage(
     contentScale: ContentScale = ContentScale.Crop,
     radius: Dp = 8.dp
 ) {
+    var targetSize by remember { mutableStateOf(IntSize.Zero) }
+    val context = LocalContext.current
+
     Box(
         modifier = modifier
+            .onSizeChanged { targetSize = it }
             .clip(RoundedCornerShape(radius))
             .background(Divider)
     ) {
         if (url.isNotBlank()) {
+            val request = remember(url, targetSize) {
+                ImageRequest.Builder(context)
+                    .data(url)
+                    .apply {
+                        if (targetSize.width > 0 && targetSize.height > 0) {
+                            size(targetSize.width, targetSize.height)
+                        }
+                    }
+                    .build()
+            }
             AsyncImage(
-                model = url,
+                model = request,
                 contentDescription = null,
                 contentScale = contentScale,
                 modifier = Modifier.fillMaxSize()
@@ -111,8 +139,18 @@ fun Avatar(
         contentAlignment = Alignment.Center
     ) {
         if (url.isNotBlank()) {
+            // 【任务⑤：图片按尺寸裁剪】头像尺寸已知，直接按像素解码，避免整图解码。
+            // LocalContext/LocalDensity 都是 @Composable 读取，须在 remember 外取值。
+            val context = LocalContext.current
+            val density = LocalDensity.current
+            val request = remember(url, size) {
+                ImageRequest.Builder(context)
+                    .data(url)
+                    .size(with(density) { size.toPx() }.toInt())
+                    .build()
+            }
             AsyncImage(
-                model = url,
+                model = request,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
