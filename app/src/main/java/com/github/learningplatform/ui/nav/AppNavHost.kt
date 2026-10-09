@@ -27,6 +27,14 @@ import androidx.navigation.navArgument
 import com.github.learningplatform.ui.article.ArticleDetailScreen
 import com.github.learningplatform.ui.theme.BottomNavContainer
 import com.github.learningplatform.ui.theme.BottomNavUnselected
+import com.github.learningplatform.ui.theme.TabHomeInk
+import com.github.learningplatform.ui.theme.TabHomeWash
+import com.github.learningplatform.ui.theme.TabVideoInk
+import com.github.learningplatform.ui.theme.TabVideoWash
+import com.github.learningplatform.ui.theme.TabCommunityInk
+import com.github.learningplatform.ui.theme.TabCommunityWash
+import com.github.learningplatform.ui.theme.TabProfileInk
+import com.github.learningplatform.ui.theme.TabProfileWash
 import com.github.learningplatform.ui.article.ArticleEditScreen
 import com.github.learningplatform.ui.article.MyArticlesScreen
 import com.github.learningplatform.ui.article.TagArticlesScreen
@@ -194,6 +202,13 @@ fun MainScaffold(
                 ) {
                     BottomNavItem.entries.forEach { item ->
                         val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
+                        // 每个 Tab 一个色对：选中用该 Tab 的墨色 + 同色系淡垫，深浅模式自动切换
+                        val (ink, wash) = when (item) {
+                            BottomNavItem.HOME -> TabHomeInk to TabHomeWash
+                            BottomNavItem.VIDEO -> TabVideoInk to TabVideoWash
+                            BottomNavItem.COMMUNITY -> TabCommunityInk to TabCommunityWash
+                            BottomNavItem.PROFILE -> TabProfileInk to TabProfileWash
+                        }
                         NavigationBarItem(
                             selected = selected,
                             onClick = {
@@ -210,9 +225,9 @@ fun MainScaffold(
                             // 每个 Tab 一个色对：选中用该 Tab 的墨色 + 同色系淡垫。
                             // 不共用主色蓝 —— 那会让四个 Tab 选中时长得一样，也压不住奶油底。
                             colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = item.ink,
-                                selectedTextColor = item.ink,
-                                indicatorColor = item.wash,
+                                selectedIconColor = ink,
+                                selectedTextColor = ink,
+                                indicatorColor = wash,
                                 unselectedIconColor = BottomNavUnselected,
                                 unselectedTextColor = BottomNavUnselected
                             )

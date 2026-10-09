@@ -1,4 +1,4 @@
-package com.github.learningplatform.ui.theme
+﻿package com.github.learningplatform.ui.theme
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
@@ -164,25 +164,39 @@ val BottomNavContainer: Color
 // 改用设计稿的墨水色做图标/文字，配一格极淡的暖色垫底，和整页的奶油调统一。
 // ---------------------------------------------------------------------------
 
-/** 未选中：中性灰，带一点暖调，不要用冷灰 */
-val BottomNavUnselected = Color(0xFF9A9AA3)
+/** 未选中：中性灰，深色模式下提亮保证可读 */
+val BottomNavUnselected: Color
+    @Composable @ReadOnlyComposable get() =
+        if (LocalAppDarkTheme.current) Color(0xFFB0B5C5) else Color(0xFF9A9AA3)
 
-/** 首页：藏青墨 + 淡蓝垫 */
-val TabHomeInk = BrandNavy
-val TabHomeWash = Color(0xFFE3E8FB)
+/** 首页：藏青墨 + 淡蓝垫（深色模式下用亮蓝，保证对比度） */
+val TabHomeInk: Color
+    @Composable @ReadOnlyComposable get() =
+        if (LocalAppDarkTheme.current) Color(0xFFB8CCFF) else BrandNavy
+val TabHomeWash: Color
+    @Composable @ReadOnlyComposable get() =
+        if (LocalAppDarkTheme.current) Color(0xFF2A3350) else Color(0xFFE3E8FB)
 
 /** 视频：深青墨 + 淡青垫 */
-val TabVideoInk = Color(0xFF0E6E78)
-val TabVideoWash = Color(0xFFD9F0F3)
+val TabVideoInk: Color
+    @Composable @ReadOnlyComposable get() =
+        if (LocalAppDarkTheme.current) Color(0xFF7DD8E4) else Color(0xFF0E6E78)
+val TabVideoWash: Color
+    @Composable @ReadOnlyComposable get() =
+        if (LocalAppDarkTheme.current) Color(0xFF1E3A40) else Color(0xFFD9F0F3)
 
-/** 社区：砖红墨 + 淡粉垫（呼应设计稿的珊瑚红与椅子垫粉） */
-val TabCommunityInk = Color(0xFFA8453C)
-val TabCommunityWash = Color(0xFFFBE4E0)
+/** 社区：砖红墨 + 淡粉垫 */
+val TabCommunityInk: Color
+    @Composable @ReadOnlyComposable get() =
+        if (LocalAppDarkTheme.current) Color(0xFFF0A098) else Color(0xFFA8453C)
+val TabCommunityWash: Color
+    @Composable @ReadOnlyComposable get() =
+        if (LocalAppDarkTheme.current) Color(0xFF3D2525) else Color(0xFFFBE4E0)
 
-/** 个人主页：赭金墨 + 淡黄垫（呼应便利贴暖黄） */
-val TabProfileInk = Color(0xFF96650C)
-val TabProfileWash = Color(0xFFFBEFD2)
-
-/** 兼容旧引用 */
-val BottomNavSelected = TabHomeInk
-val BottomNavIndicator = TabHomeWash
+/** 个人主页：赭金墨 + 淡黄垫 */
+val TabProfileInk: Color
+    @Composable @ReadOnlyComposable get() =
+        if (LocalAppDarkTheme.current) Color(0xFFF0D080) else Color(0xFF96650C)
+val TabProfileWash: Color
+    @Composable @ReadOnlyComposable get() =
+        if (LocalAppDarkTheme.current) Color(0xFF3D3220) else Color(0xFFFBEFD2)
