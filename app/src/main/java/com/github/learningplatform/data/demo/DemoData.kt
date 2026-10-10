@@ -522,7 +522,8 @@ object DemoData {
     val adSlots: List<AdSlotDto> = listOf(
         AdSlotDto("startup_splash", "开屏广告", "TAKU_SLOT_SPLASH_001", 4),
         AdSlotDto("community_home_banner", "社区主页轮播广告", "TAKU_SLOT_COMM_BANNER_001", 1),
-        AdSlotDto("video_home_banner", "视频主页轮播广告", "TAKU_SLOT_VIDEO_BANNER_001", 1)
+        AdSlotDto("video_home_banner", "视频主页轮播广告", "TAKU_SLOT_VIDEO_BANNER_001", 1),
+        AdSlotDto("player_pause", "播放页暂停广告", "TAKU_SLOT_PLAYER_PAUSE_001", 1)
     )
 
     val appConfig = AppConfigDto(

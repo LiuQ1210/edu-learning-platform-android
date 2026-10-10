@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.learningplatform.ui.theme.BrandGradient
+import com.github.learningplatform.ui.common.AdSlotPlaceholder
 import com.github.learningplatform.ui.theme.GlowOrb
 import com.github.learningplatform.ui.theme.GradientBackground
 import com.github.learningplatform.ui.theme.Primary
@@ -85,6 +86,15 @@ fun SplashScreen(minDurationMs: Long = 450L) {
                 text = "提升技能、精进能力.",
                 fontSize = 15.sp,
                 color = TextSecondary
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            // 【广告位预留】开屏广告位：固定预留区域，接入 Taku 时替换内部即可
+            AdSlotPlaceholder(
+                slotCode = "startup_splash",
+                height = 56.dp,
+                modifier = Modifier.padding(horizontal = 16.dp)
             )
         }
 

@@ -47,6 +47,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.learningplatform.data.remote.dto.CourseDto
 import com.github.learningplatform.ui.common.CategoryTabs
+import com.github.learningplatform.ui.common.AdSlotPlaceholder
 import com.github.learningplatform.ui.common.ErrorState
 import com.github.learningplatform.ui.common.LoadingState
 import com.github.learningplatform.ui.common.NetImage
@@ -182,13 +183,12 @@ private fun CourseFeed(
             )
         }
 
-        // 广告位：后端配了 slot 才渲染。
-        // 特意不做「广告位占位」的假框 —— 没广告时它只是一块视觉噪音，
-        // 白白占掉首屏最贵的位置。接入 Taku 后这里换成真实广告容器即可。
+        // 【广告位预留】首页信息流广告位：后端配了 slot 才渲染。
+        // 当前占位外观用于确认位置，接入 Taku 后替换组件内部即可。
         if (uiState.adSlots.isNotEmpty()) {
             item {
-                AdSlot(
-                    slots = uiState.adSlots,
+                AdSlotPlaceholder(
+                    slotCode = uiState.adSlots.firstOrNull()?.first,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                 )
             }
@@ -510,28 +510,5 @@ private fun FeaturedCourseCarousel(
                 }
             }
         }
-    }
-}
-
-/**
- * 广告位容器（预留）。
- *
- * 需求确认「暂不做广告」，所以这里**不渲染任何内容**，只保留位置与约定：
- * 后端返回的 slotCode 决定用哪个 Taku 广告位（见 HomeUiState.adSlots），
- * 接入时把 [Box] 内部换成 Taku 的广告 View 即可，上层布局不用动。
- *
- * 之所以保留这个空壳而不是删掉调用点：接入广告时不用再回来找位置，
- * 也不会因为「当时没有广告位」而把这段逻辑漏掉。
- */
-@Composable
-private fun AdSlot(
-    slots: List<Pair<String, String>>,
-    modifier: Modifier = Modifier
-) {
-    // 当前无广告内容：不占空间。
-    // 若将来需要在无填充时显示兜底内容（如「开通会员免广告」），在这里加。
-    Box(modifier = modifier.fillMaxWidth()) {
-        // 预留：Taku 广告容器挂载点
-        // slots.firstOrNull()?.first 即 slotCode
     }
 }

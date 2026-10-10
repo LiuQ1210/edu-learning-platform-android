@@ -45,6 +45,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.github.learningplatform.ui.common.ErrorState
+import com.github.learningplatform.ui.common.AdSlotPlaceholder
 import com.github.learningplatform.ui.common.LoadingState
 import com.github.learningplatform.ui.nav.NavIcons
 import kotlinx.coroutines.delay
@@ -205,6 +206,23 @@ fun PlayerScreen(
                     },
                     modifier = Modifier.fillMaxSize()
                 )
+
+                // 【广告位预留】播放页暂停广告位：仅在暂停且无错误时显示，接入 Taku 时替换内部
+                if (!isPlaying && playbackError == null) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .fillMaxWidth()
+                            .background(Color.Black.copy(alpha = 0.35f))
+                            .padding(horizontal = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AdSlotPlaceholder(
+                            slotCode = "player_pause",
+                            height = 96.dp
+                        )
+                    }
+                }
 
                 // 顶部返回条
                 Row(
