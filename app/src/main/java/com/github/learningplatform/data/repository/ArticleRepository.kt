@@ -31,7 +31,7 @@ class ArticleRepository @Inject constructor(
         tagId: Long? = null,
         sort: Int? = null
     ): PageData<ArticleDto> {
-        preview { return DemoData.articlePage(pageNum, pageSize) }
+        preview { return DemoData.articlePage(pageNum, pageSize, categoryId) }
         return safeApiCall {
             articleApi.getArticles(pageNum, pageSize, categoryId, tagId, sort)
         }

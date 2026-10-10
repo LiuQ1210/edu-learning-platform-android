@@ -25,7 +25,11 @@ class NoteRepository @Inject constructor(
         sourceType: Int? = null,
         keyword: String? = null
     ): PageData<NoteDto> {
-        preview { return DemoData.notes }
+        preview {
+            val filtered = if (sourceType == null) DemoData.notes
+            else DemoData.notes.copy(list = DemoData.notes.list.filter { it.sourceType == sourceType })
+            return filtered
+        }
         return safeApiCall {
             noteApi.getNotes(pageNum, pageSize, sourceType, keyword)
         }

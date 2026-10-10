@@ -31,6 +31,10 @@ data class VideoUiState(
     val playUrls: Map<Long, String> = emptyMap(),
     val likedIds: Set<Long> = emptySet(),
     val favoritedIds: Set<Long> = emptySet(),
+    /** 本地点赞偏移：toggle 后 +1/-1，实时更新数字 */
+    val likeDelta: Map<Long, Int> = emptyMap(),
+    val favDelta: Map<Long, Int> = emptyMap(),
+    val shareDelta: Map<Long, Int> = emptyMap(),
     val pageNum: Int = 1,
     val hasMore: Boolean = false,
     val commentsTarget: Long? = null,
@@ -144,34 +148,38 @@ class VideoViewModel @Inject constructor(
     }
 
     fun toggleLike(courseId: Long) {
+        val currentlyLiked = _uiState.value.likedIds.contains(courseId)
+        val nowLiked = !currentlyLiked
         viewModelScope.launch {
             try {
-                val result = interactionRepository.toggleLike(Constants.TARGET_COURSE, courseId)
-                _uiState.value = _uiState.value.copy(
-                    likedIds = if (result.isLiked) _uiState.value.likedIds + courseId
-                    else _uiState.value.likedIds - courseId
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                _uiState.value = _uiState.value.copy(message = e.readableMessage())
+                interactionRepository.toggleLike(Constants.TARGET_COURSE, courseId)
+            } catch (_: Throwable) {
+                // preview/离线时忽略接口异常，本地状态照常切换
             }
+            val curLikes = _uiState.value.likeDelta.getOrDefault(courseId, 0)
+            _uiState.value = _uiState.value.copy(
+                likedIds = if (nowLiked) _uiState.value.likedIds + courseId
+                else _uiState.value.likedIds - courseId,
+                likeDelta = _uiState.value.likeDelta + (courseId to (if (nowLiked) curLikes + 1 else curLikes - 1))
+            )
         }
     }
 
     fun toggleFavorite(courseId: Long) {
+        val currentlyFaved = _uiState.value.favoritedIds.contains(courseId)
+        val nowFaved = !currentlyFaved
         viewModelScope.launch {
             try {
-                val result = interactionRepository.toggleFavorite(Constants.TARGET_COURSE, courseId)
-                _uiState.value = _uiState.value.copy(
-                    favoritedIds = if (result.isFavorited) _uiState.value.favoritedIds + courseId
-                    else _uiState.value.favoritedIds - courseId
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                _uiState.value = _uiState.value.copy(message = e.readableMessage())
+                interactionRepository.toggleFavorite(Constants.TARGET_COURSE, courseId)
+            } catch (_: Throwable) {
+                // preview/离线时忽略接口异常，本地状态照常切换
             }
+            val curFav = _uiState.value.favDelta.getOrDefault(courseId, 0)
+            _uiState.value = _uiState.value.copy(
+                favoritedIds = if (nowFaved) _uiState.value.favoritedIds + courseId
+                else _uiState.value.favoritedIds - courseId,
+                favDelta = _uiState.value.favDelta + (courseId to (if (nowFaved) curFav + 1 else curFav - 1))
+            )
         }
     }
 
@@ -189,7 +197,11 @@ class VideoViewModel @Inject constructor(
                     course.courseId,
                     SHARE_PLATFORM_COPY_LINK
                 )
-                _uiState.value = _uiState.value.copy(message = "链接已复制，快去分享吧")
+                val curShare = _uiState.value.shareDelta.getOrDefault(course.courseId, 0)
+                _uiState.value = _uiState.value.copy(
+                    message = "链接已复制，快去分享吧",
+                    shareDelta = _uiState.value.shareDelta + (course.courseId to curShare + 1)
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {

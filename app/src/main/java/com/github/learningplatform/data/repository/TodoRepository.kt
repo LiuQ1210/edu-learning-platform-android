@@ -26,7 +26,11 @@ class TodoRepository @Inject constructor(
         status: Int? = null,
         priority: Int? = null
     ): PageData<TodoDto> {
-        preview { return DemoData.todos }
+        preview {
+            val filtered = if (status == null) DemoData.todos
+            else DemoData.todos.copy(list = DemoData.todos.list.filter { it.status == status })
+            return filtered
+        }
         return safeApiCall {
             todoApi.getTodos(pageNum, pageSize, status, priority)
         }

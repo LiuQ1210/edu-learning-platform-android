@@ -119,6 +119,10 @@ fun VideoScreen(
                         playUrl = uiState.playUrls[course.courseId].orEmpty(),
                         isLiked = uiState.likedIds.contains(course.courseId),
                         isFavorited = uiState.favoritedIds.contains(course.courseId),
+                        likeCount = course.likeCount + uiState.likeDelta.getOrDefault(course.courseId, 0),
+                        commentCount = course.commentCount,
+                        favoriteCount = course.favoriteCount + uiState.favDelta.getOrDefault(course.courseId, 0),
+                        shareCount = course.shareCount + uiState.shareDelta.getOrDefault(course.courseId, 0),
                         onToggleLike = { viewModel.toggleLike(course.courseId) },
                         onToggleFavorite = { viewModel.toggleFavorite(course.courseId) },
                         onOpenComments = { viewModel.openComments(course.courseId) },
@@ -154,6 +158,10 @@ private fun VideoPage(
     playUrl: String,
     isLiked: Boolean,
     isFavorited: Boolean,
+    likeCount: Int,
+    commentCount: Int,
+    favoriteCount: Int,
+    shareCount: Int,
     onToggleLike: () -> Unit,
     onToggleFavorite: () -> Unit,
     onOpenComments: () -> Unit,
@@ -202,22 +210,22 @@ private fun VideoPage(
         ) {
             VideoAction(
                 icon = NavIcons.Favorite,
-                label = formatCount(course.studentCount),
+                label = formatCount(likeCount),
                 tint = if (isLiked) Color(0xFFFF4D6A) else Color.White,
                 onClick = onToggleLike
             )
             VideoAction(
                 icon = NavIcons.Comment,
-                label = "评论",
+                label = formatCount(commentCount),
                 onClick = onOpenComments
             )
             VideoAction(
                 icon = NavIcons.Bookmark,
-                label = if (isFavorited) "已收藏" else "收藏",
+                label = formatCount(favoriteCount),
                 tint = if (isFavorited) Color(0xFFFFC107) else Color.White,
                 onClick = onToggleFavorite
             )
-            VideoAction(icon = NavIcons.Share, label = "分享", onClick = onShare)
+            VideoAction(icon = NavIcons.Share, label = formatCount(shareCount), onClick = onShare)
         }
 
         // 左下信息

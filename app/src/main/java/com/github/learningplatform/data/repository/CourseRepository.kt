@@ -43,7 +43,7 @@ class CourseRepository @Inject constructor(
         sort: Int? = null,
         forceRefresh: Boolean = false
     ): PageData<CourseDto> {
-        preview { return DemoData.coursePage(pageNum, pageSize, videoType) }
+        preview { return DemoData.coursePage(pageNum, pageSize, videoType, categoryId) }
 
         // 只缓存第 1 页；翻页直接走网络
         if (pageNum != 1) {

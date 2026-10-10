@@ -7,9 +7,6 @@ import com.github.learningplatform.data.remote.dto.ArticleDetailDto
 import com.github.learningplatform.data.remote.dto.ArticleDto
 import com.github.learningplatform.data.remote.dto.ArticleTagDto
 import com.github.learningplatform.data.remote.dto.CategoryNodeDto
-import com.github.learningplatform.data.remote.dto.CheckinRecordDto
-import com.github.learningplatform.data.remote.dto.CheckinResultDto
-import com.github.learningplatform.data.remote.dto.CheckinTaskDto
 import com.github.learningplatform.data.remote.dto.CommentDto
 import com.github.learningplatform.data.remote.dto.ContentItemDto
 import com.github.learningplatform.data.remote.dto.CourseChapterDto
@@ -26,7 +23,6 @@ import com.github.learningplatform.data.remote.dto.PlayInfoDto
 import com.github.learningplatform.data.remote.dto.RatingDto
 import com.github.learningplatform.data.remote.dto.RatingResultDto
 import com.github.learningplatform.data.remote.dto.ReplyDto
-import com.github.learningplatform.data.remote.dto.SignCalendarDto
 import com.github.learningplatform.data.remote.dto.TodoDto
 import com.github.learningplatform.data.remote.dto.UserProfileDto
 import com.github.learningplatform.data.remote.dto.UserTargetItemDto
@@ -118,7 +114,11 @@ object DemoData {
             instructorName = listOf("张老师", "李老师", "王老师", "陈老师")[i % 4],
             averageScore = 4.5 + (i % 5) * 0.1,
             studentCount = 820 + i * 340,
-            viewCount = 12000 + i * 2100
+            viewCount = 12000 + i * 2100,
+            likeCount = 320 + i * 85,
+            commentCount = 18 + i * 7,
+            favoriteCount = 96 + i * 30,
+            shareCount = 12 + i * 4
         )
     }
 
@@ -136,8 +136,14 @@ object DemoData {
         )
     }
 
-    fun coursePage(pageNum: Int, pageSize: Int, videoType: Int?): PageData<CourseDto> {
-        val source = if (videoType == 1) shortVideos else courses
+    fun coursePage(pageNum: Int, pageSize: Int, videoType: Int?, categoryId: Long? = null): PageData<CourseDto> {
+        var source = if (videoType == 1) shortVideos else courses
+        // preview 模式下按分类过滤：不同分类返回不同子集，让点击 tabs 有反馈
+        if (categoryId != null) {
+            val idx = (categoryId % 10).toInt()
+            source = source.filterIndexed { i, _ -> i % 6 == idx % 6 }
+            if (source.isEmpty()) source = courses.take(2)
+        }
         // 造两页就够，用来验证上拉加载与「没有更多了」
         val all = source + source.map { it.copy(courseId = it.courseId + 5000, title = it.title + "（进阶）") }
         val from = (pageNum - 1) * pageSize
@@ -243,8 +249,15 @@ object DemoData {
         )
     }
 
-    fun articlePage(pageNum: Int, pageSize: Int): PageData<ArticleDto> {
-        val all = articles + articles.map { it.copy(articleId = it.articleId + 7000, title = it.title + "（续）") }
+    fun articlePage(pageNum: Int, pageSize: Int, categoryId: Long? = null): PageData<ArticleDto> {
+        var source = articles
+        // preview 模式下按分类过滤，让点击 tabs 有反馈
+        if (categoryId != null) {
+            val idx = (categoryId % 10).toInt()
+            source = source.filterIndexed { i, _ -> i % 5 == idx % 5 }
+            if (source.isEmpty()) source = articles.take(2)
+        }
+        val all = source + source.map { it.copy(articleId = it.articleId + 7000, title = it.title + "（续）") }
         val slice = all.drop((pageNum - 1) * pageSize).take(pageSize)
         return PageData(total = all.size.toLong(), list = slice)
     }
@@ -456,12 +469,6 @@ object DemoData {
         )
     )
 
-    val signCalendar = SignCalendarDto(
-        continueSignDay = 7,
-        totalSignDay = 20,
-        signedDates = (1..17).map { "2026-09-%02d".format(it) }
-    )
-
     // ---------------------------------------------------------------- 笔记 / 待办
 
     val notes: PageData<NoteDto> = PageData(
@@ -517,36 +524,6 @@ object DemoData {
                 priority = 3, status = 1, createTime = "2026-09-08 08:00:00"
             )
         )
-    )
-
-    // ---------------------------------------------------------------- 签到
-
-    val checkinTasks: List<CheckinTaskDto> = listOf(
-        CheckinTaskDto(6001, "每日基地打卡", 1, "点击即可完成今日签到",
-            null, null, 100, null, "2026-09-18 00:00:00", "2026-09-18 23:59:59", 0),
-        CheckinTaskDto(6002, "实训室位置签到", 2, "请在实训楼 3 楼范围内签到",
-            106.630, 26.647, 500, null, "2026-09-18 08:00:00", "2026-09-18 18:00:00", 1),
-        CheckinTaskDto(6003, "手势签到", 3, "绘制管理员预设的九宫格图案",
-            null, null, 100, "0,1,2,5,8", "2026-09-18 08:00:00", "2026-09-18 20:00:00", 0),
-        CheckinTaskDto(6004, "现场拍照签到", 4, "上传一张现场照片作为凭证",
-            null, null, 100, null, "2026-09-18 08:00:00", "2026-09-18 22:00:00", 0)
-    )
-
-    val checkinRecords: PageData<CheckinRecordDto> = PageData(
-        total = 4,
-        list = listOf(
-            CheckinRecordDto(9001, 6001, "每日基地打卡", 1, "2026-09-17 08:12:00", 1, ""),
-            CheckinRecordDto(9002, 6002, "实训室位置签到", 2, "2026-09-16 09:30:00", 1, ""),
-            CheckinRecordDto(9003, 6003, "手势签到", 3, "2026-09-15 10:05:00", 0, "手势不匹配"),
-            CheckinRecordDto(9004, 6001, "每日基地打卡", 1, "2026-09-14 07:58:00", 1, "")
-        )
-    )
-
-    fun checkinResult(taskName: String) = CheckinResultDto(
-        checkinStatus = 1,
-        message = "签到成功，连续签到 8 天",
-        continueSignDay = 8,
-        checkinTime = "2026-09-18 09:18:00"
     )
 
     // ---------------------------------------------------------------- 配置 / 广告
