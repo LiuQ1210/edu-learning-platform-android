@@ -1,6 +1,7 @@
 package com.github.learningplatform.ui.video
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -231,9 +232,6 @@ fun PlayerScreen(
                         .padding(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onBack) {
-                        Icon(NavIcons.ArrowBack, contentDescription = "返回", tint = Color.White)
-                    }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = uiState.title.ifBlank { "课程播放" },
@@ -329,6 +327,25 @@ fun PlayerScreen(
 
 
             }
+        }
+
+        // 【返回按钮·修复】抽到最外层 Box 的最高 z 序（最后绘制），
+        // 绕过 AndroidView(PlayerView) 原生层对触摸的拦截；原 Row 内按钮已移除。
+        // 按钮放在 TopStart + top=120dp：屏幕最顶部 y≈22-148 区域会被系统状态栏层拦截触摸
+        // （实测：按钮放顶部点击无效，下移后可点击）。最高 z 序 + clickable 保证不受
+        // AndroidView(PlayerView) 全屏原生层影响。
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = 8.dp, top = 120.dp)
+                .size(48.dp)
+                .clickable {
+                    android.util.Log.d("PlayerScreen", "BACK_CLICKED")
+                    onBack()
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(NavIcons.ArrowBack, contentDescription = "返回", tint = Color.White)
         }
     }
 
