@@ -15,8 +15,6 @@ import com.github.learningplatform.BuildConfig
  * ```
  * 关掉开关（`-PuiPreview=false`）后 [preview] 恒返回 null，走真实请求。
  *
- * 注意：这里不是「网络失败时兜底」，而是**编译期开关**。生产构建里
- * `DemoData.enabled` 是常量 false，R8 会把整条分支和样例数据一起裁掉。
  */
 inline fun <T : Any> preview(block: () -> T): T? =
     if (DemoData.enabled) block() else null

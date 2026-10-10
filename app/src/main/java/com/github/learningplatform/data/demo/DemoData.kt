@@ -34,16 +34,6 @@ import com.github.learningplatform.data.remote.dto.ViewHistoryItemDto
 
 /**
  * UI 预览样例数据。
- *
- * **只在 `BuildConfig.UI_PREVIEW = true` 时被 Repository 使用**，编译期常量，
- * release 构建关掉后整块数据会被 R8 裁掉，不会进生产包。
- *
- * 存在的意义：后端未就绪时，界面必须能被打开、被点、被评审。没有它就只能看到
- * 一个登录页和满屏「网络异常」。这里给出的是**结构真实**的假数据 —— 字段、分页、
- * 层级关系都与接口文档 v3.1 一致，所以列表滚动、分页加载、空状态、详情跳转都能真跑。
- *
- * 图片用 picsum 的稳定占位图（同一 seed 每次返回同一张），断网时会自动落到
- * NetImage 的灰底占位，不影响布局检查。
  */
 object DemoData {
 

@@ -22,20 +22,13 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // 后端 BaseUrl：由 BuildConfig 注入，code 侧通过 Constants.BASE_URL 读取。
-        // 【登录注册联调】切到若依真实后端。认证接口为 /api/user/*（带 /api 前缀），
-        // 图形验证码接口为根路径 /captchaImage，故 BASE_URL 用根路径、接口注解写相对前缀。
         buildConfigField("String", "BASE_URL", "\"http://43.142.9.214:8080/\"")
 
-        // UI 预览开关：true 时 Repository 直接返回本地样例数据，不发任何网络请求。
-        // 用途：后端未就绪时先把界面跑起来给人看（四个 Tab、列表、详情、空/错状态）。
-        // 关掉它：./gradlew :app:assembleDebug -PuiPreview=false
-        val uiPreview = (project.findProperty("uiPreview") as String?)?.toBoolean() ?: true
+        // UI 预览开关：true 时登录/注册等认证接口直接返回本地假登录，不发任何网络请求。
+        val uiPreview = (project.findProperty("uiPreview") as String?)?.toBoolean() ?: false
         buildConfigField("boolean", "UI_PREVIEW", uiPreview.toString())
 
-        // 【任务⑦ 混合模式】内容域（分类树/课程/文章/个人中心内容）独立预览开关：
-        //  - UI_PREVIEW=false 时，登录/注册等认证接口走真实后端（若依已就绪），
-        //    而内容域接口后端尚未提供 → CONTENT_PREVIEW 默认 true，内容域继续返回本地死数据；
-        //  - 后端内容域接口做好后，关闭它即可切回真实接口：./gradlew :app:assembleDebug -PuiPreview=false -PcontentPreview=false
+        // 内容域（分类树/课程/文章/个人中心内容）独立预览开关：
         val contentPreview = (project.findProperty("contentPreview") as String?)?.toBoolean() ?: true
         buildConfigField("boolean", "CONTENT_PREVIEW", contentPreview.toString())
     }

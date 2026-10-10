@@ -3,7 +3,7 @@ package com.github.learningplatform.core.constants
 import com.github.learningplatform.BuildConfig
 
 /**
- * 全局常量 —— 对齐《接口设计文档 v3.0》。
+ * 全局常量
  *
  * BASE_URL 不能声明为 const val：BuildConfig.BASE_URL 是 Java static final。
  */
