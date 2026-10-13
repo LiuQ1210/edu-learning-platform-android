@@ -87,8 +87,9 @@ fun LoginScreen(
         AuthField(
             value = uiState.username,
             onValueChange = viewModel::onUsernameChange,
-            placeholder = "用户名",
+            placeholder = "手机号",
             icon = NavIcons.Person,
+            keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone,
             isError = uiState.usernameError != null,
             errorMessage = uiState.usernameError.orEmpty()
         )

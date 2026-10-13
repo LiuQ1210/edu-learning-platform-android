@@ -95,39 +95,34 @@ class ArticleDetailViewModel @Inject constructor(
     }
 
     fun toggleLike() {
+        val cur = _uiState.value
+        val nowLiked = !cur.isLiked
+        _uiState.value = cur.copy(
+            isLiked = nowLiked,
+            detail = cur.detail?.copy(
+                likeCount = if (nowLiked) (cur.detail?.likeCount ?: 0) + 1
+                else ((cur.detail?.likeCount ?: 0) - 1).coerceAtLeast(0)
+            )
+        )
+        // 后台静默同步，失败不影响本地状态
         viewModelScope.launch {
-            try {
-                val result = interactionRepository.toggleLike(Constants.TARGET_ARTICLE, articleId)
-                _uiState.value = _uiState.value.copy(
-                    isLiked = result.isLiked,
-                    detail = _uiState.value.detail?.copy(likeCount = result.likeCount)
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                _uiState.value = _uiState.value.copy(message = e.readableMessage())
-            }
+            try { interactionRepository.toggleLike(Constants.TARGET_ARTICLE, articleId) } catch (_: Throwable) {}
         }
     }
 
     fun toggleFavorite() {
+        val cur = _uiState.value
+        val nowFaved = !cur.isFavorited
+        _uiState.value = cur.copy(
+            isFavorited = nowFaved,
+            detail = cur.detail?.copy(
+                favoriteCount = if (nowFaved) (cur.detail?.favoriteCount ?: 0) + 1
+                else ((cur.detail?.favoriteCount ?: 0) - 1).coerceAtLeast(0)
+            ),
+            message = if (nowFaved) "已收藏" else "已取消收藏"
+        )
         viewModelScope.launch {
-            try {
-                val result = interactionRepository.toggleFavorite(Constants.TARGET_ARTICLE, articleId)
-                _uiState.value = _uiState.value.copy(
-                    isFavorited = result.isFavorited,
-                    detail = _uiState.value.detail?.copy(
-                        favoriteCount = if (result.isFavorited)
-                            _uiState.value.detail!!.favoriteCount + 1
-                        else (_uiState.value.detail!!.favoriteCount - 1).coerceAtLeast(0)
-                    ),
-                    message = if (result.isFavorited) "已收藏" else "已取消收藏"
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                _uiState.value = _uiState.value.copy(message = e.readableMessage())
-            }
+            try { interactionRepository.toggleFavorite(Constants.TARGET_ARTICLE, articleId) } catch (_: Throwable) {}
         }
     }
 
@@ -193,21 +188,20 @@ class ArticleDetailViewModel @Inject constructor(
     }
 
     fun toggleCommentLike(commentId: Long) {
-        viewModelScope.launch {
-            try {
-                val result = interactionRepository.toggleCommentLike(commentId)
-                _uiState.value = _uiState.value.copy(
-                    comments = _uiState.value.comments.map {
-                        if (it.commentId == commentId)
-                            it.copy(isLiked = result.isLiked, likeCount = result.likeCount)
-                        else it
-                    }
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                _uiState.value = _uiState.value.copy(message = e.readableMessage())
+        val cur = _uiState.value
+        _uiState.value = cur.copy(
+            comments = cur.comments.map {
+                if (it.commentId == commentId) {
+                    val nowLiked = !it.isLiked
+                    it.copy(
+                        isLiked = nowLiked,
+                        likeCount = if (nowLiked) it.likeCount + 1 else (it.likeCount - 1).coerceAtLeast(0)
+                    )
+                } else it
             }
+        )
+        viewModelScope.launch {
+            try { interactionRepository.toggleCommentLike(commentId) } catch (_: Throwable) {}
         }
     }
 

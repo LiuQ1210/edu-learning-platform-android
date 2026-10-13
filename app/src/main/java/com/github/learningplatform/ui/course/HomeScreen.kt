@@ -74,6 +74,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun HomeScreen(
     onOpenSearch: () -> Unit,
+    onOpenNotifications: () -> Unit,
     onOpenAllCategories: () -> Unit,
     onOpenCourse: (Long) -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
@@ -86,7 +87,7 @@ fun HomeScreen(
             // 与登录页一致的奶油渐变（只铺顶部一段；列表页整屏渐变会让长时间阅读很累）
             .background(pageGradientBrush(strong = false))
     ) {
-        HomeTopBar(onOpenSearch = onOpenSearch)
+        HomeTopBar(onOpenSearch = onOpenSearch, onOpenMenu = onOpenAllCategories, onOpenNotifications = onOpenNotifications)
 
         if (uiState.categories.isNotEmpty()) {
             CategoryTabs(
@@ -112,14 +113,14 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HomeTopBar(onOpenSearch: () -> Unit) {
+private fun HomeTopBar(onOpenSearch: () -> Unit, onOpenMenu: () -> Unit, onOpenNotifications: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 4.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = { }) {
+        IconButton(onClick = onOpenMenu) {
             Icon(NavIcons.Menu, contentDescription = "菜单", tint = TextPrimary)
         }
 
@@ -147,7 +148,7 @@ private fun HomeTopBar(onOpenSearch: () -> Unit) {
             )
         }
 
-        IconButton(onClick = { }) {
+        IconButton(onClick = onOpenNotifications) {
             Icon(NavIcons.Notifications, contentDescription = "通知", tint = TextPrimary)
         }
     }

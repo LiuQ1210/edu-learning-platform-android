@@ -84,10 +84,6 @@ fun SettingsScreen(
             ) {
                 SettingRow(NavIcons.Lock, "修改密码", onClick = onOpenChangePassword)
                 Divider()
-                SettingRow(NavIcons.Person, "个人资料", onClick = { })
-                Divider()
-                SettingRow(NavIcons.Notifications, "消息通知", onClick = { })
-                Divider()
                 SettingRow(
                     icon = NavIcons.Bookmark,
                     title = "主题模式",

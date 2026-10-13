@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -32,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -102,6 +104,10 @@ fun PlayerScreen(
     var positionSec by remember { mutableFloatStateOf(0f) }
     var durationSec by remember { mutableFloatStateOf(0f) }
     var isPlaying by remember { mutableStateOf(true) }
+    val speeds = listOf(0.5f, 1.0f, 1.25f, 1.5f, 2.0f)
+    var speedIdx by remember { mutableStateOf(1) }
+    var showSpeedMenu by remember { mutableStateOf(false) }
+    var isFullscreen by remember { mutableStateOf(false) }
 
     // 进度采样 + 心跳：只在播放中推进，暂停时不上报
     DisposableEffect(player) {
@@ -292,6 +298,52 @@ fun PlayerScreen(
                         color = Color.White,
                         style = MaterialTheme.typography.labelSmall
                     )
+
+                    // 倍速按钮
+                    Box {
+                        TextButton(
+                            onClick = { showSpeedMenu = true },
+                            colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = Color.White)
+                        ) {
+                            Text(
+                                text = String.format(Locale.CHINA, "%.2fx", speeds[speedIdx]),
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                        androidx.compose.material3.DropdownMenu(
+                            expanded = showSpeedMenu,
+                            onDismissRequest = { showSpeedMenu = false }
+                        ) {
+                            speeds.forEachIndexed { i, sp ->
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(String.format(Locale.CHINA, "%.2fx", sp)) },
+                                    onClick = {
+                                        speedIdx = i
+                                        player.setPlaybackSpeed(sp)
+                                        showSpeedMenu = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // 全屏按钮：横屏放大 / 竖屏恢复
+                    IconButton(onClick = {
+                        val activity = context as? android.app.Activity
+                        if (!isFullscreen) {
+                            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                            isFullscreen = true
+                        } else {
+                            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                            isFullscreen = false
+                        }
+                    }) {
+                        Text(
+                            text = if (isFullscreen) "⤡" else "⛶",
+                            color = Color.White,
+                            fontSize = 18.sp
+                        )
+                    }
                 }
 
 
@@ -302,6 +354,14 @@ fun PlayerScreen(
     if (uiState.isLoading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(color = Color.White)
+        }
+    }
+
+    // 退出时恢复竖屏
+    DisposableEffect(Unit) {
+        onDispose {
+            val activity = context as? android.app.Activity
+            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
     }
 

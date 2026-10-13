@@ -52,6 +52,9 @@ object Routes {
     const val SETTINGS = "settings"
     const val CHANGE_PASSWORD = "change_password"
 
+    // ---- 通知 ----
+    const val NOTIFICATIONS = "notifications"
+
     // ---- 签到（全屏）----
     const val CHECKIN = "checkin"
     const val CHECKIN_RECORD = "checkin_record"
@@ -82,7 +85,7 @@ object Routes {
     fun articleEdit(articleId: Long) = "article_edit/$articleId"
     fun noteDetail(noteId: Long) = "note_detail/$noteId"
     fun tagArticles(tagId: Long) = "tag_articles/$tagId"
-    fun blogHome(userId: Long) = "blog_home/$userId"
+    fun blogHome(userId: Long, self: Boolean = false) = "blog_home/$userId?self=$self"
     fun player(courseId: Long, lessonId: Long? = null) =
         "player/$courseId?lessonId=${lessonId ?: 0L}"
 }

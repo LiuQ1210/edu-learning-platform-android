@@ -210,7 +210,7 @@ object DemoData {
         // 实测症状是「画面不动、位置一直 00:00」——ExoPlayer 停在 BUFFERING、
         // duration 始终是 TIME_UNSET，但**代码链路完全正常**，很容易误判成播放器有问题。
         // W3C 这个源支持 Range 请求，进度条可以拖动。
-        playUrl = "https://media.w3.org/2010/05/sintel/trailer.mp4",
+        playUrl = "https://www.runoob.com/try/demo/movie.mp4",
         expireTime = System.currentTimeMillis() / 1000 + 3600,
         watermarkText = "DemoUser1001",
         duration = 52
@@ -249,13 +249,18 @@ object DemoData {
         )
     }
 
-    fun articlePage(pageNum: Int, pageSize: Int, categoryId: Long? = null): PageData<ArticleDto> {
+    fun articlePage(pageNum: Int, pageSize: Int, categoryId: Long? = null, sort: Int? = null): PageData<ArticleDto> {
         var source = articles
         // preview 模式下按分类过滤，让点击 tabs 有反馈
         if (categoryId != null) {
             val idx = (categoryId % 10).toInt()
             source = source.filterIndexed { i, _ -> i % 5 == idx % 5 }
             if (source.isEmpty()) source = articles.take(2)
+        }
+        // 排序：1最新(默认按时间) 2最热(按点赞) 3精华(只取前3篇当精华)
+        when (sort) {
+            2 -> source = source.sortedByDescending { it.likeCount }
+            3 -> source = source.take(3)
         }
         val all = source + source.map { it.copy(articleId = it.articleId + 7000, title = it.title + "（续）") }
         val slice = all.drop((pageNum - 1) * pageSize).take(pageSize)
@@ -367,22 +372,22 @@ object DemoData {
         HotWordDto("英语口语", 310)
     )
 
-    fun searchResult(keyword: String?, type: Int, pageNum: Int): PageData<ContentItemDto> {
-        val items = if (type == 1) {
-            articles.map {
+    fun searchResult(keyword: String?, type: Int, pageNum: Int, categoryId: Long? = null): PageData<ContentItemDto> {
+        val pool = if (type == 1) {
+            articles.mapIndexed { idx, it ->
                 ContentItemDto(
                     id = it.articleId, type = 1, title = it.title, summary = it.summary,
-                    coverUrl = it.coverUrl, categoryId = 101, categoryName = it.categoryName,
+                    coverUrl = it.coverUrl, categoryId = 101L + (idx % 5), categoryName = it.categoryName,
                     authorId = it.authorId, authorName = it.authorName,
                     viewCount = it.viewCount, likeCount = it.likeCount, commentCount = it.commentCount,
                     createTime = it.publishTime, publishTime = it.publishTime
                 )
             }
         } else {
-            courses.map {
+            courses.mapIndexed { idx, it ->
                 ContentItemDto(
                     id = it.courseId, type = 2, title = it.title, summary = "系统讲解 + 实战演练",
-                    coverUrl = it.coverUrl, categoryId = 3, categoryName = "IT 解决方案",
+                    coverUrl = it.coverUrl, categoryId = 1L + (idx % 6), categoryName = "IT 解决方案",
                     authorId = 88, authorName = it.instructorName,
                     viewCount = it.viewCount,
                     duration = it.duration, score = it.averageScore,
@@ -390,9 +395,29 @@ object DemoData {
                 )
             }
         }
-        val filtered = if (keyword.isNullOrBlank()) items
-        else items.filter { it.title.contains(keyword, ignoreCase = true) }
-            .ifEmpty { items }   // 预览模式下不制造「无结果」，避免看起来像坏了
+        var filtered = pool
+        // 按分类过滤：一级分类 1-6，子分类 11-42；
+        // 点子分类时归到它的一级父类（11->1, 21->2, 31->3, 41->4）
+        if (categoryId != null) {
+            val parentCat = when (categoryId) {
+                in 11..19 -> 1L
+                in 21..29 -> 2L
+                in 31..39 -> 3L
+                in 41..49 -> 4L
+                in 51..59 -> 5L
+                in 61..69 -> 6L
+                else -> categoryId
+            }
+            filtered = pool.filter { it.categoryId == parentCat }
+            // 该分类在 demo 里只有 1-2 门课，太少就补几条，保证看起来不空
+            if (filtered.size < 2) {
+                filtered = pool.filter { it.categoryId == parentCat || it.categoryId == (parentCat % 6) + 1L }
+            }
+        }
+        if (!keyword.isNullOrBlank()) {
+            val byKw = filtered.filter { it.title.contains(keyword, ignoreCase = true) }
+            if (byKw.isNotEmpty()) filtered = byKw
+        }
         val slice = filtered.drop((pageNum - 1) * 10).take(10)
         return PageData(total = filtered.size.toLong(), list = slice)
     }
@@ -408,8 +433,8 @@ object DemoData {
         email = "zhangsan@example.com",
         gender = 1,
         bio = "热爱学习，正在补 Android 和算法。",
-        continueSignDay = 7,
-        lastSignDate = "2026-09-17",
+        continueSignDay = 12,
+        lastSignDate = "2026-10-09",
         createTime = "2026-01-01 00:00:00"
     )
 

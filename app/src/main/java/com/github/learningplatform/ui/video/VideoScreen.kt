@@ -24,14 +24,19 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,6 +64,7 @@ import com.github.learningplatform.ui.common.NetImage
 import com.github.learningplatform.ui.common.formatCount
 import com.github.learningplatform.ui.nav.NavIcons
 import com.github.learningplatform.ui.theme.TextHint
+import com.github.learningplatform.ui.theme.TextSecondary
 import com.github.learningplatform.ui.theme.pageGradientBrush
 import java.util.Locale
 
@@ -146,6 +152,7 @@ fun VideoScreen(
             error = uiState.commentsError,
             hasMore = uiState.commentsHasMore,
             onLoadMore = viewModel::loadMoreComments,
+            onPostComment = viewModel::postComment,
             onDismiss = viewModel::closeComments
         )
     }
@@ -204,7 +211,7 @@ private fun VideoPage(
         Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 12.dp, bottom = 120.dp),
+                .padding(end = 12.dp, bottom = 80.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
@@ -225,26 +232,15 @@ private fun VideoPage(
                 tint = if (isFavorited) Color(0xFFFFC107) else Color.White,
                 onClick = onToggleFavorite
             )
-            VideoAction(icon = NavIcons.Share, label = formatCount(shareCount), onClick = onShare)
+            // 分享按钮已移除
         }
 
         // 左下信息
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 16.dp, end = 80.dp, bottom = 120.dp)
+                .padding(start = 16.dp, end = 80.dp, bottom = 80.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Avatar(url = "", name = course.instructorName, size = 32.dp)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = course.instructorName.ifBlank { "学习平台" },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            Spacer(Modifier.height(10.dp))
             Text(
                 text = course.title,
                 style = MaterialTheme.typography.titleMedium,
@@ -317,21 +313,81 @@ private fun ShortVideoPlayer(playUrl: String, modifier: Modifier = Modifier) {
             prepare()
         }
     }
+    DisposableEffect(player) { onDispose { player.release() } }
 
-    DisposableEffect(player) {
-        onDispose { player.release() }
+    var isPlaying by remember { mutableStateOf(false) }
+    var pos by remember { mutableStateOf(0L) }
+    var dur by remember { mutableStateOf(0L) }
+
+    LaunchedEffect(player) {
+        while (true) {
+            if (player.duration > 0) dur = player.duration
+            pos = player.currentPosition
+            isPlaying = player.isPlaying
+            kotlinx.coroutines.delay(500)
+        }
     }
 
-    AndroidView(
-        factory = {
-            PlayerView(it).apply {
-                useController = false
-                this.player = player
-                setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
+    Box(modifier = modifier) {
+        AndroidView(
+            factory = {
+                PlayerView(it).apply {
+                    useController = false
+                    this.player = player
+                    setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // 点击画面暂停/播放
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable { if (player.isPlaying) player.pause() else player.play() }
+        )
+
+        // 暂停时中央显示播放按钮
+        if (!isPlaying) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .clickable { player.play() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(NavIcons.Play, contentDescription = "播放", tint = Color.White, modifier = Modifier.size(36.dp))
             }
-        },
-        modifier = modifier
-    )
+        }
+
+        // 底部进度条
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(bottom = 90.dp, start = 12.dp, end = 12.dp)
+        ) {
+            Text(fmt(pos), style = MaterialTheme.typography.labelSmall, color = Color.White)
+            Slider(
+                value = if (dur > 0) (pos.toFloat() / dur).coerceIn(0f, 1f) else 0f,
+                onValueChange = { if (dur > 0) player.seekTo((it * dur).toLong()) },
+                modifier = Modifier.weight(1f).height(24.dp),
+                colors = androidx.compose.material3.SliderDefaults.colors(
+                    thumbColor = Color.White, activeTrackColor = Color.White,
+                    inactiveTrackColor = Color.White.copy(alpha = 0.3f)
+                )
+            )
+            Text(fmt(dur), style = MaterialTheme.typography.labelSmall, color = Color.White)
+        }
+    }
+}
+
+private fun fmt(ms: Long): String {
+    if (ms <= 0) return "00:00"
+    val s = ms / 1000; return String.format(Locale.CHINA, "%02d:%02d", s / 60, s % 60)
 }
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -342,6 +398,7 @@ private fun CommentsSheet(
     error: String?,
     hasMore: Boolean,
     onLoadMore: () -> Unit,
+    onPostComment: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -352,25 +409,38 @@ private fun CommentsSheet(
                 .height(420.dp)
                 .padding(horizontal = 16.dp)
         ) {
-            Text(
-                text = "评论",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
+            var replyToUser by remember { mutableStateOf<String?>(null) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "评论",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "${comments.size} 条",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextHint
+                )
+            }
             Spacer(Modifier.height(12.dp))
 
             when {
-                loading && comments.isEmpty() -> LoadingState()
-                error != null && comments.isEmpty() -> ErrorState(message = error)
-                comments.isEmpty() -> EmptyState(message = "还没有评论")
+                loading && comments.isEmpty() -> Box(Modifier.weight(1f).fillMaxWidth()) { LoadingState() }
+                error != null && comments.isEmpty() -> Box(Modifier.weight(1f).fillMaxWidth()) { ErrorState(message = error) }
+                comments.isEmpty() -> Box(Modifier.weight(1f).fillMaxWidth()) { EmptyState(message = "还没有评论") }
                 else -> LazyColumn(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .weight(1f)
+                        .fillMaxWidth()
                         .background(pageGradientBrush(strong = true)),
                     contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
                     items(comments, key = { it.commentId }) { comment ->
-                        CommentRow(comment)
+                        CommentRow(
+                            comment = comment,
+                            onReply = { replyToUser = comment.userName }
+                        )
                     }
                     if (hasMore) {
                         item {
@@ -391,12 +461,50 @@ private fun CommentsSheet(
                     }
                 }
             }
+
+            // 底部评论输入框
+            Spacer(Modifier.height(8.dp))
+            if (replyToUser != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("回复 @$replyToUser", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = { replyToUser = null }) { Text("取消", color = TextHint) }
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                var input by remember { mutableStateOf("") }
+                androidx.compose.material3.OutlinedTextField(
+                    value = input,
+                    onValueChange = { input = it },
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text(if (replyToUser != null) "回复 @$replyToUser..." else "说点什么...", color = TextHint) },
+                    shape = RoundedCornerShape(24.dp),
+                    singleLine = true
+                )
+                Spacer(Modifier.width(8.dp))
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        if (input.isNotBlank()) {
+                            onPostComment(if (replyToUser != null) "回复 @$replyToUser: ${input.trim()}" else input.trim())
+                            input = ""
+                            replyToUser = null
+                        }
+                    }
+                ) {
+                    Text("发送", color = MaterialTheme.colorScheme.primary)
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun CommentRow(comment: CommentDto) {
+private fun CommentRow(comment: CommentDto, onReply: () -> Unit = {}) {
+    var liked by remember { mutableStateOf(comment.isLiked) }
+    var likeCnt by remember { mutableStateOf(comment.likeCount) }
     Row(modifier = Modifier
         .fillMaxWidth()
         .padding(vertical = 10.dp)
@@ -413,10 +521,44 @@ private fun CommentRow(comment: CommentDto) {
             Text(text = comment.content, style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(4.dp))
             Text(
-                text = comment.createTime,
+                text = comment.createTime + "  ·  回复 " + comment.replyCount,
                 style = MaterialTheme.typography.bodySmall,
                 color = TextHint
             )
+            // 显示热门回复
+            comment.hotReplies.forEach { reply ->
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.Black.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
+                        .padding(8.dp)
+                ) {
+                    Text(
+                        text = reply.userName + (reply.replyToName?.let { " 回复 $it" } ?: "") + "：" + reply.content,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                }
+            }
+        }
+        // 评论点赞 + 回复
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                NavIcons.Favorite,
+                contentDescription = "赞",
+                tint = if (liked) Color(0xFFFF4D6A) else TextHint,
+                modifier = Modifier
+                    .size(18.dp)
+                    .clickable {
+                        liked = !liked
+                        likeCnt = if (liked) likeCnt + 1 else likeCnt - 1
+                    }
+            )
+            Spacer(Modifier.height(2.dp))
+            Text("$likeCnt", style = MaterialTheme.typography.labelSmall, color = TextHint)
+            Spacer(Modifier.height(8.dp))
+            Icon(NavIcons.Comment, contentDescription = "回复", tint = TextHint, modifier = Modifier.size(16.dp).clickable { onReply() })
         }
     }
 }

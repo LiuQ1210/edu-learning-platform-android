@@ -107,5 +107,6 @@ data class RatingDto(
     val userName: String = "",
     val userAvatar: String = "",
     val score: Double = 0.0,
+    val comment: String = "",
     val createTime: String = ""
 )

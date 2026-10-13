@@ -1,5 +1,6 @@
 package com.github.learningplatform.ui.article
 
+import kotlinx.coroutines.launch
 import android.annotation.SuppressLint
 import android.os.Build
 import android.webkit.WebView
@@ -93,9 +94,23 @@ fun ArticleDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    // 从通知点进来时高亮指定评论
+    val highlightCommentId = remember { CommentHighlightBus.highlightCommentId.also { CommentHighlightBus.highlightCommentId = null } }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     var commentInput by remember { mutableStateOf("") }
 
     LaunchedEffect(articleId) { viewModel.load(articleId) }
+
+    // 从通知点进来时自动滚动到高亮评论
+    LaunchedEffect(highlightCommentId, uiState.comments.size) {
+        val target = highlightCommentId ?: return@LaunchedEffect
+        val idx = uiState.comments.indexOfFirst { it.commentId == target }
+        if (idx >= 0) {
+            // 前面有 3 个 item：Header、正文、评论标题
+            listState.animateScrollToItem(3 + idx)
+        }
+    }
 
     LaunchedEffect(uiState.message) {
         uiState.message?.let {
@@ -156,6 +171,9 @@ fun ArticleDetailScreen(
             ArticleBottomBar(
                 likeCount = uiState.detail?.likeCount ?: 0,
                 commentCount = uiState.detail?.commentCount ?: 0,
+                onOpenComments = {
+                    scope.launch { listState.animateScrollToItem(2) }
+                },
                 isLiked = uiState.isLiked,
                 isFavorited = uiState.isFavorited,
                 commentInput = commentInput,
@@ -186,7 +204,7 @@ fun ArticleDetailScreen(
             uiState.detail == null -> EmptyState(message = "文章不存在", modifier = m)
             else -> {
                 val detail = uiState.detail!!
-                LazyColumn(modifier = m.background(pageGradientBrush(strong = true)), contentPadding = PaddingValues(bottom = 24.dp)) {
+                LazyColumn(state = listState, modifier = m.background(pageGradientBrush(strong = true)), contentPadding = PaddingValues(bottom = 24.dp)) {
                     item {
                         ArticleHeader(
                             detail = detail,
@@ -222,8 +240,12 @@ fun ArticleDetailScreen(
                     items(uiState.comments, key = { it.commentId }) { comment ->
                         CommentItem(
                             comment = comment,
+                            highlighted = comment.commentId == highlightCommentId,
                             onToggleLike = { viewModel.toggleCommentLike(comment.commentId) },
-                            onDelete = { viewModel.deleteComment(comment.commentId) }
+                            onDelete = { viewModel.deleteComment(comment.commentId) },
+                            onReply = {
+                                commentInput = "回复 @${comment.userName}："
+                            }
                         )
                     }
 
@@ -327,6 +349,7 @@ private fun ArticleHeader(
                 }
             }
         }
+
     }
 }
 
@@ -434,13 +457,18 @@ private fun RichContent(html: String, modifier: Modifier = Modifier) {
 @Composable
 private fun CommentItem(
     comment: CommentDto,
+    highlighted: Boolean = false,
     onToggleLike: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onReply: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 10.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (highlighted) Color(0xFFFFF3E0) else Color.Transparent)
+            .padding(horizontal = if (highlighted) 8.dp else 0.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Avatar(url = comment.userAvatar, name = comment.userName, size = 32.dp)
@@ -521,6 +549,7 @@ private fun CommentItem(
 private fun ArticleBottomBar(
     likeCount: Int,
     commentCount: Int,
+    onOpenComments: () -> Unit,
     isLiked: Boolean,
     isFavorited: Boolean,
     commentInput: String,
@@ -582,19 +611,13 @@ private fun ArticleBottomBar(
                     icon = NavIcons.Comment,
                     label = formatCount(commentCount),
                     tint = TextSecondary,
-                    onClick = { }
+                    onClick = onOpenComments
                 )
                 BarAction(
                     icon = NavIcons.Bookmark,
                     label = if (isFavorited) "已收藏" else "收藏",
                     tint = if (isFavorited) Primary else TextSecondary,
                     onClick = onToggleFavorite
-                )
-                BarAction(
-                    icon = NavIcons.Share,
-                    label = "分享",
-                    tint = TextSecondary,
-                    onClick = onShare
                 )
             }
         }

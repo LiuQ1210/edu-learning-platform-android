@@ -57,6 +57,8 @@ import com.github.learningplatform.ui.mine.MyCoursesScreen
 import com.github.learningplatform.ui.mine.ProfileScreen
 import com.github.learningplatform.ui.mine.StudyStatsScreen
 import com.github.learningplatform.ui.mine.StudyPathScreen
+import com.github.learningplatform.ui.mine.NotificationsScreen
+import com.github.learningplatform.ui.community.CommunityProfileScreen
 import com.github.learningplatform.ui.mine.SettingsScreen
 import com.github.learningplatform.ui.mine.WatchHistoryScreen
 import com.github.learningplatform.ui.note.NoteDetailScreen
@@ -135,12 +137,17 @@ private fun RootNavHost(navController: NavHostController, startDestination: Stri
         composable(Routes.CHECKIN) {
             CheckinTaskScreen(
                 onBack = { navController.popBackStack() },
-                onOpenRecords = { navController.navigate(Routes.CHECKIN_RECORD) }
+                onOpenRecords = { navController.navigate(Routes.CHECKIN_RECORD) },
+                onOpenRules = { navController.navigate("checkin_rules") }
             )
         }
 
         composable(Routes.CHECKIN_RECORD) {
             CheckinRecordScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable("checkin_rules") {
+            com.github.learningplatform.ui.checkin.PointsRulesScreen(onBack = { navController.popBackStack() })
         }
 
         // 播放器：全屏 + 横竖屏自适应
@@ -246,6 +253,7 @@ fun MainScaffold(
             composable(Routes.HOME) {
                 HomeScreen(
                     onOpenSearch = { navController.navigate(Routes.search()) },
+                    onOpenNotifications = { navController.navigate(Routes.NOTIFICATIONS) },
                     onOpenAllCategories = { navController.navigate(Routes.CATEGORY_ALL) },
                     onOpenCourse = { navController.navigate(Routes.courseDetail(it)) },
                 )
@@ -269,8 +277,10 @@ fun MainScaffold(
 
             composable(Routes.PROFILE) {
                 ProfileScreen(
+                    onOpenNotifications = { navController.navigate(Routes.NOTIFICATIONS) },
                     onOpenCheckin = onOpenCheckin,
                     onOpenEditProfile = { navController.navigate(Routes.EDIT_PROFILE) },
+                    onOpenCommunityProfile = { navController.navigate(Routes.blogHome(0L, self = true)) },
                     onOpenMyCourses = { navController.navigate(Routes.MY_COURSES) },
                     onOpenStudyStats = { navController.navigate(Routes.STUDY_STATS) },
                     onOpenMyArticles = { navController.navigate(Routes.MY_ARTICLES) },
@@ -494,6 +504,47 @@ fun MainScaffold(
                 ChangePasswordScreen(
                     onBack = { navController.popBackStack() },
                     onDone = { navController.popBackStack() }
+                )
+            }
+
+            composable(Routes.NOTIFICATIONS) {
+                NotificationsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenCourse = { courseId, lessonId ->
+                        com.github.learningplatform.ui.course.LessonHighlightBus.highlightLessonId = lessonId
+                        navController.navigate(Routes.courseDetail(courseId))
+                    },
+                    onOpenArticle = { articleId, commentId ->
+                        com.github.learningplatform.ui.article.CommentHighlightBus.highlightCommentId = commentId
+                        navController.navigate(Routes.articleDetail(articleId))
+                    },
+                    onOpenVideo = { commentId ->
+                            com.github.learningplatform.ui.video.VideoCommentHighlightBus.highlightCommentId = commentId
+                            navController.navigate(Routes.VIDEO)
+                        },
+                    onOpenUser = { userId -> navController.navigate(Routes.blogHome(userId)) },
+                    onOpenTodos = { navController.navigate(Routes.TODOS) }
+                )
+            }
+
+            composable(
+                route = Routes.BLOG_HOME + "?self={self}",
+                arguments = listOf(
+                    navArgument("userId") { type = NavType.LongType },
+                    navArgument("self") {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    }
+                )
+            ) { backStack ->
+                val userId = backStack.arguments?.getLong("userId") ?: 0L
+                val isSelf = backStack.arguments?.getBoolean("self") ?: false
+                CommunityProfileScreen(
+                    userId = userId,
+                    onBack = { navController.popBackStack() },
+                    onOpenArticle = { navController.navigate(Routes.articleDetail(it)) },
+                    isSelf = isSelf,
+                    onEdit = { navController.navigate(Routes.EDIT_PROFILE) }
                 )
             }
         }

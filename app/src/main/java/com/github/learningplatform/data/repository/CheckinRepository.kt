@@ -24,9 +24,9 @@ class CheckinRepository @Inject constructor() {
 
     // ---- preview 内存状态 ----
     private var lastSignDate: String = ""
-    private var continuousDays: Int = 0
-    private var points: Int = 0
-    private var totalSigns: Int = 0
+    private var continuousDays: Int = 12
+    private var points: Int = 286
+    private var totalSigns: Int = 12
     private var adFreeUntil: Long = 0L
 
     private val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())

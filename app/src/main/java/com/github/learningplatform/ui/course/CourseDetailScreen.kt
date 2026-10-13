@@ -1,6 +1,7 @@
 ﻿package com.github.learningplatform.ui.course
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -46,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.learningplatform.data.remote.dto.CourseChapterDto
@@ -87,9 +90,33 @@ fun CourseDetailScreen(
     viewModel: CourseDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val highlightLessonId = remember { LessonHighlightBus.highlightLessonId.also { LessonHighlightBus.highlightLessonId = null } }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
+    var localRatings by remember { mutableStateOf(listOf<RatingDto>()) }
 
     LaunchedEffect(courseId) { viewModel.load(courseId) }
+
+    // 从通知点进来时自动滚动到包含高亮课的章节
+    LaunchedEffect(highlightLessonId, uiState.detail) {
+        val target = highlightLessonId ?: return@LaunchedEffect
+        val detail = uiState.detail ?: return@LaunchedEffect
+        // 计算高亮课在第几个章节：前面有多少个非章节 item
+        var itemIndex = 0
+        var found = false
+        for (chapter in detail.chapters) {
+            // 每个章节是一个 item
+            if (chapter.lessons.any { it.lessonId == target }) {
+                found = true
+                break
+            }
+            itemIndex++
+        }
+        if (found) {
+            // 章节前面还有 Header、简介等 item（粗略估计 3 个）
+            listState.animateScrollToItem(itemIndex + 3)
+        }
+    }
 
     LaunchedEffect(uiState.message) {
         uiState.message?.let {
@@ -99,27 +126,7 @@ fun CourseDetailScreen(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        bottomBar = {
-            val detail = uiState.detail
-            if (detail != null) {
-                CourseBottomBar(
-                    joined = detail.isJoined,
-                    isFree = detail.isFree == 1,
-                    busy = uiState.joining,
-                    isFavorited = uiState.isFavorited,
-                    onJoin = viewModel::joinOrPlay,
-                    onToggleFavorite = viewModel::toggleFavorite,
-                    onPlay = {
-                        if (!uiState.hasPlayPermission(detail)) {
-                            viewModel.notifyNeedJoin()
-                        } else {
-                            onOpenPlayer(courseId, null)
-                        }
-                    }
-                )
-            }
-        }
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         val m = Modifier
             .padding(padding)
@@ -136,7 +143,7 @@ fun CourseDetailScreen(
             uiState.detail == null -> EmptyState(message = "课程不存在", modifier = m)
             else -> {
                 val detail = uiState.detail!!
-                LazyColumn(modifier = m.background(pageGradientBrush(strong = true)), contentPadding = PaddingValues(bottom = 24.dp)) {
+                LazyColumn(state = listState, modifier = m.background(pageGradientBrush(strong = true)), contentPadding = PaddingValues(bottom = 24.dp)) {
                     item {
                         Box {
                             NetImage(
@@ -159,7 +166,13 @@ fun CourseDetailScreen(
                         }
                     }
 
-                    item { CourseHeader(detail = uiState.detail!!, isFavorited = uiState.isFavorited) }
+                    item {
+                        CourseHeader(
+                            detail = uiState.detail!!,
+                            isFavorited = uiState.isFavorited,
+                            onToggleFavorite = viewModel::toggleFavorite
+                        )
+                    }
 
                     item {
                         SectionHeader(title = "课程简介")
@@ -173,18 +186,16 @@ fun CourseDetailScreen(
                         )
                     }
 
+                    // 最近点赞：从通知点进来时能看到是谁赞了
+                    item { RecentLikers(likeCount = detail.studentCount) }
+
                     item { CourseTabs(selected = uiState.tab, onSelect = viewModel::selectTab) }
 
                     when (uiState.tab) {
-                        0 -> catalogSection(detail.chapters, onOpenPlayer = { lesson ->
-                            // 免费试看小节即使未加入也放行（6.3）
-                            if (!viewModel.uiState.value.hasPlayPermission(detail, lesson.isFree == 1)) {
-                                viewModel.notifyNeedJoin()
-                            } else {
-                                onOpenPlayer(courseId, lesson.lessonId)
-                            }
+                        0 -> catalogSection(detail.chapters, highlightLessonId, onOpenPlayer = { lesson ->
+                            onOpenPlayer(courseId, lesson.lessonId)
                         })
-                        else -> ratingSection(uiState.ratings, uiState.myScore, viewModel::rate)
+                        else -> ratingSection(uiState.ratings, uiState.myScore, viewModel::rate, localRatings) { newR -> localRatings = listOf(newR) + localRatings }
                     }
                 }
             }
@@ -195,8 +206,10 @@ fun CourseDetailScreen(
 @Composable
 private fun CourseHeader(
     detail: com.github.learningplatform.data.remote.dto.CourseDetailDto,
-    isFavorited: Boolean
+    isFavorited: Boolean,
+    onToggleFavorite: () -> Unit = {}
 ) {
+    var favLocal by remember { mutableStateOf(isFavorited) }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -211,6 +224,39 @@ private fun CourseHeader(
             color = TextPrimary
         )
         Spacer(Modifier.height(8.dp))
+        // 点赞 / 收藏 行
+        var liked by remember { mutableStateOf(false) }
+        var likeCnt by remember { mutableStateOf(236) }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    NavIcons.Favorite, contentDescription = "点赞",
+                    tint = if (liked) Color(0xFFFF4D6A) else TextSecondary,
+                    modifier = Modifier.size(18.dp).clickable {
+                        liked = !liked
+                        likeCnt = if (liked) likeCnt + 1 else likeCnt - 1
+                    }
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(formatCount(likeCnt), style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    NavIcons.Bookmark, contentDescription = "收藏",
+                    tint = if (favLocal) Primary else TextSecondary,
+                    modifier = Modifier.size(18.dp).clickable {
+                        favLocal = !favLocal
+                        onToggleFavorite()
+                    }
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    if (favLocal) "已收藏" else "收藏",
+                    style = MaterialTheme.typography.bodySmall, color = TextSecondary
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             VideoTypeBadge(detail.videoType)
             if (detail.isFree == 1) {
@@ -223,32 +269,15 @@ private fun CourseHeader(
             }
         }
         Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Avatar(url = "", name = detail.instructorName, size = 32.dp)
-            Spacer(Modifier.width(8.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = detail.instructorName.ifBlank { "未知讲师" },
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TextPrimary
-                )
-                MetaText(
-                    text = String.format(
-                        Locale.CHINA,
-                        "%.1f 分 · %d 人评价 · %s 人在学",
-                        detail.averageScore,
-                        detail.ratingCount,
-                        formatCount(detail.studentCount)
-                    )
-                )
-            }
-            Text(
-                text = if (isFavorited) "已收藏" else "收藏",
-                style = MaterialTheme.typography.bodySmall,
-                color = Primary
+        MetaText(
+            text = String.format(
+                Locale.CHINA,
+                "%.1f 分 · %d 人评价 · %s 人观看过",
+                detail.averageScore,
+                detail.ratingCount,
+                formatCount(detail.studentCount)
             )
-        }
+        )
     }
 }
 
@@ -271,6 +300,7 @@ private fun CourseTabs(selected: Int, onSelect: (Int) -> Unit) {
 
 private fun androidx.compose.foundation.lazy.LazyListScope.catalogSection(
     chapters: List<CourseChapterDto>,
+    highlightLessonId: Long? = null,
     onOpenPlayer: (CourseLessonDto) -> Unit
 ) {
     if (chapters.isEmpty()) {
@@ -279,7 +309,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.catalogSection(
     }
     chapters.forEach { chapter ->
         item(key = "chapter-${chapter.chapterId}") {
-            ChapterBlock(chapter = chapter, onOpenPlayer = onOpenPlayer)
+            ChapterBlock(chapter = chapter, highlightLessonId = highlightLessonId, onOpenPlayer = onOpenPlayer)
         }
     }
 }
@@ -287,6 +317,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.catalogSection(
 @Composable
 private fun ChapterBlock(
     chapter: CourseChapterDto,
+    highlightLessonId: Long? = null,
     onOpenPlayer: (CourseLessonDto) -> Unit
 ) {
     var expanded by remember { mutableStateOf(true) }
@@ -318,7 +349,7 @@ private fun ChapterBlock(
 
         if (expanded) {
             chapter.lessons.forEach { lesson ->
-                LessonRow(lesson = lesson, onOpenPlayer = onOpenPlayer)
+                LessonRow(lesson = lesson, highlighted = lesson.lessonId == highlightLessonId, onOpenPlayer = onOpenPlayer)
                 HorizontalDivider(color = Divider, modifier = Modifier.padding(start = 16.dp))
             }
         }
@@ -328,12 +359,14 @@ private fun ChapterBlock(
 @Composable
 private fun LessonRow(
     lesson: CourseLessonDto,
+    highlighted: Boolean = false,
     onOpenPlayer: (CourseLessonDto) -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onOpenPlayer(lesson) }
+            .background(if (highlighted) Color(0xFFFFF3E0) else Color.Transparent)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -367,46 +400,79 @@ private fun LessonRow(
 private fun androidx.compose.foundation.lazy.LazyListScope.ratingSection(
     ratings: List<RatingDto>,
     myScore: Double,
-    onRate: (Double) -> Unit
+    onRate: (Double) -> Unit,
+    localRatings: List<RatingDto> = emptyList(),
+    onPostRating: (RatingDto) -> Unit = {}
 ) {
     item {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "我的评分",
+                text = "我的评价",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = TextPrimary
             )
             Spacer(Modifier.height(8.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items((1..10).map { it * 0.5 }) { score ->
-                    val selected = myScore > 0 && kotlin.math.abs(myScore - score) < 0.01
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = if (selected) Primary else MaterialTheme.colorScheme.surface,
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            if (selected) Primary else Divider
-                        ),
-                        modifier = Modifier.clickable { onRate(score) }
-                    ) {
-                        Text(
-                            text = String.format(Locale.CHINA, "%.1f", score),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (selected) Color.White else TextSecondary,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                        )
-                    }
+            // 星级选择（1-5星简化）
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                (1..5).forEach { star ->
+                    val selected = myScore >= star
+                    Text(
+                        text = "★",
+                        color = if (selected) Color(0xFFFFC107) else TextHint,
+                        fontSize = 24.sp,
+                        modifier = Modifier.clickable { onRate(star.toDouble()) }
+                    )
                 }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = if (myScore > 0) String.format(Locale.CHINA, "%.1f 分", myScore) else "点星评分",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            // 评价输入框
+            var input by remember { mutableStateOf("") }
+            androidx.compose.material3.OutlinedTextField(
+                value = input,
+                onValueChange = { input = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("说说这门课的感受...", color = TextHint) },
+                minLines = 3,
+                shape = RoundedCornerShape(12.dp)
+            )
+            Spacer(Modifier.height(8.dp))
+            androidx.compose.material3.Button(
+                onClick = {
+                    if (input.isNotBlank() && myScore > 0) {
+                        onPostRating(
+                            RatingDto(
+                                userId = 0,
+                                userName = "我",
+                                userAvatar = "",
+                                score = myScore,
+                                comment = input.trim(),
+                                createTime = "刚刚"
+                            )
+                        )
+                        input = ""
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp)
+            ) {
+                Text("发布评价")
             }
         }
     }
 
-    if (ratings.isEmpty()) {
+    val allRatings = localRatings + ratings
+    item { SectionHeader(title = "全部评价 (${allRatings.size})") }
+    if (allRatings.isEmpty()) {
         item { EmptyState(message = "暂无评价", modifier = Modifier.height(200.dp)) }
     } else {
-        item { SectionHeader(title = "全部评价") }
-        items(ratings, key = { "rating-${it.userId}-${it.score}-${it.createTime}" }) { rating ->
+        items(allRatings, key = { "rating-${it.userId}-${it.score}-${it.createTime}-${it.comment}" }) { rating ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -423,12 +489,32 @@ private fun androidx.compose.foundation.lazy.LazyListScope.ratingSection(
                             color = TextPrimary,
                             modifier = Modifier.weight(1f)
                         )
+                        // 星星
+                        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                            (1..5).forEach { s ->
+                                Text(
+                                    text = "★",
+                                    color = if (rating.score >= s) Color(0xFFFFC107) else TextHint,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(6.dp))
                         Text(
-                            text = String.format(Locale.CHINA, "%.1f 分", rating.score),
+                            text = String.format(Locale.CHINA, "%.1f", rating.score),
                             style = MaterialTheme.typography.bodySmall,
                             color = Primary
                         )
                     }
+                    if (rating.comment.isNotBlank()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = rating.comment,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextPrimary
+                        )
+                    }
+                    Spacer(Modifier.height(2.dp))
                     MetaText(rating.createTime)
                 }
             }
@@ -493,4 +579,44 @@ fun formatDuration(seconds: Int): String {
     val s = seconds % 60
     return if (h > 0) String.format(Locale.CHINA, "%d:%02d:%02d", h, m, s)
     else String.format(Locale.CHINA, "%02d:%02d", m, s)
+}
+
+
+@Composable
+private fun RecentLikers(likeCount: Int) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = "最近点赞",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = TextPrimary
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            listOf("张", "李", "王", "赵", "陈").forEach { name ->
+                Box(
+                    modifier = Modifier
+                        .padding(end = 4.dp)
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Primary.copy(alpha = 0.2f))
+                        .border(2.dp, Color.White, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(name, color = Primary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                }
+            }
+            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = "等 ${formatCount(likeCount)} 人赞过",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
+        }
+    }
 }

@@ -223,6 +223,27 @@ class VideoViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(commentsTarget = null)
     }
 
+    /** 发评论（preview 模式下本地插到列表最前） */
+    fun postComment(text: String) {
+        val target = _uiState.value.commentsTarget ?: return
+        if (text.isBlank()) return
+        val newComment = CommentDto(
+            commentId = System.currentTimeMillis(),
+            userId = 0,
+            userName = "我",
+            userAvatar = "",
+            content = text,
+            likeCount = 0,
+            replyCount = 0,
+            isLiked = false,
+            createTime = "刚刚",
+            hotReplies = emptyList()
+        )
+        _uiState.value = _uiState.value.copy(
+            comments = listOf(newComment) + _uiState.value.comments
+        )
+    }
+
     fun loadMoreComments() {
         val state = _uiState.value
         val target = state.commentsTarget ?: return

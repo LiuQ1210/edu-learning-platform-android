@@ -28,6 +28,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import com.github.learningplatform.ui.theme.TextPrimary
+import com.github.learningplatform.ui.theme.TextSecondary
+import com.github.learningplatform.ui.theme.Primary
+import com.github.learningplatform.ui.theme.pageGradientBrush
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -50,6 +54,7 @@ import com.github.learningplatform.ui.nav.NavIcons
 fun CheckinTaskScreen(
     onBack: () -> Unit,
     onOpenRecords: () -> Unit,
+    onOpenRules: () -> Unit,
     viewModel: CheckinViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -57,7 +62,7 @@ fun CheckinTaskScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("每日签到") },
+                title = { Text("任务中心") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(NavIcons.ArrowBack, contentDescription = "返回")
@@ -107,6 +112,22 @@ fun CheckinTaskScreen(
 
             // 免广告状态
             item { AdFreeStatusCard(status.adFreeUntil) }
+
+            // 积分规则入口
+            item {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.clickable { onOpenRules() }
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("积分获取与兑换规则", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        Text("查看 >", color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
 
             // 兑换列表
             item {
@@ -241,5 +262,32 @@ private fun RewardItem(
                 Text("兑换")
             }
         }
+    }
+}
+
+
+@Composable
+private fun PointsRulesCard() {
+    Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("积分获取规则", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+            RuleLine("每日签到", "每天可签到一次")
+            RuleLine("连续 1 天", "5 积分")
+            RuleLine("连续 2 天", "8 积分")
+            RuleLine("连续 3 天", "10 积分")
+            RuleLine("连续 4 天", "12 积分")
+            RuleLine("连续 5 天", "15 积分")
+            RuleLine("连续 6 天", "18 积分")
+            RuleLine("连续 7 天", "20 积分（之后循环）")
+            RuleLine("断签重置", "中断一天后连续天数重新从 1 开始")
+        }
+    }
+}
+
+@Composable
+private fun RuleLine(label: String, value: String) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Text(label, color = TextSecondary, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        Text(value, fontSize = 13.sp)
     }
 }
