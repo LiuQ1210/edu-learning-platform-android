@@ -63,6 +63,7 @@ import com.github.learningplatform.ui.common.LoadingState
 import com.github.learningplatform.ui.common.NetImage
 import com.github.learningplatform.ui.common.formatCount
 import com.github.learningplatform.ui.nav.NavIcons
+import com.github.learningplatform.ui.theme.Primary
 import com.github.learningplatform.ui.theme.TextHint
 import com.github.learningplatform.ui.theme.TextSecondary
 import com.github.learningplatform.ui.theme.pageGradientBrush
@@ -520,25 +521,31 @@ private fun CommentRow(comment: CommentDto, onReply: () -> Unit = {}) {
             Spacer(Modifier.height(2.dp))
             Text(text = comment.content, style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(4.dp))
+            var expanded by remember { mutableStateOf(false) }
             Text(
-                text = comment.createTime + "  ·  回复 " + comment.replyCount,
+                text = if (comment.replyCount > 0) {
+                    (if (expanded) "收起回复" else "查看 " + comment.replyCount + " 条回复")
+                } else comment.createTime,
                 style = MaterialTheme.typography.bodySmall,
-                color = TextHint
+                color = if (comment.replyCount > 0)     Primary else TextHint,
+                modifier = if (comment.replyCount > 0) Modifier.clickable { expanded = !expanded } else Modifier
             )
-            // 显示热门回复
-            comment.hotReplies.forEach { reply ->
-                Spacer(Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color.Black.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
-                        .padding(8.dp)
-                ) {
-                    Text(
-                        text = reply.userName + (reply.replyToName?.let { " 回复 $it" } ?: "") + "：" + reply.content,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
-                    )
+            // 展开显示回复
+            if (expanded) {
+                comment.hotReplies.forEach { reply ->
+                    Spacer(Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color.Black.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
+                            .padding(8.dp)
+                    ) {
+                        Text(
+                            text = reply.userName + (reply.replyToName?.let { " 回复 $it" } ?: "") + "：" + reply.content,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    }
                 }
             }
         }

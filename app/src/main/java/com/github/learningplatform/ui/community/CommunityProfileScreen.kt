@@ -55,12 +55,13 @@ fun CommunityProfileScreen(
     var followers by remember { mutableIntStateOf(356) }
     var liked by remember { mutableIntStateOf(1024) }
     var isFollowed by remember { mutableStateOf(false) }
+    var pendingDeleteId by remember { mutableStateOf<Long?>(null) }
 
-    val userArticles = listOf(
+    var userArticles by remember { mutableStateOf(listOf(
         Triple(5001L, "Kotlin 协程取消机制完全指南", "1.2k 阅读 · 32 赞"),
         Triple(5002L, "Compose 重组优化实战笔记", "860 阅读 · 18 赞"),
         Triple(5003L, "Android 性能优化从入门到实战", "2.1k 阅读 · 56 赞")
-    )
+    )) }
 
     Column(
         modifier = Modifier
@@ -204,7 +205,7 @@ fun CommunityProfileScreen(
                             color = Primary,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
-                                .clickable { }
+                                .clickable { onOpenArticle(id) }
                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                         )
                         Text(
@@ -213,13 +214,30 @@ fun CommunityProfileScreen(
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
-                                .clickable { }
+                                .clickable { pendingDeleteId = id }
                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                         )
                     }
                 }
             }
         }
+    }
+
+    if (pendingDeleteId != null) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pendingDeleteId = null },
+            title = { Text("删除文章") },
+            text = { Text("确定要彻底删除这篇文章吗？删除后不可恢复。") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    userArticles = userArticles.filter { it.first != pendingDeleteId }
+                    pendingDeleteId = null
+                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { pendingDeleteId = null }) { Text("取消") }
+            }
+        )
     }
 }
 
