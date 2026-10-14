@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -62,6 +63,7 @@ import com.github.learningplatform.ui.theme.Surface
 import com.github.learningplatform.ui.theme.TextHint
 import com.github.learningplatform.ui.theme.TextPrimary
 import com.github.learningplatform.ui.theme.TextSecondary
+import java.util.Locale
 import kotlinx.coroutines.delay
 
 /**
@@ -168,14 +170,7 @@ private fun CourseFeed(
             .background(pageGradientBrush(strong = false)),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        item {
-            SectionHeader(
-                title = "课程分类",
-                actionText = "查看全部",
-                onAction = onOpenAllCategories
-            )
-        }
-
+        item { Spacer(Modifier.height(8.dp)) }
         item {
             FeaturedCourseCarousel(
                 courses = uiState.featuredCourses,
@@ -195,54 +190,68 @@ private fun CourseFeed(
             }
         }
 
-        item { SectionHeader(title = "热门课程") }
-
-        if (uiState.hotCourses.isEmpty()) {
-            item {
+        // 排序筛选标签
+        item {
+            val sorts = listOf("推荐", "高分", "热门", "最新")
+            var selectedSort by remember { mutableStateOf("推荐") }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                sorts.forEach { s ->
+                    val selected = s == selectedSort
+                    Text(
+                        text = s,
+                        fontSize = 14.sp,
+                        color = if (selected) TextPrimary else TextHint,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        modifier = Modifier.clickable { selectedSort = s }
+                    )
+                }
+            }
+            // 排序后的课程列表 - 2列网格
+            val sortedCourses = when (selectedSort) {
+                "高分" -> uiState.hotCourses.sortedByDescending { it.averageScore }
+                "热门" -> uiState.hotCourses.sortedByDescending { it.likeCount }
+                "最新" -> uiState.hotCourses.sortedByDescending { it.courseId }
+                else -> uiState.hotCourses
+            }
+            if (sortedCourses.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 32.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "该分类下暂无课程",
-                        color = TextHint,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    Text("该分类下暂无课程", color = TextHint, style = MaterialTheme.typography.bodyMedium)
+                }
+            } else {
+                // 每两个一行
+                sortedCourses.chunked(2).forEach { rowItems ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        rowItems.forEach { course ->
+                            CourseCard(
+                                course = course,
+                                onOpenCourse = onOpenCourse,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        if (rowItems.size == 1) Spacer(Modifier.weight(1f))
+                    }
                 }
             }
-        } else {
-            item { HotCourseGroup(courses = uiState.hotCourses, onOpenCourse = onOpenCourse) }
-        }
-
-        if (uiState.rankCourses.isNotEmpty()) {
-            item { SectionHeader(title = "本周课程热度排行") }
-            items(uiState.rankCourses, key = { "rank-${it.courseId}" }) { course ->
-                RankRow(course = course, onOpenCourse = onOpenCourse)
-                Box(
-                    modifier = Modifier
-                        .padding(start = 16.dp)
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(Divider)
-                )
-            }
-        }
-
-        // 为你推荐（占位，等后端推荐接口）
-        item { SectionHeader(title = "为你推荐") }
-        item {
-            Text(
-                text = "推荐内容即将上线",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextHint,
-                modifier = Modifier.padding(16.dp)
-            )
         }
 
         if (uiState.hasMore) {
             item {
+                LaunchedEffect(Unit) { onLoadMore() }
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -251,13 +260,6 @@ private fun CourseFeed(
                 ) {
                     if (uiState.isLoadingMore) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    } else {
-                        Text(
-                            text = "上拉加载更多",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextHint,
-                            modifier = Modifier.clickable(onClick = onLoadMore)
-                        )
                     }
                 }
             }
@@ -321,6 +323,55 @@ private fun HotCourseGroup(courses: List<CourseDto>, onOpenCourse: (Long) -> Uni
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CourseCard(
+    course: CourseDto,
+    onOpenCourse: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.White)
+            .clickable { onOpenCourse(course.courseId) }
+    ) {
+        Box {
+            NetImage(
+                url = course.coverUrl,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(90.dp),
+                radius = 12.dp
+            )
+            Icon(
+                NavIcons.Play,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(6.dp)
+                    .size(18.dp)
+            )
+        }
+        Column(modifier = Modifier.padding(8.dp)) {
+            Text(
+                text = course.title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = TextPrimary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = String.format(Locale.CHINA, "%.1f分 · %s人观看", course.averageScore, formatCount(course.viewCount)),
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
         }
     }
 }

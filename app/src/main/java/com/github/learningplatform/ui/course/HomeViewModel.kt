@@ -184,7 +184,7 @@ class HomeViewModel @Inject constructor(
                     hotCourses = accumulated,
                     rankCourses = rank,
                     pageNum = nextPage,
-                    hasMore = accumulated.size < page.total
+                    hasMore = true // demo 模式下无限加载
                 )
             } catch (e: CancellationException) {
                 throw e
