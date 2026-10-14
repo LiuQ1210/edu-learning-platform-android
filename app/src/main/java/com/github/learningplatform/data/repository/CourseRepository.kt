@@ -3,8 +3,8 @@ package com.github.learningplatform.data.repository
 import com.github.learningplatform.core.network.safeApiCall
 import com.github.learningplatform.core.network.safeApiCallForUnit
 import com.github.learningplatform.data.demo.DemoData
-import com.github.learningplatform.data.demo.preview
-import com.github.learningplatform.data.demo.previewUnit
+import com.github.learningplatform.data.demo.contentPreview
+import com.github.learningplatform.data.demo.contentPreviewUnit
 import com.github.learningplatform.data.local.CacheKeys
 import com.github.learningplatform.data.local.CacheStore
 import com.github.learningplatform.data.local.CacheTtl
@@ -43,7 +43,7 @@ class CourseRepository @Inject constructor(
         sort: Int? = null,
         forceRefresh: Boolean = false
     ): PageData<CourseDto> {
-        preview { return DemoData.coursePage(pageNum, pageSize, videoType, categoryId) }
+        contentPreview { return DemoData.coursePage(pageNum, pageSize, videoType, categoryId) }
 
         // 只缓存第 1 页；翻页直接走网络
         if (pageNum != 1) {
@@ -81,7 +81,7 @@ class CourseRepository @Inject constructor(
 
     /** 课程详情（6.2）：变动慢，用 LOOSE 档 */
     suspend fun getCourseDetail(courseId: Long, forceRefresh: Boolean = false): CourseDetailDto {
-        preview { return DemoData.courseDetail(courseId) }
+        contentPreview { return DemoData.courseDetail(courseId) }
 
         val key = CacheKeys.detail("course", courseId)
         if (forceRefresh) cache.remove(key)
@@ -102,19 +102,19 @@ class CourseRepository @Inject constructor(
      *  - 取凭证本身就是一次权限校验，缓存等于绕过校验
      */
     suspend fun getPlayInfo(courseId: Long, lessonId: Long? = null): PlayInfoDto {
-        preview { return DemoData.playInfo(courseId, lessonId) }
+        contentPreview { return DemoData.playInfo(courseId, lessonId) }
         return safeApiCall { courseApi.getPlayInfo(courseId, lessonId) }
     }
 
     /** 播放进度心跳（建议 15-30 秒一次）：写操作，不缓存 */
     suspend fun syncProgress(request: ProgressSyncRequest) {
-        previewUnit { return }
+        contentPreviewUnit { return }
         safeApiCallForUnit { courseApi.syncProgress(request) }
     }
 
     /** 评分：写操作；成功后让详情与评分列表失效，避免展示旧分数 */
     suspend fun rateCourse(courseId: Long, score: Double): RatingResultDto {
-        preview { return DemoData.rateResult(score) }
+        contentPreview { return DemoData.rateResult(score) }
         val result = safeApiCall { courseApi.rateCourse(courseId, RatingRequest(score)) }
         cache.remove(CacheKeys.detail("course", courseId))
         cache.invalidateModule(MODULE_RATING)
@@ -123,7 +123,7 @@ class CourseRepository @Inject constructor(
 
     /** 课程评分列表：用户随时可评，变动快，用 TIGHT 档 */
     suspend fun getRatings(courseId: Long, pageNum: Int = 1, pageSize: Int = 20): PageData<RatingDto> {
-        preview { return DemoData.ratings(courseId) }
+        contentPreview { return DemoData.ratings(courseId) }
 
         if (pageNum != 1) {
             return safeApiCall { courseApi.getRatings(courseId, pageNum, pageSize) }

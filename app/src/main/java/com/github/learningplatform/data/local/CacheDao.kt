@@ -12,17 +12,15 @@ interface CacheDao {
     @Query("SELECT value FROM cache_kv WHERE `key` = :key LIMIT 1")
     suspend fun get(key: String): String?
 
-    @Query("SELECT * FROM cache_kv WHERE `key` = :key LIMIT 1")
-    fun observe(key: String): Flow<CacheEntry?>
-
     /**
-     * 取整条记录（含 `updatedAt`）。
-     *
-     * 与 [get] 的区别：TTL 判断需要写入时间，[get] 只返回字符串拿不到时间戳。
-     * 缓存读取一律用这个，[get] 保留给不需要判断新鲜度的场景。
+     * 【任务②：定缓存键规则与 TTL；分类树接 Room 缓存】
+     * 取完整缓存条目（含 updatedAt），供 Repository 做 TTL 过期判断后决定是否回源。
      */
     @Query("SELECT * FROM cache_kv WHERE `key` = :key LIMIT 1")
     suspend fun getEntry(key: String): CacheEntry?
+
+    @Query("SELECT * FROM cache_kv WHERE `key` = :key LIMIT 1")
+    fun observe(key: String): Flow<CacheEntry?>
 
     /**
      * 按前缀删除。

@@ -1,7 +1,7 @@
 package com.github.learningplatform.data.repository
 
 import com.github.learningplatform.core.network.ApiException
-import com.github.learningplatform.data.demo.previewUnit
+import com.github.learningplatform.data.demo.contentPreviewUnit
 import com.github.learningplatform.data.remote.ResourceApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -29,7 +29,7 @@ class DownloadRepository @Inject constructor(
         target: File,
         onProgress: (downloaded: Long, total: Long) -> Unit = { _, _ -> }
     ): File {
-        previewUnit { return target }
+        contentPreviewUnit { return target }
         return withContext(Dispatchers.IO) {
             val existingLength = if (target.exists()) target.length() else 0L
             val rangeHeader = if (existingLength > 0) "bytes=$existingLength-" else null

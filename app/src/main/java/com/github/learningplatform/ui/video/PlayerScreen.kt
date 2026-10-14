@@ -1,6 +1,7 @@
 ﻿package com.github.learningplatform.ui.video
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -36,14 +38,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.github.learningplatform.core.constants.Constants
 import com.github.learningplatform.ui.ad.AdSlot
 import com.github.learningplatform.ui.common.ErrorState
+import com.github.learningplatform.ui.common.AdSlotPlaceholder
 import com.github.learningplatform.ui.common.LoadingState
 import com.github.learningplatform.ui.common.WriteNoteDialog
 import com.github.learningplatform.ui.nav.NavIcons
@@ -104,6 +111,8 @@ fun PlayerScreen(
     var positionSec by remember { mutableFloatStateOf(0f) }
     var durationSec by remember { mutableFloatStateOf(0f) }
     var isPlaying by remember { mutableStateOf(true) }
+    /** 【任务⑥：中断与恢复】播放异常时置非空，覆盖层提示 + 重试；就绪后自动清空 */
+    var playbackError by remember { mutableStateOf<String?>(null) }
     val speeds = listOf(0.5f, 1.0f, 1.25f, 1.5f, 2.0f)
     var speedIdx by remember { mutableStateOf(1) }
     var showSpeedMenu by remember { mutableStateOf(false) }
@@ -160,6 +169,38 @@ fun PlayerScreen(
         }
     }
 
+    // 【任务⑥】中断与恢复：切后台（来电/Home 键）自动暂停，回前台自动恢复播放。
+    // 记录切出前的播放态，回来时仅当之前正在播放才恢复。
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var wasPlayingBeforeStop by remember { mutableStateOf(true) }
+    DisposableEffect(player, lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> {
+                    wasPlayingBeforeStop = player.isPlaying
+                    player.pause()
+                }
+                Lifecycle.Event.ON_START ->
+                    if (wasPlayingBeforeStop && playbackError == null) player.play()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // 【任务⑥】中断后的重试：重新装载同一地址并起播；失败会再次触发 onPlayerError
+    fun retryPlayback() {
+        playbackError = null
+        val url = uiState.playInfo?.playUrl
+        if (!url.isNullOrBlank()) {
+            player.clearMediaItems()
+            player.setMediaItem(MediaItem.fromUri(url))
+            player.prepare()
+            player.playWhenReady = true
+        }
+    }
+
     LaunchedEffect(player) {
         while (true) {
             delay(1000)
@@ -209,6 +250,23 @@ fun PlayerScreen(
                     },
                     modifier = Modifier.fillMaxSize()
                 )
+
+                // 【广告位预留】播放页暂停广告位：仅在暂停且无错误时显示，接入 Taku 时替换内部
+                if (!isPlaying && playbackError == null) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .fillMaxWidth()
+                            .background(Color.Black.copy(alpha = 0.35f))
+                            .padding(horizontal = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AdSlotPlaceholder(
+                            slotCode = "player_pause",
+                            height = 96.dp
+                        )
+                    }
+                }
 
                 // 顶部返回条
                 Row(
@@ -346,8 +404,59 @@ fun PlayerScreen(
                     }
                 }
 
+                // 【任务⑥】播放中断覆盖层：出错时提示原因并提供重试，避免无声卡死
+                playbackError?.let { err ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.78f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "播放中断",
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                text = err,
+                                color = Color.White.copy(alpha = 0.72f),
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 2,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 24.dp)
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            Button(onClick = ::retryPlayback) {
+                                Text("重试")
+                            }
+                        }
+                    }
+                }
+
 
             }
+        }
+
+        // 【返回按钮·修复】抽到最外层 Box 的最高 z 序（最后绘制），
+        // 绕过 AndroidView(PlayerView) 原生层对触摸的拦截；原 Row 内按钮已移除。
+        // 按钮放在 TopStart + top=120dp：屏幕最顶部 y≈22-148 区域会被系统状态栏层拦截触摸
+        // （实测：按钮放顶部点击无效，下移后可点击）。最高 z 序 + clickable 保证不受
+        // AndroidView(PlayerView) 全屏原生层影响。
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = 8.dp, top = 120.dp)
+                .size(48.dp)
+                .clickable {
+                    android.util.Log.d("PlayerScreen", "BACK_CLICKED")
+                    onBack()
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(NavIcons.ArrowBack, contentDescription = "返回", tint = Color.White)
         }
     }
 

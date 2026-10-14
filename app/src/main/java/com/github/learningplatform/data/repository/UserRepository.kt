@@ -3,8 +3,8 @@ package com.github.learningplatform.data.repository
 import com.github.learningplatform.core.network.safeApiCall
 import com.github.learningplatform.core.network.safeApiCallForUnit
 import com.github.learningplatform.data.demo.DemoData
-import com.github.learningplatform.data.demo.preview
-import com.github.learningplatform.data.demo.previewUnit
+import com.github.learningplatform.data.demo.contentPreview
+import com.github.learningplatform.data.demo.contentPreviewUnit
 import com.github.learningplatform.data.remote.UserApi
 import com.github.learningplatform.data.remote.dto.BlogHomeDto
 import com.github.learningplatform.data.remote.dto.DownloadRecordDto
@@ -24,18 +24,18 @@ class UserRepository @Inject constructor(
 ) {
 
     suspend fun getProfile(): UserProfileDto {
-        preview { return DemoData.profile }
+        contentPreview { return DemoData.profile }
         return safeApiCall { userApi.getProfile() }
     }
 
     suspend fun updateProfile(request: UpdateProfileRequest) {
-        previewUnit { return }
+        contentPreviewUnit { return }
         safeApiCallForUnit { userApi.updateProfile(request) }
     }
 
     /** 他人博客主页（公开） */
     suspend fun getBlogHome(userId: Long, pageNum: Int = 1, pageSize: Int = 20): BlogHomeDto {
-        preview {
+        contentPreview {
             return BlogHomeDto(
                 userId = userId,
                 nickname = "张三",
@@ -56,18 +56,18 @@ class UserRepository @Inject constructor(
         pageSize: Int = 20,
         keyword: String? = null
     ): PageData<MyCourseDto> {
-        preview { return DemoData.myCourses }
+        contentPreview { return DemoData.myCourses }
         return safeApiCall { userApi.getMyCourses(pageNum, pageSize, keyword) }
     }
 
     /** @return 是否加入成功 */
     suspend fun joinCourse(courseId: Long): Boolean {
-        preview { return true }
+        contentPreview { return true }
         return safeApiCall { userApi.joinCourse(courseId) }.joined
     }
 
     suspend fun quitCourse(courseId: Long) {
-        previewUnit { return }
+        contentPreviewUnit { return }
         safeApiCallForUnit { userApi.quitCourse(courseId) }
     }
 
@@ -77,7 +77,7 @@ class UserRepository @Inject constructor(
         pageSize: Int = 20,
         targetType: Int? = null
     ): PageData<UserTargetItemDto> {
-        preview {
+        contentPreview {
             val filtered = if (targetType == null) DemoData.favorites
             else DemoData.favorites.copy(list = DemoData.favorites.list.filter { it.targetType == targetType })
             return filtered
@@ -94,7 +94,7 @@ class UserRepository @Inject constructor(
     ): PageData<UserTargetItemDto> {
         // 用独立的 likes 样例，不要复用 favorites：
         // 复用会让点赞页与收藏页显示完全相同的内容，掩盖「接口映射接错」这类问题
-        preview {
+        contentPreview {
             val filtered = if (targetType == null) DemoData.likes
             else DemoData.likes.copy(list = DemoData.likes.list.filter { it.targetType == targetType })
             return filtered
@@ -109,7 +109,7 @@ class UserRepository @Inject constructor(
         pageSize: Int = 20,
         targetType: Int? = null
     ): PageData<ViewHistoryItemDto> {
-        preview { return DemoData.history }
+        contentPreview { return DemoData.history }
         return safeApiCall {
             userApi.getViewHistory(pageNum, pageSize, targetType)
         }
@@ -117,7 +117,7 @@ class UserRepository @Inject constructor(
 
     /** 不传 targetType 则清空全部 */
     suspend fun clearViewHistory(targetType: Int? = null) {
-        previewUnit { return }
+        contentPreviewUnit { return }
         safeApiCallForUnit { userApi.clearViewHistory(targetType) }
     }
 
@@ -126,7 +126,7 @@ class UserRepository @Inject constructor(
         pageSize: Int = 20,
         resourceType: Int? = null
     ): PageData<DownloadRecordDto> {
-        preview {
+        contentPreview {
             val filtered = if (resourceType == null) DemoData.downloads
             else DemoData.downloads.copy(list = DemoData.downloads.list.filter { it.resourceType == resourceType })
             return filtered

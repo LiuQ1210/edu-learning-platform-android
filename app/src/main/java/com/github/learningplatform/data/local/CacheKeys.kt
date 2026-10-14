@@ -11,13 +11,13 @@ package com.github.learningplatform.data.local
  *
  * 键一旦发布就别改语义——用户升级后旧键会变成垃圾数据。
  * 结构变化时改前缀版本号（如 `v2:`），别复用旧键。
+ *
+ * 【任务②：定缓存键规则与 TTL；分类树接 Room 缓存】
+ * 【任务③：首页课程列表接缓存】
+ * 【任务④：课程详情接缓存 + 失效逻辑（过期重取、下拉强制回源）】
  */
 object CacheKeys {
-
     private const val V = "v1"
-
-    /** 分类树。type: 1-文章分类 2-视频课程分类 */
-    fun categoryTree(type: Int) = "$V:category_tree:$type"
 
     /**
      * 分页列表。模块名 + 所有查询参数。
@@ -47,4 +47,34 @@ object CacheKeys {
 
     /** 清理全部业务缓存时用（去掉版本号前缀即为全量） */
     val all: String get() = V
+
+    // ========= 业务对外方法，保持原有函数签名，上层调用代码无需改动 =========
+    /** 分类树。type: 1-文章分类 2-视频课程分类（接口4.1） */
+    fun categoryTree(type: Int): String = page("category_tree", "type" to type)
+
+    /**
+     * 【任务③：首页课程列表接缓存】
+     * 课程列表（接口 6.1）。5 个参数必须全部拼进 key，缺一不可：
+     * 缺 pageNum 会串页、缺 categoryId 会串分类、缺 sort 会串排序。
+     */
+    fun courseHome(
+        pageNum: Int,
+        pageSize: Int,
+        categoryId: Long?,
+        videoType: Int?,
+        sort: Int?
+    ): String = page(
+        "course_home",
+        "page" to pageNum,
+        "size" to pageSize,
+        "cat" to categoryId,
+        "vtype" to videoType,
+        "sort" to sort
+    )
+
+    /**
+     * 【任务④：课程详情接缓存 + 失效逻辑（过期重取、下拉强制回源）】
+     * 课程详情（接口 6.2），按课程 id 区分，一门课一条缓存。
+     */
+    fun courseDetail(courseId: Long): String = detail("course", courseId)
 }

@@ -40,6 +40,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.learningplatform.data.remote.dto.ArticleDto
 import com.github.learningplatform.ui.common.Avatar
+import com.github.learningplatform.ui.common.AdSlotPlaceholder
 import com.github.learningplatform.ui.common.CategoryTabs
 import com.github.learningplatform.ui.common.EmptyState
 import com.github.learningplatform.ui.common.ErrorState
@@ -101,6 +102,15 @@ fun CommunityScreen(
                         .background(pageGradientBrush(strong = false)),
                     contentPadding = PaddingValues(bottom = 88.dp)
                 ) {
+                    // 【广告位预留】社区列表广告位：固定预留区域，接入 Taku 时替换内部
+                    item {
+                        AdSlotPlaceholder(
+                            slotCode = "community_home_banner",
+                            height = 64.dp,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+
                     items(uiState.articles, key = { it.articleId }) { article ->
                         ArticleCard(
                             article = article,

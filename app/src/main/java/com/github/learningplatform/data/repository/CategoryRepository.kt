@@ -2,7 +2,7 @@ package com.github.learningplatform.data.repository
 
 import com.github.learningplatform.core.network.safeApiCall
 import com.github.learningplatform.data.demo.DemoData
-import com.github.learningplatform.data.demo.preview
+import com.github.learningplatform.data.demo.contentPreview
 import com.github.learningplatform.data.local.CacheKeys
 import com.github.learningplatform.data.local.CacheStore
 import com.github.learningplatform.data.local.CacheTtl
@@ -24,7 +24,7 @@ class CategoryRepository @Inject constructor(
     /** @param type 1-文章分类 2-视频课程分类 */
     suspend fun getTree(type: Int): List<CategoryNodeDto> {
         // 按接口 4.1 的原始 type 值分派，不引入 UI 层常量
-        preview { return DemoData.categoryTree(type) }
+        contentPreview { return DemoData.categoryTree(type) }
 
         // 分类树是导航骨架，断网时没有它首页连分类都列不出来，
         // 所以用 STATIC 档（6 小时）并把旧数据兜底留给 cachedObject 处理。
@@ -49,7 +49,7 @@ class CategoryRepository @Inject constructor(
         sort: Int? = null,
         forceRefresh: Boolean = false
     ): PageData<ContentItemDto> {
-        preview { return DemoData.searchResult(null, type, pageNum) }
+        contentPreview { return DemoData.searchResult(null, type, pageNum) }
 
         // 只缓存第 1 页：翻页数据命中率低，缓存收益不抵存储与失效成本
         if (pageNum != 1) {

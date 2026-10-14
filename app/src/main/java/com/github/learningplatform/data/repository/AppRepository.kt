@@ -2,7 +2,7 @@ package com.github.learningplatform.data.repository
 
 import com.github.learningplatform.core.network.safeApiCall
 import com.github.learningplatform.data.demo.DemoData
-import com.github.learningplatform.data.demo.preview
+import com.github.learningplatform.data.demo.contentPreview
 import com.github.learningplatform.data.local.CacheKeys
 import com.github.learningplatform.data.local.CacheStore
 import com.github.learningplatform.data.local.CacheTtl
@@ -34,7 +34,7 @@ class AppRepository @Inject constructor(
      * 不分键会让后请求的场景覆盖前一个，表现是「首页广告位显示了社区的场景」。
      */
     suspend fun getAdSlots(scene: String? = null, forceRefresh: Boolean = false): List<AdSlotDto> {
-        preview { return DemoData.adSlots }
+        contentPreview { return DemoData.adSlots }
 
         val key = CacheKeys.page(MODULE_SLOT, "scene" to scene)
         if (forceRefresh) cache.remove(key)
@@ -55,7 +55,7 @@ class AppRepository @Inject constructor(
      * 用缓存兜底比让调用方处理 null 更省事，也避免各处重复判空。
      */
     suspend fun getAppConfig(forceRefresh: Boolean = false): AppConfigDto {
-        preview { return DemoData.appConfig }
+        contentPreview { return DemoData.appConfig }
 
         val key = CacheKeys.config(MODULE_SLOT, NAME_CONFIG)
         if (forceRefresh) cache.remove(key)
