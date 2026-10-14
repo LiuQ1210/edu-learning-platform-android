@@ -11,6 +11,23 @@ package com.github.learningplatform.data.local
  */
 object CacheTtl {
 
+    // ---- 通用分档（CacheStore 体系用）：按「数据多久会变一次」分档 ----
+    /** 几乎不变：分类树、字典、榜单配置 */
+    const val STATIC = 6 * 60 * 60 * 1000L
+
+    /** 变动慢：课程详情、文章详情 */
+    const val LOOSE = 30 * 60 * 1000L
+
+    /** 变动中等：首页列表、搜索结果 */
+    const val MEDIUM = 5 * 60 * 1000L
+
+    /** 变动快：评论、签到状态、个人统计 */
+    const val TIGHT = 30 * 1000L
+
+    /** 陈旧条目的保留上限：超过就清掉（过期缓存还有断网兜底的用处） */
+    const val MAX_AGE = 8 * 24 * 60 * 60 * 1000L
+
+    // ---- 业务精确 TTL（Repository 直连 Room 体系用） ----
     /** 分类树：24 小时（分类结构低频变化，可放宽） */
     const val CATEGORY_TREE = 24 * 60 * 60 * 1000L
 

@@ -40,13 +40,20 @@ object Routes {
     // ---- 我的 ----
     const val EDIT_PROFILE = "edit_profile"
     const val MY_COURSES = "my_courses"
+    const val STUDY_STATS = "study_stats"
+    const val STUDY_PATH = "study_path"
     const val MY_FAVORITES = "my_favorites"
+    const val MY_LIKES = "my_likes"
+    const val MY_DOWNLOADS = "my_downloads"
     const val WATCH_HISTORY = "watch_history"
     const val NOTES = "notes"
     const val NOTE_DETAIL = "note_detail/{noteId}"
     const val TODOS = "todos"
     const val SETTINGS = "settings"
     const val CHANGE_PASSWORD = "change_password"
+
+    // ---- 通知 ----
+    const val NOTIFICATIONS = "notifications"
 
     // ---- 签到（全屏）----
     const val CHECKIN = "checkin"
@@ -63,7 +70,7 @@ object Routes {
         HOME, VIDEO, COMMUNITY, PROFILE,
         COURSE_DETAIL, SEARCH, CATEGORY_ALL,
         ARTICLE_DETAIL, ARTICLE_PUBLISH, ARTICLE_EDIT, MY_ARTICLES, TAG_ARTICLES, BLOG_HOME,
-        EDIT_PROFILE, MY_COURSES, MY_FAVORITES, WATCH_HISTORY,
+        EDIT_PROFILE, MY_COURSES, MY_FAVORITES, MY_LIKES, MY_DOWNLOADS, WATCH_HISTORY,
         NOTES, NOTE_DETAIL, TODOS, SETTINGS, CHANGE_PASSWORD
     )
 
@@ -78,7 +85,7 @@ object Routes {
     fun articleEdit(articleId: Long) = "article_edit/$articleId"
     fun noteDetail(noteId: Long) = "note_detail/$noteId"
     fun tagArticles(tagId: Long) = "tag_articles/$tagId"
-    fun blogHome(userId: Long) = "blog_home/$userId"
+    fun blogHome(userId: Long, self: Boolean = false) = "blog_home/$userId?self=$self"
     fun player(courseId: Long, lessonId: Long? = null) =
         "player/$courseId?lessonId=${lessonId ?: 0L}"
 }

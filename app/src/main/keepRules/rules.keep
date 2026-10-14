@@ -1,5 +1,8 @@
 # ============================================================
 # R8 keep 规则（AGP 9 使用 src/main/keepRules 目录，取代 proguard-rules.pro）
+#
+# 说明：Hilt / Room / Compose 的规则**不用手写** —— 它们各自的 AAR 自带
+# consumer rules，AGP 会自动合并。这里只补「自带规则覆盖不到」的部分。
 # ============================================================
 
 # --- Retrofit ---
@@ -35,3 +38,57 @@
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**
+
+# --- 泛型签名：Retrofit 与 kotlinx-serialization 都靠它解析
+#     Response<ApiResponse<PageData<ContentItemDto>>> 这类嵌套泛型
+#     一旦被裁掉就会在运行时抛 IllegalArgumentException / 反序列化失败。
+-keepattributes Signature, Exceptions, EnclosingMethod
+
+# --- 枚举的 values()/valueOf()：R8 有时会裁掉，用于枚举反序列化时会崩 ---
+-keepclassmembers enum * {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
+
+# --- Parcelable / Serializable ---
+-keepclassmembers class * implements android.os.Parcelable {
+    public static final ** CREATOR;
+}
+-keepclassmembers class * implements java.io.Serializable {
+    static final long serialVersionUID;
+    private static final java.io.ObjectStreamField[] serialPersistentFields;
+    !static !transient <fields>;
+    private void writeObject(java.io.ObjectOutputStream);
+    private void readObject(java.io.ObjectInputStream);
+    java.lang.Object writeReplace();
+    java.lang.Object readResolve();
+}
+
+# --- DataStore Preferences ---
+# proto/preferences 通过反射找生成的类；漏掉会报
+# "Unable to parse preferences proto" 之类的运行期错误（缓存层会全挂）。
+-keep class androidx.datastore.preferences.protobuf.** { *; }
+-dontwarn androidx.datastore.preferences.protobuf.**
+
+# --- Room ---
+# Room 的 @Entity/@Dao 实现是编译期生成的，自带规则已覆盖大部分；
+# 这里额外保住实体类字段名可读性，便于排查缓存问题（代价很小）。
+-keepclassmembers class com.github.learningplatform.data.local.** {
+    <init>(...);
+}
+
+# --- Coil 3 ---
+# Coil 通过 ServiceLoader 找 ImageLoader/Decoder，裁掉会导致图片全部加载失败。
+-keep class coil3.** { *; }
+-dontwarn coil3.**
+
+# --- Media3 / ExoPlayer ---
+# 播放器通过反射加载 MediaCodec 相关的扩展与 Renderer。
+-keep class androidx.media3.** { *; }
+-dontwarn androidx.media3.**
+
+# --- Timber ---
+# 生产构建里 Timber 只挂了一个 release tree；日志方法被裁掉不影响功能，
+# 但保留行号能让线上崩溃栈可读。
+-keepattributes SourceFile, LineNumberTable
+-renamesourcefileattribute SourceFile

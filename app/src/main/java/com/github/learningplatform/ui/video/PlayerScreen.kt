@@ -1,39 +1,41 @@
-package com.github.learningplatform.ui.video
+﻿package com.github.learningplatform.ui.video
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -45,12 +47,18 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import com.github.learningplatform.core.constants.Constants
+import com.github.learningplatform.ui.ad.AdSlot
 import com.github.learningplatform.ui.common.ErrorState
 import com.github.learningplatform.ui.common.AdSlotPlaceholder
 import com.github.learningplatform.ui.common.LoadingState
+import com.github.learningplatform.ui.common.WriteNoteDialog
 import com.github.learningplatform.ui.nav.NavIcons
-import kotlinx.coroutines.delay
 import java.util.Locale
+import kotlinx.coroutines.delay
+import timber.log.Timber
+
+
 
 /**
  * 播放页（接口文档 6.3 播放凭证 / 6.4 进度心跳）。
@@ -71,6 +79,15 @@ fun PlayerScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
+    /*
+     * 打开笔记弹窗那一刻的播放位置。
+     *
+     * 为什么不在弹窗里实时读：视频此时还在播，位置每帧都在变，
+     * 时间戳会一直跳，用户看到「笔记位置」的数字在动会以为是 bug。
+     * 打开时定格一次，语义也更对 —— 这条笔记就是记在这一刻的。
+     */
+    var noteTimestamp by remember { mutableStateOf<Int?>(null) }
+
     LaunchedEffect(courseId, lessonId) { viewModel.load(courseId, lessonId) }
 
     val player = remember { ExoPlayer.Builder(context).build() }
@@ -79,9 +96,15 @@ fun PlayerScreen(
     LaunchedEffect(uiState.playInfo?.playUrl) {
         val url = uiState.playInfo?.playUrl
         if (!url.isNullOrBlank()) {
+            Timber.i("播放装载: url=%s", url)
             player.setMediaItem(MediaItem.fromUri(url))
             player.prepare()
             player.playWhenReady = true
+        } else {
+            Timber.w(
+                "播放未装载: playInfo=%s playUrl='%s' error=%s",
+                uiState.playInfo, url, uiState.error
+            )
         }
     }
 
@@ -90,6 +113,10 @@ fun PlayerScreen(
     var isPlaying by remember { mutableStateOf(true) }
     /** 【任务⑥：中断与恢复】播放异常时置非空，覆盖层提示 + 重试；就绪后自动清空 */
     var playbackError by remember { mutableStateOf<String?>(null) }
+    val speeds = listOf(0.5f, 1.0f, 1.25f, 1.5f, 2.0f)
+    var speedIdx by remember { mutableStateOf(1) }
+    var showSpeedMenu by remember { mutableStateOf(false) }
+    var isFullscreen by remember { mutableStateOf(false) }
 
     // 进度采样 + 心跳：只在播放中推进，暂停时不上报
     DisposableEffect(player) {
@@ -98,17 +125,33 @@ fun PlayerScreen(
                 isPlaying = playing
             }
 
-            // 【任务⑥】播放中断兜底：断网 / 源不可用 / 凭证过期时进入错误态，
-            // 展示覆盖层提示并支持重试（见 retryPlayback），不再无声卡死。
-            override fun onPlayerError(error: PlaybackException) {
-                playbackError = error.message?.takeIf { it.isNotBlank() } ?: "播放中断"
+            /*
+             * 下面两个回调是排查「画面不动」的关键。
+             *
+             * 只看 UI 上的 00:00 分不清三种情况：正在缓冲、加载失败、解码失败。
+             * 三者的表现都是「位置不动」，但原因和修法完全不同。
+             * onPlaybackStateChanged / onPlayerError 能把它们区分开。
+             */
+            override fun onPlaybackStateChanged(state: Int) {
+                val name = when (state) {
+                    Player.STATE_IDLE -> "IDLE"
+                    Player.STATE_BUFFERING -> "BUFFERING"
+                    Player.STATE_READY -> "READY"
+                    Player.STATE_ENDED -> "ENDED"
+                    else -> "UNKNOWN($state)"
+                }
+                Timber.i(
+                    "播放状态=%s 时长=%dms 位置=%dms",
+                    name, player.duration, player.currentPosition
+                )
             }
 
-            // 错误清除后（重试成功 / ExoPlayer 自动恢复）自动收起覆盖层
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_READY && playbackError != null) {
-                    playbackError = null
-                }
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                Timber.e(
+                    error,
+                    "播放失败 errorCode=%d name=%s",
+                    error.errorCode, error.errorCodeName
+                )
             }
         }
         player.addListener(listener)
@@ -232,6 +275,9 @@ fun PlayerScreen(
                         .padding(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    IconButton(onClick = onBack) {
+                        Icon(NavIcons.ArrowBack, contentDescription = "返回", tint = Color.White)
+                    }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = uiState.title.ifBlank { "课程播放" },
@@ -248,6 +294,25 @@ fun PlayerScreen(
                             )
                         }
                     }
+
+                    // 写笔记：视频笔记会带上当前播放位置
+                    IconButton(onClick = {
+                        // 直接取 ExoPlayer 的真实位置，不要用 ViewModel 里缓存的
+                        // lastKnownSeconds —— 那个只在 15-30 秒一次的心跳里更新，会偏
+                        noteTimestamp = (player.currentPosition / 1000).toInt().coerceAtLeast(0)
+                        viewModel.showNoteDialog()
+                    }) {
+                        Icon(
+                            NavIcons.Note,
+                            contentDescription = "写笔记",
+                            tint = Color.White
+                        )
+                    }
+                }
+
+                // 暂停时显示广告位（预留）
+                if (!isPlaying) {
+                    AdSlot(slotId = "video_pause_banner", modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 50.dp))
                 }
 
                 // 底部进度条
@@ -291,6 +356,52 @@ fun PlayerScreen(
                         color = Color.White,
                         style = MaterialTheme.typography.labelSmall
                     )
+
+                    // 倍速按钮
+                    Box {
+                        TextButton(
+                            onClick = { showSpeedMenu = true },
+                            colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = Color.White)
+                        ) {
+                            Text(
+                                text = String.format(Locale.CHINA, "%.2fx", speeds[speedIdx]),
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                        androidx.compose.material3.DropdownMenu(
+                            expanded = showSpeedMenu,
+                            onDismissRequest = { showSpeedMenu = false }
+                        ) {
+                            speeds.forEachIndexed { i, sp ->
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(String.format(Locale.CHINA, "%.2fx", sp)) },
+                                    onClick = {
+                                        speedIdx = i
+                                        player.setPlaybackSpeed(sp)
+                                        showSpeedMenu = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // 全屏按钮：横屏放大 / 竖屏恢复
+                    IconButton(onClick = {
+                        val activity = context as? android.app.Activity
+                        if (!isFullscreen) {
+                            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                            isFullscreen = true
+                        } else {
+                            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                            isFullscreen = false
+                        }
+                    }) {
+                        Text(
+                            text = if (isFullscreen) "⤡" else "⛶",
+                            color = Color.White,
+                            fontSize = 18.sp
+                        )
+                    }
                 }
 
                 // 【任务⑥】播放中断覆盖层：出错时提示原因并提供重试，避免无声卡死
@@ -353,6 +464,29 @@ fun PlayerScreen(
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(color = Color.White)
         }
+    }
+
+    // 退出时恢复竖屏
+    DisposableEffect(Unit) {
+        onDispose {
+            val activity = context as? android.app.Activity
+            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+    }
+
+    if (uiState.showNoteDialog) {
+        WriteNoteDialog(
+            sourceType = Constants.TARGET_COURSE,
+            sourceTitle = uiState.title,
+            // 位置在弹窗打开时取一次：写笔记期间视频还在播，
+            // 若每帧都重取会导致时间戳跳动，用户看到数字在变
+            videoTimestamp = noteTimestamp,
+            saving = uiState.noteSaving,
+            onDismiss = viewModel::dismissNoteDialog,
+            onSave = { title, content ->
+                viewModel.createNote(title, content, noteTimestamp ?: 0)
+            }
+        )
     }
 }
 

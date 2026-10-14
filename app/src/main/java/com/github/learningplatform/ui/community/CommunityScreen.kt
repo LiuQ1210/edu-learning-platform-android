@@ -1,4 +1,4 @@
-package com.github.learningplatform.ui.community
+﻿package com.github.learningplatform.ui.community
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -154,25 +154,6 @@ fun CommunityScreen(
             }
         }
 
-        FloatingActionButton(
-            onClick = onOpenPublish,
-            containerColor = Primary,
-            contentColor = Color.White,
-            // M3 的 FloatingActionButton 默认是 16dp 圆角方形；这里用正圆，
-            // 和设计稿里圆润的图形语言一致
-            shape = CircleShape,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(20.dp)
-        ) {
-            // 图标显式给 14dp。Edit 的路径几乎占满 24x24 视口，按默认尺寸渲染时
-            // 观感比按钮本身还重；14dp 是「图标明显轻于 40dp 按钮」的比例。
-            Icon(
-                imageVector = NavIcons.Edit,
-                contentDescription = "发布文章",
-                modifier = Modifier.size(14.dp)
-            )
-        }
     }
 }
 

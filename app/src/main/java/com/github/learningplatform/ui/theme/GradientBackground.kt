@@ -10,7 +10,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -40,20 +39,29 @@ fun GradientBackground(
     glowRadiusRatio: Float = 1.15f,
     content: @Composable BoxScope.() -> Unit
 ) {
+    val dark = LocalAppDarkTheme.current
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(
-                Brush.verticalGradient(
-                    0.00f to GradTop,
-                    0.22f to GradCream,
-                    0.38f to GradPeach,
-                    0.72f to GradBlush,
-                    1.00f to GradBottom
-                )
+                if (dark) {
+                    // 深色：深蓝灰微渐变，顶部略亮，底部沉下去，不叠暖色
+                    Brush.verticalGradient(
+                        0.00f to DarkSurface,
+                        1.00f to DarkBackground
+                    )
+                } else {
+                    Brush.verticalGradient(
+                        0.00f to GradTop,
+                        0.22f to GradCream,
+                        0.38f to GradPeach,
+                        0.72f to GradBlush,
+                        1.00f to GradBottom
+                    )
+                }
             )
     ) {
-        if (showGlow) {
+        if (showGlow && !dark) {
             // 柔光圆：径向渐变，圆心按容器尺寸算，半径取屏宽的比例。
             // 不用固定像素值 —— 不同屏幕密度下会差很多。
             val density = androidx.compose.ui.platform.LocalDensity.current
@@ -91,36 +99,55 @@ fun GlowOrb(
     diameter: Dp = 260.dp,
     alpha: Float = 0.85f
 ) {
+    /*
+     * 用「多段径向渐变」而不是 `Modifier.blur`。
+     *
+     * 为什么必须去掉 blur：`Modifier.blur` 底层是 RenderEffect，在软件渲染
+     * （模拟器常见的 swiftshader_indirect）下退化为 CPU 逐像素卷积。
+     * 实测后果：本 App 出现 "Skipped 124 frames"，并让桌面 launcher 掉帧到
+     * Davey duration 732~888ms、QueueBufferDuration 接近 1 秒 —— 表现就是
+     * 「一启动 App 桌面就卡死」。GPU 渲染的设备上 blur 没问题，但不能依赖它。
+     *
+     * 柔光本来就不需要真模糊：把白→透明的过渡拆成多段，视觉上等价，
+     * 而渐变由渲染管线一次插值完成，开销可以忽略。
+     */
     Box(
         modifier = modifier
             .size(diameter)
             .clip(CircleShape)
             .background(
                 Brush.radialGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = alpha),
-                        GlowEdge.copy(alpha = alpha * 0.30f),
-                        Color.Transparent
-                    )
+                    0.00f to Color.White.copy(alpha = alpha),
+                    0.35f to Color.White.copy(alpha = alpha * 0.55f),
+                    0.62f to GlowEdge.copy(alpha = alpha * 0.22f),
+                    0.82f to GlowEdge.copy(alpha * 0.07f),
+                    1.00f to Color.Transparent
                 )
             )
-            .blur(32.dp)
     )
 }
 
 /**
  * 可点元素表面的轻柔渐变（卡片、胶囊、列表行）。
  *
- * 强度刻意压得很低 —— 目的是让这些元素融入奶油底色，而不是自己被看见。
+ * 强度刻意压得很低 —— 目的是让这些元素融入底色，而不是自己被看见。
  * 直接用 `Brush.linearGradient` 线性过渡，不用径向，避免在扁长卡片上出现光斑。
  *
- * @param selected 选中态：换成品牌浅蓝到白的过渡，和未选中的暖色形成区分
+ * @param selected 选中态：浅色下换成品牌浅蓝到白，深色下用品牌蓝半透明
  */
 @Composable
-fun surfaceWashBrush(selected: Boolean = false): Brush = if (selected) {
-    Brush.linearGradient(listOf(PrimaryContainer.copy(alpha = 0.70f), Surface))
-} else {
-    Brush.linearGradient(listOf(SurfaceWashStart, SurfaceWashEnd))
+fun surfaceWashBrush(selected: Boolean = false): Brush {
+    val dark = LocalAppDarkTheme.current
+    return when {
+        selected && dark ->
+            Brush.linearGradient(listOf(Primary.copy(alpha = 0.30f), DarkSurface))
+        selected ->
+            Brush.linearGradient(listOf(PrimaryContainer.copy(alpha = 0.70f), Surface))
+        dark ->
+            Brush.linearGradient(listOf(DarkSurfaceVariant, DarkSurface))
+        else ->
+            Brush.linearGradient(listOf(SurfaceWashStart, SurfaceWashEnd))
+    }
 }
 
 /** 轻柔渐变的两个端点，单独导出以便需要纯色时取其一 */
@@ -146,21 +173,31 @@ val SurfaceWashEnd: Color get() = Color(0xFFFEF8F4)
  * @param strong 是否用完整四段。true 用于内容较少的页面（详情、列表空态）；
  *               false 用于长列表页，顶部奶白往下很快回到中性底，避免长时间阅读疲劳
  */
-fun pageGradientBrush(strong: Boolean = true): Brush = if (strong) {
-    Brush.verticalGradient(
-        0.00f to GradTop,
-        0.12f to GradCream,
-        0.34f to GradPeach,
-        0.72f to GradBlush,
-        1.00f to GradBottom
-    )
-} else {
-    Brush.verticalGradient(
-        0.00f to GradPeach,
-        0.10f to GradCream,
-        0.28f to Background,
-        1.00f to Background
-    )
+@Composable
+fun pageGradientBrush(strong: Boolean = true): Brush {
+    val dark = LocalAppDarkTheme.current
+    return if (dark) {
+        // 深色：深蓝灰微渐变，顶部稍亮做层次
+        Brush.verticalGradient(
+            0.00f to DarkSurface,
+            1.00f to DarkBackground
+        )
+    } else if (strong) {
+        Brush.verticalGradient(
+            0.00f to GradTop,
+            0.12f to GradCream,
+            0.34f to GradPeach,
+            0.72f to GradBlush,
+            1.00f to GradBottom
+        )
+    } else {
+        Brush.verticalGradient(
+            0.00f to GradPeach,
+            0.10f to GradCream,
+            0.28f to Background,
+            1.00f to Background
+        )
+    }
 }
 
 // ---------------------------------------------------------------------------

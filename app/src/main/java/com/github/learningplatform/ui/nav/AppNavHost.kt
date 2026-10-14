@@ -1,4 +1,4 @@
-package com.github.learningplatform.ui.nav
+﻿package com.github.learningplatform.ui.nav
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
@@ -27,6 +27,14 @@ import androidx.navigation.navArgument
 import com.github.learningplatform.ui.article.ArticleDetailScreen
 import com.github.learningplatform.ui.theme.BottomNavContainer
 import com.github.learningplatform.ui.theme.BottomNavUnselected
+import com.github.learningplatform.ui.theme.TabHomeInk
+import com.github.learningplatform.ui.theme.TabHomeWash
+import com.github.learningplatform.ui.theme.TabVideoInk
+import com.github.learningplatform.ui.theme.TabVideoWash
+import com.github.learningplatform.ui.theme.TabCommunityInk
+import com.github.learningplatform.ui.theme.TabCommunityWash
+import com.github.learningplatform.ui.theme.TabProfileInk
+import com.github.learningplatform.ui.theme.TabProfileWash
 import com.github.learningplatform.ui.article.ArticleEditScreen
 import com.github.learningplatform.ui.article.MyArticlesScreen
 import com.github.learningplatform.ui.article.TagArticlesScreen
@@ -43,8 +51,14 @@ import com.github.learningplatform.ui.mine.BlogHomeScreen
 import com.github.learningplatform.ui.mine.ChangePasswordScreen
 import com.github.learningplatform.ui.mine.EditProfileScreen
 import com.github.learningplatform.ui.mine.FavoritesScreen
+import com.github.learningplatform.ui.mine.DownloadsScreen
+import com.github.learningplatform.ui.mine.LikesScreen
 import com.github.learningplatform.ui.mine.MyCoursesScreen
 import com.github.learningplatform.ui.mine.ProfileScreen
+import com.github.learningplatform.ui.mine.StudyStatsScreen
+import com.github.learningplatform.ui.mine.StudyPathScreen
+import com.github.learningplatform.ui.mine.NotificationsScreen
+import com.github.learningplatform.ui.community.CommunityProfileScreen
 import com.github.learningplatform.ui.mine.SettingsScreen
 import com.github.learningplatform.ui.mine.WatchHistoryScreen
 import com.github.learningplatform.ui.note.NoteDetailScreen
@@ -123,12 +137,17 @@ private fun RootNavHost(navController: NavHostController, startDestination: Stri
         composable(Routes.CHECKIN) {
             CheckinTaskScreen(
                 onBack = { navController.popBackStack() },
-                onOpenRecords = { navController.navigate(Routes.CHECKIN_RECORD) }
+                onOpenRecords = { navController.navigate(Routes.CHECKIN_RECORD) },
+                onOpenRules = { navController.navigate("checkin_rules") }
             )
         }
 
         composable(Routes.CHECKIN_RECORD) {
             CheckinRecordScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable("checkin_rules") {
+            com.github.learningplatform.ui.checkin.PointsRulesScreen(onBack = { navController.popBackStack() })
         }
 
         // 播放器：全屏 + 横竖屏自适应
@@ -190,6 +209,13 @@ fun MainScaffold(
                 ) {
                     BottomNavItem.entries.forEach { item ->
                         val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
+                        // 每个 Tab 一个色对：选中用该 Tab 的墨色 + 同色系淡垫，深浅模式自动切换
+                        val (ink, wash) = when (item) {
+                            BottomNavItem.HOME -> TabHomeInk to TabHomeWash
+                            BottomNavItem.VIDEO -> TabVideoInk to TabVideoWash
+                            BottomNavItem.COMMUNITY -> TabCommunityInk to TabCommunityWash
+                            BottomNavItem.PROFILE -> TabProfileInk to TabProfileWash
+                        }
                         NavigationBarItem(
                             selected = selected,
                             onClick = {
@@ -206,9 +232,9 @@ fun MainScaffold(
                             // 每个 Tab 一个色对：选中用该 Tab 的墨色 + 同色系淡垫。
                             // 不共用主色蓝 —— 那会让四个 Tab 选中时长得一样，也压不住奶油底。
                             colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = item.ink,
-                                selectedTextColor = item.ink,
-                                indicatorColor = item.wash,
+                                selectedIconColor = ink,
+                                selectedTextColor = ink,
+                                indicatorColor = wash,
                                 unselectedIconColor = BottomNavUnselected,
                                 unselectedTextColor = BottomNavUnselected
                             )
@@ -227,6 +253,7 @@ fun MainScaffold(
             composable(Routes.HOME) {
                 HomeScreen(
                     onOpenSearch = { navController.navigate(Routes.search()) },
+                    onOpenNotifications = { navController.navigate(Routes.NOTIFICATIONS) },
                     onOpenAllCategories = { navController.navigate(Routes.CATEGORY_ALL) },
                     onOpenCourse = { navController.navigate(Routes.courseDetail(it)) },
                 )
@@ -250,12 +277,17 @@ fun MainScaffold(
 
             composable(Routes.PROFILE) {
                 ProfileScreen(
+                    onOpenNotifications = { navController.navigate(Routes.NOTIFICATIONS) },
                     onOpenCheckin = onOpenCheckin,
                     onOpenEditProfile = { navController.navigate(Routes.EDIT_PROFILE) },
+                    onOpenCommunityProfile = { navController.navigate(Routes.blogHome(0L, self = true)) },
                     onOpenMyCourses = { navController.navigate(Routes.MY_COURSES) },
+                    onOpenStudyStats = { navController.navigate(Routes.STUDY_STATS) },
                     onOpenMyArticles = { navController.navigate(Routes.MY_ARTICLES) },
                     onOpenHistory = { navController.navigate(Routes.WATCH_HISTORY) },
                     onOpenFavorites = { navController.navigate(Routes.MY_FAVORITES) },
+                    onOpenLikes = { navController.navigate(Routes.MY_LIKES) },
+                    onOpenDownloads = { navController.navigate(Routes.MY_DOWNLOADS) },
                     onOpenNotes = { navController.navigate(Routes.NOTES) },
                     onOpenTodos = { navController.navigate(Routes.TODOS) },
                     onOpenSettings = { navController.navigate(Routes.SETTINGS) },
@@ -389,9 +421,39 @@ fun MainScaffold(
                 )
             }
 
+            composable(Routes.STUDY_STATS) {
+                StudyStatsScreen(onBack = { navController.popBackStack() })
+            }
+
+            composable(Routes.STUDY_PATH) {
+                StudyPathScreen(onBack = { navController.popBackStack() })
+            }
+
             composable(Routes.MY_FAVORITES) {
                 FavoritesScreen(
                     onBack = { navController.popBackStack() },
+                    onOpenTarget = { type, id ->
+                        if (type == 1) navController.navigate(Routes.articleDetail(id))
+                        else navController.navigate(Routes.courseDetail(id))
+                    }
+                )
+            }
+
+            composable(Routes.MY_LIKES) {
+                LikesScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenTarget = { type, id ->
+                        if (type == 1) navController.navigate(Routes.articleDetail(id))
+                        else navController.navigate(Routes.courseDetail(id))
+                    }
+                )
+            }
+
+            composable(Routes.MY_DOWNLOADS) {
+                DownloadsScreen(
+                    onBack = { navController.popBackStack() },
+                    // 下载记录的 resourceType 与点赞的 targetType 是两套语义，
+                    // 但跳转目标一致：文章详情 / 课程详情
                     onOpenTarget = { type, id ->
                         if (type == 1) navController.navigate(Routes.articleDetail(id))
                         else navController.navigate(Routes.courseDetail(id))
@@ -442,6 +504,47 @@ fun MainScaffold(
                 ChangePasswordScreen(
                     onBack = { navController.popBackStack() },
                     onDone = { navController.popBackStack() }
+                )
+            }
+
+            composable(Routes.NOTIFICATIONS) {
+                NotificationsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenCourse = { courseId, lessonId ->
+                        com.github.learningplatform.ui.course.LessonHighlightBus.highlightLessonId = lessonId
+                        navController.navigate(Routes.courseDetail(courseId))
+                    },
+                    onOpenArticle = { articleId, commentId ->
+                        com.github.learningplatform.ui.article.CommentHighlightBus.highlightCommentId = commentId
+                        navController.navigate(Routes.articleDetail(articleId))
+                    },
+                    onOpenVideo = { commentId ->
+                            com.github.learningplatform.ui.video.VideoCommentHighlightBus.highlightCommentId = commentId
+                            navController.navigate(Routes.VIDEO)
+                        },
+                    onOpenUser = { userId -> navController.navigate(Routes.blogHome(userId)) },
+                    onOpenTodos = { navController.navigate(Routes.TODOS) }
+                )
+            }
+
+            composable(
+                route = Routes.BLOG_HOME + "?self={self}",
+                arguments = listOf(
+                    navArgument("userId") { type = NavType.LongType },
+                    navArgument("self") {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    }
+                )
+            ) { backStack ->
+                val userId = backStack.arguments?.getLong("userId") ?: 0L
+                val isSelf = backStack.arguments?.getBoolean("self") ?: false
+                CommunityProfileScreen(
+                    userId = userId,
+                    onBack = { navController.popBackStack() },
+                    onOpenArticle = { navController.navigate(Routes.articleDetail(it)) },
+                    isSelf = isSelf,
+                    onEdit = { navController.navigate(Routes.EDIT_PROFILE) }
                 )
             }
         }

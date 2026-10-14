@@ -58,7 +58,8 @@ class SearchViewModel @Inject constructor(
             type = if (categoryId != null) 2 else initialType
         )
         loadHotWords()
-        if (keyword.isNotBlank()) search()
+        // 从分类页进来时 keyword 为空，但 categoryId 有值，也要自动加载该分类课程
+        if (keyword.isNotBlank() || categoryId != null) search()
     }
 
     fun onKeywordChange(value: String) {

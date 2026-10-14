@@ -1,4 +1,4 @@
-package com.github.learningplatform.ui.auth
+﻿package com.github.learningplatform.ui.auth
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
@@ -49,14 +50,15 @@ import com.github.learningplatform.ui.theme.Surface
 import com.github.learningplatform.ui.theme.surfaceWashBrush
 import com.github.learningplatform.ui.theme.GlowOrb
 import com.github.learningplatform.ui.theme.GradientBackground
+import com.github.learningplatform.ui.theme.Surface
 import com.github.learningplatform.ui.theme.TextHint
 import com.github.learningplatform.ui.theme.TextPrimary
 import com.github.learningplatform.ui.theme.TextSecondary
 
 /**
- * 登录页（对齐 UI 稿「登录」）。
+ * 登录页（对齐 UI 稿「登录」，去掉抖音/QQ 第三方入口）。
  *
- * 页面语义：不接第三方登录入口，账号体系只走用户名 / 手机号 / 邮箱 + 密码。
+ * 页面语义：3 个第三方入口只保留微信，其余账号体系走用户名密码。
  * 背景使用与 UI 稿一致的浅暖渐变，主色沿用品牌蓝。
  */
 @Composable
@@ -84,13 +86,14 @@ fun LoginScreen(
             color = TextSecondary
         )
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(12.dp))
 
         AuthField(
             value = uiState.username,
             onValueChange = viewModel::onUsernameChange,
-            placeholder = "用户名",
+            placeholder = "手机号",
             icon = NavIcons.Person,
+            keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone,
             isError = uiState.usernameError != null,
             errorMessage = uiState.usernameError.orEmpty()
         )

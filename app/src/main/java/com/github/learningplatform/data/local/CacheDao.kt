@@ -22,6 +22,15 @@ interface CacheDao {
     @Query("SELECT * FROM cache_kv WHERE `key` = :key LIMIT 1")
     fun observe(key: String): Flow<CacheEntry?>
 
+    /**
+     * 按前缀删除。
+     *
+     * 用来做「某个模块的数据全失效」，比如发布文章后清掉文章列表缓存。
+     * 注意 `%` 和 `_` 在 LIKE 里是通配符，键名请勿包含这两个字符。
+     */
+    @Query("DELETE FROM cache_kv WHERE `key` LIKE :prefix || '%'")
+    suspend fun removeByPrefix(prefix: String)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun put(entry: CacheEntry)
 

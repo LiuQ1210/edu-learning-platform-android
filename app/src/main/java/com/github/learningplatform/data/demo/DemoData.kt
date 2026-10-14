@@ -1,4 +1,4 @@
-package com.github.learningplatform.data.demo
+﻿package com.github.learningplatform.data.demo
 
 import com.github.learningplatform.BuildConfig
 import com.github.learningplatform.data.remote.dto.AdSlotDto
@@ -7,9 +7,6 @@ import com.github.learningplatform.data.remote.dto.ArticleDetailDto
 import com.github.learningplatform.data.remote.dto.ArticleDto
 import com.github.learningplatform.data.remote.dto.ArticleTagDto
 import com.github.learningplatform.data.remote.dto.CategoryNodeDto
-import com.github.learningplatform.data.remote.dto.CheckinRecordDto
-import com.github.learningplatform.data.remote.dto.CheckinResultDto
-import com.github.learningplatform.data.remote.dto.CheckinTaskDto
 import com.github.learningplatform.data.remote.dto.CommentDto
 import com.github.learningplatform.data.remote.dto.ContentItemDto
 import com.github.learningplatform.data.remote.dto.CourseChapterDto
@@ -26,7 +23,6 @@ import com.github.learningplatform.data.remote.dto.PlayInfoDto
 import com.github.learningplatform.data.remote.dto.RatingDto
 import com.github.learningplatform.data.remote.dto.RatingResultDto
 import com.github.learningplatform.data.remote.dto.ReplyDto
-import com.github.learningplatform.data.remote.dto.SignCalendarDto
 import com.github.learningplatform.data.remote.dto.TodoDto
 import com.github.learningplatform.data.remote.dto.UserProfileDto
 import com.github.learningplatform.data.remote.dto.UserTargetItemDto
@@ -34,7 +30,17 @@ import com.github.learningplatform.data.remote.dto.ViewHistoryItemDto
 
 /**
  * UI 预览样例数据。
- */
+ *
+ * **只在 `BuildConfig.UI_PREVIEW = true` 时被 Repository 使用**，编译期常量，
+ * release 构建关掉后整块数据会被 R8 裁掉，不会进生产包。
+ *
+ * 存在的意义：后端未就绪时，界面必须能被打开、被点、被评审。没有它就只能看到
+ * 一个登录页和满屏「网络异常」。这里给出的是**结构真实**的假数据 —— 字段、分页、
+ * 层级关系都与接口文档 v3.1 一致，所以列表滚动、分页加载、空状态、详情跳转都能真跑。
+ *
+ * 图片用 picsum 的稳定占位图（同一 seed 每次返回同一张），断网时会自动落到
+ * NetImage 的灰底占位，不影响布局检查。
+**/
 object DemoData {
 
     val enabled: Boolean get() = BuildConfig.UI_PREVIEW
@@ -108,7 +114,11 @@ object DemoData {
             instructorName = listOf("张老师", "李老师", "王老师", "陈老师")[i % 4],
             averageScore = 4.5 + (i % 5) * 0.1,
             studentCount = 820 + i * 340,
-            viewCount = 12000 + i * 2100
+            viewCount = 12000 + i * 2100,
+            likeCount = 320 + i * 85,
+            commentCount = 18 + i * 7,
+            favoriteCount = 96 + i * 30,
+            shareCount = 12 + i * 4
         )
     }
 
@@ -126,8 +136,14 @@ object DemoData {
         )
     }
 
-    fun coursePage(pageNum: Int, pageSize: Int, videoType: Int?): PageData<CourseDto> {
-        val source = if (videoType == 1) shortVideos else courses
+    fun coursePage(pageNum: Int, pageSize: Int, videoType: Int?, categoryId: Long? = null): PageData<CourseDto> {
+        var source = if (videoType == 1) shortVideos else courses
+        // preview 模式下按分类过滤：不同分类返回不同子集，让点击 tabs 有反馈
+        if (categoryId != null) {
+            val idx = (categoryId % 10).toInt()
+            source = source.filterIndexed { i, _ -> i % 6 == idx % 6 }
+            if (source.isEmpty()) source = courses.take(2)
+        }
         // 造两页就够，用来验证上拉加载与「没有更多了」
         val all = source + source.map { it.copy(courseId = it.courseId + 5000, title = it.title + "（进阶）") }
         val from = (pageNum - 1) * pageSize
@@ -187,11 +203,14 @@ object DemoData {
     fun playInfo(courseId: Long, lessonId: Long?) = PlayInfoDto(
         courseId = courseId,
         lessonId = lessonId ?: 0L,
-        // 【任务⑥】公开测试流：w3.org 的 Sintel 预告片。
-        // 原 BigBuckBunny 挂在 Google GCS（commondatastorage.googleapis.com），
-        // 在当前网络环境实测不可达（curl 超时、ExoPlayer 一直缓冲黑屏），已换源。
-        // 曾临时指向 404 地址验证 onPlayerError→覆盖层→重试闭环（build/e2,e3 截图），验证完已恢复。
-        playUrl = "https://media.w3.org/2010/05/sintel/trailer.mp4",
+        // 公开测试流。
+        //
+        // 用 W3C 的示例视频，**不要用 Google 的 gtv-videos-bucket**：
+        // 后者是 commondatastorage.googleapis.com，国内网络访问不通。
+        // 实测症状是「画面不动、位置一直 00:00」——ExoPlayer 停在 BUFFERING、
+        // duration 始终是 TIME_UNSET，但**代码链路完全正常**，很容易误判成播放器有问题。
+        // W3C 这个源支持 Range 请求，进度条可以拖动。
+        playUrl = "https://www.runoob.com/try/demo/movie.mp4",
         expireTime = System.currentTimeMillis() / 1000 + 3600,
         watermarkText = "DemoUser1001",
         duration = 52
@@ -230,8 +249,20 @@ object DemoData {
         )
     }
 
-    fun articlePage(pageNum: Int, pageSize: Int): PageData<ArticleDto> {
-        val all = articles + articles.map { it.copy(articleId = it.articleId + 7000, title = it.title + "（续）") }
+    fun articlePage(pageNum: Int, pageSize: Int, categoryId: Long? = null, sort: Int? = null): PageData<ArticleDto> {
+        var source = articles
+        // preview 模式下按分类过滤，让点击 tabs 有反馈
+        if (categoryId != null) {
+            val idx = (categoryId % 10).toInt()
+            source = source.filterIndexed { i, _ -> i % 5 == idx % 5 }
+            if (source.isEmpty()) source = articles.take(2)
+        }
+        // 排序：1最新(默认按时间) 2最热(按点赞) 3精华(只取前3篇当精华)
+        when (sort) {
+            2 -> source = source.sortedByDescending { it.likeCount }
+            3 -> source = source.take(3)
+        }
+        val all = source + source.map { it.copy(articleId = it.articleId + 7000, title = it.title + "（续）") }
         val slice = all.drop((pageNum - 1) * pageSize).take(pageSize)
         return PageData(total = all.size.toLong(), list = slice)
     }
@@ -309,13 +340,20 @@ object DemoData {
     fun commentList(targetId: Long): List<CommentDto> = listOf(
         CommentDto(
             88009, 1001, "张三", "", "讲得很清晰，第一章就解决了我卡了很久的环境问题。",
-            12, 2, false, "2026-09-12 10:00:00",
-            listOf(HotReplyDto(88010, "李四", "张三", "同感，1.3 那节特别有用"))
+            12, 3, false, "2026-09-12 10:00:00",
+            listOf(
+                HotReplyDto(88010, "李四", "张三", "同感，1.3 那节特别有用"),
+                HotReplyDto(88014, "王五", "张三", "我也是卡了两天，看了这节突然通了"),
+                HotReplyDto(88015, "赵六", "李四", "请问环境是 Windows 还是 Mac？")
+            )
         ),
         CommentDto(88011, 1002, "李四", "", "希望能补充一下复杂度的推导过程。", 5, 0, true, "2026-09-12 11:20:00"),
         CommentDto(
-            88012, 1003, "王五", "", "已加入学习，进度到第二章了。", 2, 1, false, "2026-09-12 13:05:00",
-            listOf(HotReplyDto(88013, "张三", "王五", "加油，第三章是重点"))
+            88012, 1003, "王五", "", "已加入学习，进度到第二章了。", 2, 2, false, "2026-09-12 13:05:00",
+            listOf(
+                HotReplyDto(88013, "张三", "王五", "加油，第三章是重点"),
+                HotReplyDto(88016, "李四", "王五", "请问有没有配套代码？")
+            )
         ),
         CommentDto(88020, 1004, "陈老师", "", "有疑问可以在评论区留言，我会定期回复。", 30, 0, false, "2026-09-13 09:00:00"),
         CommentDto(88021, 1005, "赵六", "", "第六章的示例代码跑不通，是版本问题吗？", 8, 0, false, "2026-09-13 15:40:00"),
@@ -341,22 +379,22 @@ object DemoData {
         HotWordDto("英语口语", 310)
     )
 
-    fun searchResult(keyword: String?, type: Int, pageNum: Int): PageData<ContentItemDto> {
-        val items = if (type == 1) {
-            articles.map {
+    fun searchResult(keyword: String?, type: Int, pageNum: Int, categoryId: Long? = null): PageData<ContentItemDto> {
+        val pool = if (type == 1) {
+            articles.mapIndexed { idx, it ->
                 ContentItemDto(
                     id = it.articleId, type = 1, title = it.title, summary = it.summary,
-                    coverUrl = it.coverUrl, categoryId = 101, categoryName = it.categoryName,
+                    coverUrl = it.coverUrl, categoryId = 101L + (idx % 5), categoryName = it.categoryName,
                     authorId = it.authorId, authorName = it.authorName,
                     viewCount = it.viewCount, likeCount = it.likeCount, commentCount = it.commentCount,
                     createTime = it.publishTime, publishTime = it.publishTime
                 )
             }
         } else {
-            courses.map {
+            courses.mapIndexed { idx, it ->
                 ContentItemDto(
                     id = it.courseId, type = 2, title = it.title, summary = "系统讲解 + 实战演练",
-                    coverUrl = it.coverUrl, categoryId = 3, categoryName = "IT 解决方案",
+                    coverUrl = it.coverUrl, categoryId = 1L + (idx % 6), categoryName = "IT 解决方案",
                     authorId = 88, authorName = it.instructorName,
                     viewCount = it.viewCount,
                     duration = it.duration, score = it.averageScore,
@@ -364,9 +402,29 @@ object DemoData {
                 )
             }
         }
-        val filtered = if (keyword.isNullOrBlank()) items
-        else items.filter { it.title.contains(keyword, ignoreCase = true) }
-            .ifEmpty { items }   // 预览模式下不制造「无结果」，避免看起来像坏了
+        var filtered = pool
+        // 按分类过滤：一级分类 1-6，子分类 11-42；
+        // 点子分类时归到它的一级父类（11->1, 21->2, 31->3, 41->4）
+        if (categoryId != null) {
+            val parentCat = when (categoryId) {
+                in 11..19 -> 1L
+                in 21..29 -> 2L
+                in 31..39 -> 3L
+                in 41..49 -> 4L
+                in 51..59 -> 5L
+                in 61..69 -> 6L
+                else -> categoryId
+            }
+            filtered = pool.filter { it.categoryId == parentCat }
+            // 该分类在 demo 里只有 1-2 门课，太少就补几条，保证看起来不空
+            if (filtered.size < 2) {
+                filtered = pool.filter { it.categoryId == parentCat || it.categoryId == (parentCat % 6) + 1L }
+            }
+        }
+        if (!keyword.isNullOrBlank()) {
+            val byKw = filtered.filter { it.title.contains(keyword, ignoreCase = true) }
+            if (byKw.isNotEmpty()) filtered = byKw
+        }
         val slice = filtered.drop((pageNum - 1) * 10).take(10)
         return PageData(total = filtered.size.toLong(), list = slice)
     }
@@ -382,8 +440,8 @@ object DemoData {
         email = "zhangsan@example.com",
         gender = 1,
         bio = "热爱学习，正在补 Android 和算法。",
-        continueSignDay = 7,
-        lastSignDate = "2026-09-17",
+        continueSignDay = 12,
+        lastSignDate = "2026-10-09",
         createTime = "2026-01-01 00:00:00"
     )
 
@@ -406,6 +464,25 @@ object DemoData {
         )
     )
 
+    /**
+     * 我的点赞。
+     *
+     * 单独一份而不是复用 [favorites]：两者数据不该相同 ——
+     * 点赞和收藏是独立操作，用户可能只点赞不收藏。
+     * 复用会让「点赞页和收藏页一模一样」，评审时看不出问题，
+     * 真接后端才会发现字段映射接错（getLikes 接到了收藏接口）。
+     */
+    val likes: PageData<UserTargetItemDto> = PageData(
+        total = 5,
+        list = listOf(
+            UserTargetItemDto(2, 1001, "Machine Learning 从入门到实战", cover("course0"), "2026-09-16 20:10:00"),
+            UserTargetItemDto(1, 5002, "结构化并发为什么必须向上抛 CancellationException", cover("article1"), "2026-09-15 22:40:00"),
+            UserTargetItemDto(2, 2002, "Data Science 数据分析实战", cover("short1"), "2026-09-14 19:05:00"),
+            UserTargetItemDto(1, 5003, "Compose 重组优化实战", cover("article2"), "2026-09-13 11:20:00"),
+            UserTargetItemDto(2, 1004, "Android 性能优化", cover("course3"), "2026-09-12 08:45:00")
+        )
+    )
+
     val history: PageData<ViewHistoryItemDto> = PageData(
         total = 4,
         list = listOf(
@@ -422,12 +499,6 @@ object DemoData {
             DownloadRecordDto(1, 9001, 1, "第一章课件.pdf", "ch1.pdf", 2_400_000, "2026-09-12 10:00:00"),
             DownloadRecordDto(2, 9002, 2, "实战项目源码.zip", "source.zip", 18_600_000, "2026-09-11 15:30:00")
         )
-    )
-
-    val signCalendar = SignCalendarDto(
-        continueSignDay = 7,
-        totalSignDay = 20,
-        signedDates = (1..17).map { "2026-09-%02d".format(it) }
     )
 
     // ---------------------------------------------------------------- 笔记 / 待办
@@ -487,43 +558,12 @@ object DemoData {
         )
     )
 
-    // ---------------------------------------------------------------- 签到
-
-    val checkinTasks: List<CheckinTaskDto> = listOf(
-        CheckinTaskDto(6001, "每日基地打卡", 1, "点击即可完成今日签到",
-            null, null, 100, null, "2026-09-18 00:00:00", "2026-09-18 23:59:59", 0),
-        CheckinTaskDto(6002, "实训室位置签到", 2, "请在实训楼 3 楼范围内签到",
-            106.630, 26.647, 500, null, "2026-09-18 08:00:00", "2026-09-18 18:00:00", 1),
-        CheckinTaskDto(6003, "手势签到", 3, "绘制管理员预设的九宫格图案",
-            null, null, 100, "0,1,2,5,8", "2026-09-18 08:00:00", "2026-09-18 20:00:00", 0),
-        CheckinTaskDto(6004, "现场拍照签到", 4, "上传一张现场照片作为凭证",
-            null, null, 100, null, "2026-09-18 08:00:00", "2026-09-18 22:00:00", 0)
-    )
-
-    val checkinRecords: PageData<CheckinRecordDto> = PageData(
-        total = 4,
-        list = listOf(
-            CheckinRecordDto(9001, 6001, "每日基地打卡", 1, "2026-09-17 08:12:00", 1, ""),
-            CheckinRecordDto(9002, 6002, "实训室位置签到", 2, "2026-09-16 09:30:00", 1, ""),
-            CheckinRecordDto(9003, 6003, "手势签到", 3, "2026-09-15 10:05:00", 0, "手势不匹配"),
-            CheckinRecordDto(9004, 6001, "每日基地打卡", 1, "2026-09-14 07:58:00", 1, "")
-        )
-    )
-
-    fun checkinResult(taskName: String) = CheckinResultDto(
-        checkinStatus = 1,
-        message = "签到成功，连续签到 8 天",
-        continueSignDay = 8,
-        checkinTime = "2026-09-18 09:18:00"
-    )
-
     // ---------------------------------------------------------------- 配置 / 广告
 
     val adSlots: List<AdSlotDto> = listOf(
         AdSlotDto("startup_splash", "开屏广告", "TAKU_SLOT_SPLASH_001", 4),
         AdSlotDto("community_home_banner", "社区主页轮播广告", "TAKU_SLOT_COMM_BANNER_001", 1),
-        AdSlotDto("video_home_banner", "视频主页轮播广告", "TAKU_SLOT_VIDEO_BANNER_001", 1),
-        AdSlotDto("player_pause", "播放页暂停广告", "TAKU_SLOT_PLAYER_PAUSE_001", 1)
+        AdSlotDto("video_home_banner", "视频主页轮播广告", "TAKU_SLOT_VIDEO_BANNER_001", 1)
     )
 
     val appConfig = AppConfigDto(

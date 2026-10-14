@@ -2,23 +2,27 @@ package com.github.learningplatform.ui.video
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.learningplatform.core.constants.Constants
 import com.github.learningplatform.data.remote.dto.CourseDetailDto
+import com.github.learningplatform.data.remote.dto.CreateNoteRequest
 import com.github.learningplatform.data.remote.dto.PlayInfoDto
 import com.github.learningplatform.data.remote.dto.ProgressSyncRequest
 import com.github.learningplatform.data.repository.CourseRepository
+import com.github.learningplatform.data.repository.NoteRepository
 import com.github.learningplatform.ui.readableMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
+
 
 /** 客户端类型：1-Web 2-iOS 3-Android（接口 6.4） */
 private const val DEVICE_TYPE_ANDROID = 3
@@ -28,6 +32,10 @@ data class PlayerUiState(
     val error: String? = null,
     val title: String = "",
     val playInfo: PlayInfoDto? = null,
+    /** 写笔记弹窗是否可见 */
+    val showNoteDialog: Boolean = false,
+    /** 笔记保存中（禁用按钮防重复提交） */
+    val noteSaving: Boolean = false,
     val message: String? = null
 )
 
@@ -38,7 +46,8 @@ data class PlayerUiState(
  */
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
-    private val courseRepository: CourseRepository
+    private val courseRepository: CourseRepository,
+    private val noteRepository: NoteRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PlayerUiState())
@@ -153,6 +162,62 @@ class PlayerViewModel @Inject constructor(
         appScope.launch {
             withContext(NonCancellable) {
                 runCatching { courseRepository.syncProgress(request) }
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------- 写笔记
+
+    fun showNoteDialog() {
+        _uiState.value = _uiState.value.copy(showNoteDialog = true)
+    }
+
+    fun dismissNoteDialog() {
+        // 保存中不允许关闭，否则用户以为没保存成功会重复提交
+        if (_uiState.value.noteSaving) return
+        _uiState.value = _uiState.value.copy(showNoteDialog = false)
+    }
+
+    /**
+     * 从播放页创建视频笔记。
+     *
+     * `sourceType = 2`（视频/课程）、`sourceId = courseId`，
+     * 并带上当前播放位置作为 `videoTimestamp` —— 这样在笔记列表里能显示
+     * 「该笔记对应视频第几分钟」，是视频笔记相对文章笔记的核心差别。
+     *
+     * @param positionSeconds **由 UI 传入的真实播放位置**。
+     *   不要在这里读 `lastKnownSeconds`：那个值只在 `syncProgress`（心跳，15-30 秒一次）
+     *   和 `onPlayerDetached` 时更新，拿它当时间戳会**偏最多 30 秒**，而且不报错、很难发现。
+     *   播放位置只有持有 ExoPlayer 的那一层知道，必须由 UI 传进来。
+     */
+    fun createNote(title: String, content: String, positionSeconds: Int) {
+        if (_uiState.value.noteSaving) return
+        _uiState.value = _uiState.value.copy(noteSaving = true)
+        viewModelScope.launch {
+            try {
+                noteRepository.createNote(
+                    CreateNoteRequest(
+                        title = title,
+                        content = content,
+                        sourceType = Constants.TARGET_COURSE,
+                        sourceId = courseId,
+                        // 位置为 0 时不带时间戳：那是「还没开始看」，标记成 00:00 没意义
+                        videoTimestamp = positionSeconds.takeIf { it > 0 }
+                    )
+                )
+                _uiState.value = _uiState.value.copy(
+                    noteSaving = false,
+                    showNoteDialog = false,
+                    message = "笔记已保存"
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                // 保存失败时**不关闭弹窗**，否则用户输入的内容会丢
+                _uiState.value = _uiState.value.copy(
+                    noteSaving = false,
+                    message = e.readableMessage()
+                )
             }
         }
     }

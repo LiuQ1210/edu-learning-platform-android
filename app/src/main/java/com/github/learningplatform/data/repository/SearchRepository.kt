@@ -24,7 +24,7 @@ class SearchRepository @Inject constructor(
         pageNum: Int = 1,
         pageSize: Int = 20
     ): PageData<ContentItemDto> {
-        contentPreview { return DemoData.searchResult(keyword, type, pageNum) }
+        contentPreview { return DemoData.searchResult(keyword, type, pageNum, categoryId) }
         return safeApiCall {
             searchApi.search(keyword, type, categoryId, pageNum, pageSize)
         }
@@ -43,7 +43,7 @@ class SearchRepository @Inject constructor(
         pageNum: Int = 1,
         pageSize: Int = 20
     ): PageData<ContentItemDto> {
-        contentPreview { return DemoData.searchResult(keyword, type, pageNum) }
+        contentPreview { return DemoData.searchResult(keyword, type, pageNum, categoryId) }
         return safeApiCall {
             searchApi.search(keyword, type, categoryId, pageNum, pageSize)
         }

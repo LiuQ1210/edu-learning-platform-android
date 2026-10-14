@@ -19,7 +19,11 @@ data class CourseDto(
     val instructorName: String = "",
     val averageScore: Double = 0.0,
     val studentCount: Int = 0,
-    val viewCount: Int = 0
+    val viewCount: Int = 0,
+    val likeCount: Int = 0,
+    val commentCount: Int = 0,
+    val favoriteCount: Int = 0,
+    val shareCount: Int = 0
 )
 
 /** 6.2 课程详情（不含真实播放地址） */
@@ -103,5 +107,6 @@ data class RatingDto(
     val userName: String = "",
     val userAvatar: String = "",
     val score: Double = 0.0,
+    val comment: String = "",
     val createTime: String = ""
 )

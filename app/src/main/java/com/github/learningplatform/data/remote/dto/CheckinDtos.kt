@@ -2,73 +2,62 @@ package com.github.learningplatform.data.remote.dto
 
 import kotlinx.serialization.Serializable
 
-// ---------------------- 9. 签到模块 ----------------------
+// ---------------------- 9. 每日签到（平台积分体系） ----------------------
 
-/** 9.1 今日待签到任务 */
+/** 9.1 签到状态 */
 @Serializable
-data class CheckinTaskDto(
-    val taskId: Long,
-    val taskName: String = "",
-    /** 1正常 2位置 3手势 4拍照 */
-    val checkinType: Int = 1,
-    val description: String = "",
-    val targetLongitude: Double? = null,
-    val targetLatitude: Double? = null,
-    /** 允许半径（米） */
-    val allowRadius: Int = 100,
-    val gesturePattern: String? = null,
-    val startTime: String = "",
-    val endTime: String = "",
-    /** 0-未签到 1-已签到 */
-    val status: Int = 0
-) {
-    val type: CheckinType get() = CheckinType.from(checkinType)
-    val signed: Boolean get() = status == 1
-}
-
-enum class CheckinType(val code: Int, val label: String) {
-    NORMAL(1, "正常签到"),
-    LOCATION(2, "位置签到"),
-    GESTURE(3, "手势签到"),
-    PHOTO(4, "拍照签到");
-
-    companion object {
-        fun from(code: Int): CheckinType = entries.firstOrNull { it.code == code } ?: NORMAL
-    }
-}
-
-/** 9.2 提交签到 */
-@Serializable
-data class CheckinSubmitRequest(
-    val taskId: Long,
-    val longitude: Double? = null,
-    val latitude: Double? = null,
-    val gesturePattern: String? = null,
-    val photoUrl: String? = null
+data class DailySignStatusDto(
+    /** 今日是否已签到 */
+    val signedToday: Boolean = false,
+    /** 连续签到天数 */
+    val continuousDays: Int = 0,
+    /** 积分余额 */
+    val points: Int = 0,
+    /** 累计签到次数 */
+    val totalSigns: Int = 0,
+    /** 免广告到期时间戳（毫秒），0 表示当前无免广告权益 */
+    val adFreeUntil: Long = 0L,
+    /** 今日签到可得积分 */
+    val todayPoints: Int = 5
 )
 
+/** 9.2 签到结果 */
 @Serializable
-data class CheckinResultDto(
-    /** 1-成功 */
-    val checkinStatus: Int = 1,
+data class DailySignResultDto(
+    val success: Boolean = false,
     val message: String = "",
-    val continueSignDay: Int = 0,
-    val checkinTime: String = ""
-) {
-    val success: Boolean get() = checkinStatus == 1
-}
+    /** 本次获得积分 */
+    val earnedPoints: Int = 0,
+    /** 当前连续签到天数 */
+    val continuousDays: Int = 0,
+    /** 当前积分余额 */
+    val points: Int = 0
+)
 
-/** 9.3 签到记录项 */
+/** 9.3 免广告兑换选项 */
 @Serializable
-data class CheckinRecordDto(
-    val recordId: Long,
-    val taskId: Long = 0,
-    val taskName: String = "",
-    val checkinType: Int = 1,
-    val signTime: String = "",
-    val status: Int = 1,
-    val failReason: String = ""
+data class AdFreeRewardDto(
+    val rewardId: String = "",
+    val label: String = "",
+    /** 所需积分 */
+    val costPoints: Int = 0,
+    /** 免广告时长（分钟） */
+    val durationMinutes: Int = 0
+)
+
+/** 9.4 兑换结果 */
+@Serializable
+data class ExchangeResultDto(
+    val success: Boolean = false,
+    val message: String = "",
+    val pointsLeft: Int = 0,
+    val adFreeUntil: Long = 0L
 ) {
-    val type: CheckinType get() = CheckinType.from(checkinType)
-    val success: Boolean get() = status == 1
+    companion object {
+        val OPTIONS = listOf(
+            AdFreeRewardDto("30min", "免广告 30 分钟", 10, 30),
+            AdFreeRewardDto("2h", "免广告 2 小时", 30, 120),
+            AdFreeRewardDto("24h", "免广告 24 小时", 100, 1440)
+        )
+    }
 }

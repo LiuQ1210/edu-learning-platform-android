@@ -77,7 +77,11 @@ class UserRepository @Inject constructor(
         pageSize: Int = 20,
         targetType: Int? = null
     ): PageData<UserTargetItemDto> {
-        contentPreview { return DemoData.favorites }
+        contentPreview {
+            val filtered = if (targetType == null) DemoData.favorites
+            else DemoData.favorites.copy(list = DemoData.favorites.list.filter { it.targetType == targetType })
+            return filtered
+        }
         return safeApiCall {
             userApi.getFavorites(pageNum, pageSize, targetType)
         }
@@ -88,7 +92,13 @@ class UserRepository @Inject constructor(
         pageSize: Int = 20,
         targetType: Int? = null
     ): PageData<UserTargetItemDto> {
-        contentPreview { return DemoData.favorites }
+        // 用独立的 likes 样例，不要复用 favorites：
+        // 复用会让点赞页与收藏页显示完全相同的内容，掩盖「接口映射接错」这类问题
+        contentPreview {
+            val filtered = if (targetType == null) DemoData.likes
+            else DemoData.likes.copy(list = DemoData.likes.list.filter { it.targetType == targetType })
+            return filtered
+        }
         return safeApiCall {
             userApi.getLikes(pageNum, pageSize, targetType)
         }
@@ -116,7 +126,11 @@ class UserRepository @Inject constructor(
         pageSize: Int = 20,
         resourceType: Int? = null
     ): PageData<DownloadRecordDto> {
-        contentPreview { return DemoData.downloads }
+        contentPreview {
+            val filtered = if (resourceType == null) DemoData.downloads
+            else DemoData.downloads.copy(list = DemoData.downloads.list.filter { it.resourceType == resourceType })
+            return filtered
+        }
         return safeApiCall {
             userApi.getDownloadRecords(pageNum, pageSize, resourceType)
         }

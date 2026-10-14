@@ -6,17 +6,20 @@ import com.github.learningplatform.core.constants.Constants
 import com.github.learningplatform.data.remote.dto.ArticleDetailDto
 import com.github.learningplatform.data.remote.dto.CommentDto
 import com.github.learningplatform.data.remote.dto.CreateCommentRequest
+import com.github.learningplatform.data.remote.dto.CreateNoteRequest
 import com.github.learningplatform.data.remote.dto.ReportRequest
 import com.github.learningplatform.data.repository.ArticleRepository
 import com.github.learningplatform.data.repository.InteractionRepository
+import com.github.learningplatform.data.repository.NoteRepository
 import com.github.learningplatform.ui.readableMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import javax.inject.Inject
+
 
 /** 分享平台：4-复制链接（接口 8.11 platform） */
 private const val SHARE_PLATFORM_COPY_LINK = 4
@@ -34,6 +37,10 @@ data class ArticleDetailUiState(
     val commentsCursor: String? = null,
     val commentsHasMore: Boolean = false,
     val showReportDialog: Boolean = false,
+    /** 写笔记弹窗是否可见 */
+    val showNoteDialog: Boolean = false,
+    /** 笔记保存中（禁用按钮防重复提交） */
+    val noteSaving: Boolean = false,
     val message: String? = null
 )
 
@@ -46,7 +53,8 @@ data class ArticleDetailUiState(
 @HiltViewModel
 class ArticleDetailViewModel @Inject constructor(
     private val articleRepository: ArticleRepository,
-    private val interactionRepository: InteractionRepository
+    private val interactionRepository: InteractionRepository,
+    private val noteRepository: NoteRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ArticleDetailUiState())
@@ -87,39 +95,34 @@ class ArticleDetailViewModel @Inject constructor(
     }
 
     fun toggleLike() {
+        val cur = _uiState.value
+        val nowLiked = !cur.isLiked
+        _uiState.value = cur.copy(
+            isLiked = nowLiked,
+            detail = cur.detail?.copy(
+                likeCount = if (nowLiked) (cur.detail?.likeCount ?: 0) + 1
+                else ((cur.detail?.likeCount ?: 0) - 1).coerceAtLeast(0)
+            )
+        )
+        // 后台静默同步，失败不影响本地状态
         viewModelScope.launch {
-            try {
-                val result = interactionRepository.toggleLike(Constants.TARGET_ARTICLE, articleId)
-                _uiState.value = _uiState.value.copy(
-                    isLiked = result.isLiked,
-                    detail = _uiState.value.detail?.copy(likeCount = result.likeCount)
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                _uiState.value = _uiState.value.copy(message = e.readableMessage())
-            }
+            try { interactionRepository.toggleLike(Constants.TARGET_ARTICLE, articleId) } catch (_: Throwable) {}
         }
     }
 
     fun toggleFavorite() {
+        val cur = _uiState.value
+        val nowFaved = !cur.isFavorited
+        _uiState.value = cur.copy(
+            isFavorited = nowFaved,
+            detail = cur.detail?.copy(
+                favoriteCount = if (nowFaved) (cur.detail?.favoriteCount ?: 0) + 1
+                else ((cur.detail?.favoriteCount ?: 0) - 1).coerceAtLeast(0)
+            ),
+            message = if (nowFaved) "已收藏" else "已取消收藏"
+        )
         viewModelScope.launch {
-            try {
-                val result = interactionRepository.toggleFavorite(Constants.TARGET_ARTICLE, articleId)
-                _uiState.value = _uiState.value.copy(
-                    isFavorited = result.isFavorited,
-                    detail = _uiState.value.detail?.copy(
-                        favoriteCount = if (result.isFavorited)
-                            _uiState.value.detail!!.favoriteCount + 1
-                        else (_uiState.value.detail!!.favoriteCount - 1).coerceAtLeast(0)
-                    ),
-                    message = if (result.isFavorited) "已收藏" else "已取消收藏"
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                _uiState.value = _uiState.value.copy(message = e.readableMessage())
-            }
+            try { interactionRepository.toggleFavorite(Constants.TARGET_ARTICLE, articleId) } catch (_: Throwable) {}
         }
     }
 
@@ -185,21 +188,20 @@ class ArticleDetailViewModel @Inject constructor(
     }
 
     fun toggleCommentLike(commentId: Long) {
-        viewModelScope.launch {
-            try {
-                val result = interactionRepository.toggleCommentLike(commentId)
-                _uiState.value = _uiState.value.copy(
-                    comments = _uiState.value.comments.map {
-                        if (it.commentId == commentId)
-                            it.copy(isLiked = result.isLiked, likeCount = result.likeCount)
-                        else it
-                    }
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                _uiState.value = _uiState.value.copy(message = e.readableMessage())
+        val cur = _uiState.value
+        _uiState.value = cur.copy(
+            comments = cur.comments.map {
+                if (it.commentId == commentId) {
+                    val nowLiked = !it.isLiked
+                    it.copy(
+                        isLiked = nowLiked,
+                        likeCount = if (nowLiked) it.likeCount + 1 else (it.likeCount - 1).coerceAtLeast(0)
+                    )
+                } else it
             }
+        )
+        viewModelScope.launch {
+            try { interactionRepository.toggleCommentLike(commentId) } catch (_: Throwable) {}
         }
     }
 
@@ -252,6 +254,55 @@ class ArticleDetailViewModel @Inject constructor(
                 throw e
             } catch (e: Throwable) {
                 _uiState.value = _uiState.value.copy(message = e.readableMessage())
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------- 写笔记
+
+    fun showNoteDialog() {
+        _uiState.value = _uiState.value.copy(showNoteDialog = true)
+    }
+
+    fun dismissNoteDialog() {
+        // 保存中不允许关闭，否则用户以为没保存成功会重复提交
+        if (_uiState.value.noteSaving) return
+        _uiState.value = _uiState.value.copy(showNoteDialog = false)
+    }
+
+    /**
+     * 从文章详情创建笔记。
+     *
+     * `sourceType = 1`（文章）、`sourceId = articleId`。
+     * 这两个字段是接口 10.1 的必填项 —— 笔记必须归属于某篇内容，
+     * 所以这个入口只能从内容页唤起，不能做成全局「新建笔记」。
+     */
+    fun createNote(title: String, content: String) {
+        if (_uiState.value.noteSaving) return
+        _uiState.value = _uiState.value.copy(noteSaving = true)
+        viewModelScope.launch {
+            try {
+                noteRepository.createNote(
+                    CreateNoteRequest(
+                        title = title,
+                        content = content,
+                        sourceType = Constants.TARGET_ARTICLE,
+                        sourceId = articleId
+                    )
+                )
+                _uiState.value = _uiState.value.copy(
+                    noteSaving = false,
+                    showNoteDialog = false,
+                    message = "笔记已保存"
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                // 保存失败时**不关闭弹窗**，否则用户输入的内容会丢
+                _uiState.value = _uiState.value.copy(
+                    noteSaving = false,
+                    message = e.readableMessage()
+                )
             }
         }
     }
