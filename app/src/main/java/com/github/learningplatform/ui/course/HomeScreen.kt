@@ -192,8 +192,8 @@ private fun CourseFeed(
 
         // 排序筛选标签
         item {
-            val sorts = listOf("推荐", "高分", "热门", "最新")
-            var selectedSort by remember { mutableStateOf("推荐") }
+            val sorts = listOf("高分", "热门", "最新")
+            var selectedSort by remember { mutableStateOf("高分") }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
