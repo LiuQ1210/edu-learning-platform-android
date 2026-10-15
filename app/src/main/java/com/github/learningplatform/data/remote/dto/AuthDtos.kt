@@ -1,10 +1,25 @@
 package com.github.learningplatform.data.remote.dto
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 // ---------------------------------------------------------------------------
-// 认证模块 DTO（接口文档 v3.0 第二章，11 个接口）
+// 认证模块 DTO
 // ---------------------------------------------------------------------------
+
+/**
+ * 后端 Shiro 版统一响应格式 AjaxResult。
+ * 成功 code=200，失败 code=500；登录成功时额外带 userId/phonenumber/userName/roles。
+ */
+@Serializable
+data class AjaxResultDto(
+    val code: Int = 0,
+    val msg: String = "",
+    val userId: Long? = null,
+    val phonenumber: String? = null,
+    val userName: String? = null,
+    val roles: JsonElement? = null
+)
 
 @Serializable
 data class SendCodeRequest(

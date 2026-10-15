@@ -71,11 +71,9 @@ fun RegisterScreen(
         )
         Spacer(Modifier.height(12.dp))
 
-        // 【登录注册联调】若依图形验证码：输入 + 图片（点击图片刷新）
+        // 图形验证码：只显示图片（后端不校验，点击图片刷新）
         CaptchaField(
             imageBase64 = uiState.captchaImg,
-            codeValue = uiState.captchaCode,
-            onCodeChange = viewModel::onCaptchaCodeChange,
             onRefresh = viewModel::loadCaptcha,
             loading = uiState.captchaLoading,
             isError = uiState.captchaError != null,
@@ -104,15 +102,6 @@ fun RegisterScreen(
             errorMessage = uiState.confirmError.orEmpty()
         )
         Spacer(Modifier.height(12.dp))
-
-        AuthField(
-            value = uiState.nickname,
-            onValueChange = viewModel::onNicknameChange,
-            placeholder = "昵称（选填，不填自动生成）",
-            icon = NavIcons.Person
-        )
-
-        Spacer(Modifier.height(14.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(

@@ -4,10 +4,14 @@ import com.github.learningplatform.BuildConfig
 import com.github.learningplatform.core.constants.Constants
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import kotlinx.serialization.json.Json
+import okhttp3.Cookie
+import okhttp3.CookieJar
+import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,7 +27,19 @@ class RetrofitClient @Inject constructor(
     // 两处配置不一致会出现「接口能解析但缓存读不出」这类很难定位的问题。
     private val json = AppJson
 
+    // 内存 CookieJar：保存 Shiro 的 JSESSIONID，登录后自动携带
+    private val cookieJar = object : CookieJar {
+        private val store = ConcurrentHashMap<String, MutableList<Cookie>>()
+        override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
+            val list = store.getOrPut(url.host) { mutableListOf() }
+            list.removeAll { existing -> cookies.any { it.name == existing.name } }
+            list.addAll(cookies)
+        }
+        override fun loadForRequest(url: HttpUrl): List<Cookie> = store[url.host].orEmpty()
+    }
+
     private val okHttpClient: OkHttpClient = OkHttpClient.Builder()
+        .cookieJar(cookieJar)
         .connectTimeout(Constants.CONNECT_TIMEOUT, TimeUnit.SECONDS)
         .readTimeout(Constants.READ_TIMEOUT, TimeUnit.SECONDS)
         .writeTimeout(Constants.WRITE_TIMEOUT, TimeUnit.SECONDS)

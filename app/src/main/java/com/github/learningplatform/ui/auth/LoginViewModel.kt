@@ -20,14 +20,11 @@ data class LoginUiState(
     val passwordError: String? = null,
     val error: String? = null,
     val loginSuccess: Boolean = false,
-    /** 记住我：勾选后由后端签发更长有效期的 refreshToken（前端仅传递标记） */
     val rememberMe: Boolean = false,
-    // ---- 【登录注册联调】若依图形验证码 ----
-    val captchaUuid: String = "",
+    // ---- 图形验证码（图片 base64，后端不校验，仅展示）----
     val captchaImg: String = "",
-    val captchaCode: String = "",
-    val captchaError: String? = null,
-    val captchaLoading: Boolean = false
+    val captchaLoading: Boolean = false,
+    val captchaError: String? = null
 )
 
 @HiltViewModel
@@ -50,26 +47,23 @@ class LoginViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(password = value, passwordError = null, error = null)
     }
 
-    fun onCaptchaCodeChange(value: String) {
-        _uiState.value = _uiState.value.copy(captchaCode = value, captchaError = null, error = null)
-    }
-
     fun onRememberMeChange(value: Boolean) {
         _uiState.value = _uiState.value.copy(rememberMe = value)
     }
 
-    /** 加载若依图形验证码（点击图片可刷新） */
+    /** 找回密码（暂未开放） */
+    fun notifyForgotPassword() {
+        _uiState.value = _uiState.value.copy(error = "找回密码暂未开放，请联系管理员")
+    }
+
+    /** 加载图形验证码图片（JPEG 流转 base64，点击图片刷新） */
     fun loadCaptcha() {
         if (_uiState.value.captchaLoading) return
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(captchaLoading = true, captchaError = null)
             try {
-                val captcha = authRepository.getCaptchaImage()
-                _uiState.value = _uiState.value.copy(
-                    captchaUuid = captcha.uuid,
-                    captchaImg = captcha.img,
-                    captchaLoading = false
-                )
+                val img = authRepository.getCaptchaImage()
+                _uiState.value = _uiState.value.copy(captchaImg = img, captchaLoading = false)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -81,42 +75,29 @@ class LoginViewModel @Inject constructor(
         }
     }
 
-    /** 找回密码（接口 2.11 需要手机号 + 验证码，暂未开放入口） */
-    fun notifyForgotPassword() {
-        _uiState.value = _uiState.value.copy(error = "找回密码需要短信验证码，暂未开放，请联系管理员")
-    }
-
     fun login() {
         val state = _uiState.value
         if (state.isLoading) return
 
-        // 校验错误分别绑定到对应输入框。
-        // 原实现把两种错误都挂在密码框上，"请输入用户名"会显示在密码输入框下方。
         if (state.username.isBlank()) {
-            _uiState.value = state.copy(usernameError = "请输入用户名")
+            _uiState.value = state.copy(usernameError = "请输入手机号")
             return
         }
         if (state.password.isBlank()) {
             _uiState.value = state.copy(passwordError = "请输入密码")
             return
         }
-        if (state.captchaCode.isBlank()) {
-            _uiState.value = state.copy(captchaError = "请输入验证码")
-            return
-        }
 
         viewModelScope.launch {
             _uiState.value = state.copy(isLoading = true, error = null)
             try {
-                authRepository.login(state.username, state.password, state.captchaCode, state.captchaUuid)
+                authRepository.login(state.username, state.password)
                 _uiState.value = _uiState.value.copy(isLoading = false, loginSuccess = true)
             } catch (e: CancellationException) {
-                // 协程取消必须向上抛，不能被 catch 吞掉，否则会破坏结构化并发
                 throw e
             } catch (e: Throwable) {
                 val msg = if (e is ApiException) e.message else "网络异常，请稍后重试"
-                // 登录失败（验证码过期/密码错误）后刷新图形验证码，避免用户拿旧验证码重试
-                _uiState.value = _uiState.value.copy(isLoading = false, error = msg, captchaCode = "")
+                _uiState.value = _uiState.value.copy(isLoading = false, error = msg)
                 loadCaptcha()
             }
         }

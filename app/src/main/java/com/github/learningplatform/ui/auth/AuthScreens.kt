@@ -112,11 +112,9 @@ fun LoginScreen(
 
         Spacer(Modifier.height(10.dp))
 
-        // 【登录注册联调】若依图形验证码：输入 + 图片（点击图片刷新）
+        // 图形验证码：只显示图片（后端不校验，点击图片刷新）
         CaptchaField(
             imageBase64 = uiState.captchaImg,
-            codeValue = uiState.captchaCode,
-            onCodeChange = viewModel::onCaptchaCodeChange,
             onRefresh = viewModel::loadCaptcha,
             loading = uiState.captchaLoading,
             isError = uiState.captchaError != null,
@@ -330,72 +328,36 @@ internal fun AuthField(
 // ---------------------------------------------------------------------------
 
 /**
- * 若依图形验证码行：左侧验证码输入框，右侧图片（点击可刷新）。
- * 图片为 base64（可能带 data:image/png;base64, 前缀）。
+ * 图形验证码：只显示图片（后端不校验，点击图片刷新）。
+ * 图片为 JPEG 流转成的 base64。
  */
 @Composable
 internal fun CaptchaField(
     imageBase64: String?,
-    codeValue: String,
-    onCodeChange: (String) -> Unit,
     onRefresh: () -> Unit,
     loading: Boolean,
     isError: Boolean,
     errorMessage: String
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
+    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        val bitmap = remember(imageBase64) { decodeBase64Image(imageBase64) }
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .clip(RoundedCornerShape(50))
+                .size(width = 120.dp, height = 48.dp)
+                .clip(RoundedCornerShape(10.dp))
                 .background(surfaceWashBrush())
-                .padding(start = 18.dp, end = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .clickable(enabled = !loading, onClick = onRefresh),
+            contentAlignment = Alignment.Center
         ) {
-            Icon(
-                NavIcons.Lock,
-                contentDescription = null,
-                tint = TextHint,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(Modifier.width(12.dp))
-            androidx.compose.foundation.text.BasicTextField(
-                value = codeValue,
-                // 【修复】若依图形验证码是字母+数字混合（如 r5mge），
-                // 不能像短信验证码那样过滤数字，这里仅做长度限制
-                onValueChange = { input -> onCodeChange(input.take(6)) },
-                singleLine = true,
-                cursorBrush = androidx.compose.ui.graphics.SolidColor(Primary),
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
-                modifier = Modifier.weight(1f),
-                decorationBox = { inner ->
-                    if (codeValue.isEmpty()) {
-                        Text("验证码", color = TextHint, style = MaterialTheme.typography.bodyLarge)
-                    }
-                    inner()
-                }
-            )
-
-            val bitmap = remember(imageBase64) { decodeBase64Image(imageBase64) }
-            Box(
-                modifier = Modifier
-                    .size(width = 92.dp, height = 40.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Surface)
-                    .clickable(enabled = !loading, onClick = onRefresh),
-                contentAlignment = Alignment.Center
-            ) {
-                when {
-                    loading -> Text("加载中", color = TextHint, style = MaterialTheme.typography.bodySmall)
-                    bitmap != null -> Image(
-                        bitmap = bitmap,
-                        contentDescription = "验证码图片，点击刷新",
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    else -> Text("点击刷新", color = TextHint, style = MaterialTheme.typography.bodySmall)
-                }
+            when {
+                loading -> Text("加载中", color = TextHint, style = MaterialTheme.typography.bodySmall)
+                bitmap != null -> Image(
+                    bitmap = bitmap,
+                    contentDescription = "验证码图片，点击刷新",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize()
+                )
+                else -> Text("点击刷新", color = TextHint, style = MaterialTheme.typography.bodySmall)
             }
         }
 
@@ -404,7 +366,7 @@ internal fun CaptchaField(
                 text = errorMessage,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(start = 18.dp, top = 4.dp)
+                modifier = Modifier.padding(top = 4.dp)
             )
         }
     }
