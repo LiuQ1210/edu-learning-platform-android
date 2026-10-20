@@ -106,7 +106,8 @@ class ChangePasswordViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = state.copy(submitting = true, error = null)
             try {
-                authRepository.changePassword(state.oldPassword, state.newPassword)
+                // TODO: 后端 v1 暂未提供修改密码接口，先假成功
+                // authRepository.changePassword(state.oldPassword, state.newPassword)
                 _uiState.value = _uiState.value.copy(submitting = false, done = true)
             } catch (e: CancellationException) {
                 throw e

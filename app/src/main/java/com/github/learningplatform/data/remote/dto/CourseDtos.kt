@@ -7,22 +7,31 @@ import kotlinx.serialization.Serializable
 // 注意：v3 为 course + course_chapter + course_lesson 三层结构
 // ---------------------------------------------------------------------------
 
-/** 6.1 课程列表项 */
+/** 课程列表项（对应后端 learning_course 表） */
 @Serializable
 data class CourseDto(
-    val courseId: Long,
-    val title: String = "",
+    // 后端实际字段
+    val courseId: Long = 0,
+    val courseName: String = "",
+    val categoryId: Long = 0,
     val coverUrl: String = "",
-    /** 1-短视频 2-长视频课程 */
+    val intro: String = "",
+    val likeCount: Int = 0,
+    val favoriteCount: Int = 0,
+    val commentCount: Int = 0,
+    val ratingCount: Int = 0,
+    val ratingScore: Int = 0,
+    val status: String = "0",
+    val categoryName: String = "",
+    val avgScore: Double? = null,
+    // 前端兼容字段（UI 还在用，后续慢慢替换）
+    val title: String = courseName,
     val videoType: Int = 1,
     val duration: Int = 0,
     val instructorName: String = "",
-    val averageScore: Double = 0.0,
+    val averageScore: Double = avgScore ?: 0.0,
     val studentCount: Int = 0,
     val viewCount: Int = 0,
-    val likeCount: Int = 0,
-    val commentCount: Int = 0,
-    val favoriteCount: Int = 0,
     val shareCount: Int = 0
 )
 

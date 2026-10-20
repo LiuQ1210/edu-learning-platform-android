@@ -1,47 +1,39 @@
 package com.github.learningplatform.core.network
 
-import com.github.learningplatform.core.constants.Constants
-import com.github.learningplatform.core.di.ApplicationScope
-import com.github.learningplatform.data.local.UserPreferences
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.Response
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 自动注入 `Authorization: Bearer <accessToken>`。
+ * 认证拦截器（v1 Token 版）。
  *
- * Token 缓存在内存中，由 [UserPreferences.accessToken] 驱动更新，
- * 避免每个请求都 runBlocking 读 DataStore。
+ * 从内存变量读 token，加到 Authorization: Bearer <token> header。
+ * 登录成功后由 AuthRepository 调 setToken() 更新内存缓存。
  */
 @Singleton
-class AuthInterceptor @Inject constructor(
-    private val userPreferences: UserPreferences,
-    @ApplicationScope scope: CoroutineScope
-) : Interceptor {
+class AuthInterceptor @Inject constructor() : Interceptor {
 
     @Volatile
-    private var cachedToken: String = ""
+    private var token: String = ""
 
-    init {
-        scope.launch {
-            userPreferences.accessToken.collect { cachedToken = it }
-        }
+    fun setToken(newToken: String) {
+        token = newToken
+    }
+
+    fun clearToken() {
+        token = ""
     }
 
     override fun intercept(chain: Interceptor.Chain): Response {
-        val token = cachedToken.ifBlank {
-            runBlocking { userPreferences.accessToken.first() }.also { cachedToken = it }
+        val original = chain.request()
+        // 已经有 Authorization 头就不重复加
+        if (token.isBlank() || original.header("Authorization") != null) {
+            return chain.proceed(original)
         }
-        val request = chain.request().newBuilder().apply {
-            if (token.isNotBlank()) {
-                header(Constants.HEADER_AUTHORIZATION, Constants.BEARER_PREFIX + token)
-            }
-        }.build()
-        return chain.proceed(request)
+        val newRequest = original.newBuilder()
+            .header("Authorization", "Bearer $token")
+            .build()
+        return chain.proceed(newRequest)
     }
 }

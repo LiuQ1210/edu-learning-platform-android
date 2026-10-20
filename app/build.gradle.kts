@@ -21,8 +21,8 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // 后端 BaseUrl：由 BuildConfig 注入，code 侧通过 Constants.BASE_URL 读取。
-        buildConfigField("String", "BASE_URL", "\"http://43.142.9.214:8080/\"")
+        // 后端 BaseUrl：本地调试（adb reverse 转发到宿主机 80 端口）
+        buildConfigField("String", "BASE_URL", "\"http://127.0.0.1:18080/\"")
 
         // UI 预览开关：true 时登录/注册等认证接口直接返回本地假登录，不发任何网络请求。
         val uiPreview = (project.findProperty("uiPreview") as String?)?.toBoolean() ?: false

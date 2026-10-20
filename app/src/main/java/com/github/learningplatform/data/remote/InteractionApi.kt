@@ -11,6 +11,7 @@ import com.github.learningplatform.data.remote.dto.ReplyDto
 import com.github.learningplatform.data.remote.dto.ReportRequest
 import com.github.learningplatform.data.remote.dto.ShareRequest
 import com.github.learningplatform.data.remote.dto.ToggleRequest
+import com.github.learningplatform.data.remote.dto.TableDataInfo
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -20,67 +21,89 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 /**
- * 统一互动模块（接口文档 v3.0 第八章，12 个接口）。
- *
- * 评论采用游标分页（cursor + size），三级楼中楼由 rootId + parentId 表达。
- * 收藏/点赞为统一多态 toggle 接口，写操作均带 X-Idempotent-Token（拦截器自动注入）。
+ * 互动模块 ApiV1 接口（点赞/收藏）。
  */
 interface InteractionApi {
 
-    /** 8.1 顶级评论列表（sort: 1时间倒序 2最热） */
-    @GET("comments")
-    suspend fun getComments(
-        @Query("targetType") targetType: Int,
+    // ---- 点赞/收藏 ----
+
+    /**
+     * 点赞/取消 或 收藏/取消
+     * @param targetType 目标类型（1帖子 2课程 3短视频）
+     * @param targetId 目标ID
+     * @param type 行为类型（1点赞 2收藏）
+     */
+    @POST("api/v1/interaction/toggle")
+    suspend fun toggle(
+        @Query("targetType") targetType: String,
         @Query("targetId") targetId: Long,
-        @Query("cursor") cursor: String? = null,
-        @Query("size") size: Int = 20,
-        @Query("sort") sort: Int? = null
-    ): Response<ApiResponse<CursorPage<CommentDto>>>
+        @Query("type") type: String
+    ): Response<ApiResponse<Map<String, Any>>>
 
-    /** 8.2 某顶级评论下的全部回复 */
-    @GET("comments/{rootId}/replies")
-    suspend fun getReplies(
-        @Path("rootId") rootId: Long,
-        @Query("cursor") cursor: String? = null,
-        @Query("size") size: Int = 20
-    ): Response<ApiResponse<CursorPage<ReplyDto>>>
+    /**
+     * 批量查询当前用户已点赞/已收藏的目标ID
+     * @param targetType 目标类型
+     * @param type 行为类型
+     * @param targetIds 目标ID，逗号分隔
+     */
+    @GET("api/v1/interaction/status")
+    suspend fun getStatus(
+        @Query("targetType") targetType: String,
+        @Query("type") type: String,
+        @Query("targetIds") targetIds: String
+    ): Response<ApiResponse<Map<String, List<Long>>>>
 
-    /** 8.3 发布评论 / 回复 */
-    @POST("comments")
-    suspend fun createComment(
-        @Body body: CreateCommentRequest
-    ): Response<ApiResponse<CreateCommentResponse>>
+    /**
+     * 查某个目标的真实互动数
+     * @param targetType 目标类型
+     * @param targetId 目标ID
+     * @param type 行为类型
+     */
+    @GET("api/v1/interaction/count")
+    suspend fun getCount(
+        @Query("targetType") targetType: String,
+        @Query("targetId") targetId: Long,
+        @Query("type") type: String
+    ): Response<ApiResponse<Map<String, Int>>>
 
-    /** 8.4 删除评论（本人或管理员） */
-    @DELETE("comments/{commentId}")
-    suspend fun deleteComment(@Path("commentId") commentId: Long): Response<ApiResponse<Unit>>
+    // ---- 评论 ----
 
-    /** 8.5 评论点赞切换 */
-    @POST("comments/{commentId}/like/toggle")
-    suspend fun toggleCommentLike(
-        @Path("commentId") commentId: Long
-    ): Response<ApiResponse<LikeToggleResultDto>>
+    /**
+     * 发表评论 / 回复评论
+     * @param targetType 目标类型（1帖子 2课程 3短视频）
+     * @param targetId 目标ID
+     * @param content 评论内容
+     * @param parentId 被回复的评论ID（可选）
+     */
+    @POST("api/v1/comment/add")
+    suspend fun addComment(
+        @Query("targetType") targetType: String,
+        @Query("targetId") targetId: Long,
+        @Query("content") content: String,
+        @Query("parentId") parentId: Long? = null
+    ): Response<ApiResponse<Map<String, Any>>>
 
-    /** 8.6 举报评论 */
-    @POST("comments/{commentId}/report")
-    suspend fun reportComment(
-        @Path("commentId") commentId: Long,
-        @Body body: ReportRequest
-    ): Response<ApiResponse<Unit>>
+    /**
+     * 评论列表（分页）
+     * @param targetType 目标类型
+     * @param targetId 目标ID
+     * @param pageNum 页码
+     * @param pageSize 每页数量
+     */
+    @GET("api/v1/comment/list")
+    suspend fun getCommentList(
+        @Query("targetType") targetType: String,
+        @Query("targetId") targetId: Long,
+        @Query("pageNum") pageNum: Int = 1,
+        @Query("pageSize") pageSize: Int = 20
+    ): Response<TableDataInfo<CommentDto>>
 
-    /** 8.9 收藏切换（文章/课程） */
-    @POST("favorites/toggle")
-    suspend fun toggleFavorite(
-        @Body body: ToggleRequest
-    ): Response<ApiResponse<FavoriteToggleResultDto>>
-
-    /** 8.10 点赞切换（文章/课程/评论） */
-    @POST("likes/toggle")
-    suspend fun toggleLike(
-        @Body body: ToggleRequest
-    ): Response<ApiResponse<LikeToggleResultDto>>
-
-    /** 8.11 记录转发行为 */
-    @POST("shares")
-    suspend fun recordShare(@Body body: ShareRequest): Response<ApiResponse<Unit>>
+    /**
+     * 删除评论
+     * @param commentId 评论ID
+     */
+    @POST("api/v1/comment/remove")
+    suspend fun removeComment(
+        @Query("commentId") commentId: Long
+    ): Response<ApiResponse<Map<String, Any>>>
 }

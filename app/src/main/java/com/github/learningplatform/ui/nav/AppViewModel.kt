@@ -32,7 +32,7 @@ class AppViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            val loggedIn = runCatching { userPreferences.accessToken.first().isNotBlank() }
+            val loggedIn = runCatching { userPreferences.userId.first().isNotBlank() }
                 .getOrDefault(false)
             _startState.value = if (loggedIn) AppStartState.LOGGED_IN else AppStartState.LOGGED_OUT
         }

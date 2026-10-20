@@ -18,9 +18,6 @@ class RetrofitClient @Inject constructor(
     idempotencyInterceptor: IdempotencyInterceptor,
     tokenAuthenticator: TokenAuthenticator
 ) {
-    // 用共享的 AppJson，不要在这里另建一份：
-    // 缓存层要把响应序列化成字符串存进 Room、读回时再反序列化，
-    // 两处配置不一致会出现「接口能解析但缓存读不出」这类很难定位的问题。
     private val json = AppJson
 
     private val okHttpClient: OkHttpClient = OkHttpClient.Builder()
@@ -31,7 +28,6 @@ class RetrofitClient @Inject constructor(
         .addInterceptor(idempotencyInterceptor)
         .authenticator(tokenAuthenticator)
         .apply {
-            // 仅 debug 打印报文：BODY 级别会输出 Token 与密码明文
             if (BuildConfig.DEBUG) {
                 addInterceptor(
                     HttpLoggingInterceptor().apply {

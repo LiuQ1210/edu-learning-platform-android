@@ -96,10 +96,10 @@ class EditProfileViewModel @Inject constructor(
                 )
                 // 同步本地缓存，个人主页首屏直接用新昵称
                 userPreferences.saveLoginInfo(
-                    accessToken = userPreferences.currentAccessToken(),
-                    refreshToken = userPreferences.currentRefreshToken(),
+                    token = userPreferences.getToken(),
                     userId = userPreferences.userId.first(),
-                    nickname = state.nickname,
+                    userName = userPreferences.userName.first(),
+                    phone = userPreferences.phone.first(),
                     avatar = state.avatar
                 )
                 _uiState.value = _uiState.value.copy(
