@@ -7,10 +7,10 @@ import kotlinx.serialization.Serializable
 // 评论/收藏/点赞/转发统一为多态接口，用 targetType 区分：1文章 2视频课程 3评论
 // ---------------------------------------------------------------------------
 
-/** 8.1 顶级评论项 */
+/** 评论项 */
 @Serializable
 data class CommentDto(
-    val commentId: Long,
+    val commentId: Long = 0,
     val userId: Long = 0,
     val userName: String = "",
     val userAvatar: String = "",

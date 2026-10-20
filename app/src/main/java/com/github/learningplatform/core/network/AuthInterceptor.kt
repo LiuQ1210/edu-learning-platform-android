@@ -6,12 +6,34 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 认证拦截器（Shiro Session 版）。
+ * 认证拦截器（v1 Token 版）。
  *
- * 后端用 JSESSIONID Cookie 认证，OkHttp CookieJar 自动管理 Cookie，
- * 此拦截器不再注入 Authorization header，保留类以兼容 DI 注入链。
+ * 从内存变量读 token，加到 Authorization: Bearer <token> header。
+ * 登录成功后由 AuthRepository 调 setToken() 更新内存缓存。
  */
 @Singleton
 class AuthInterceptor @Inject constructor() : Interceptor {
-    override fun intercept(chain: Interceptor.Chain): Response = chain.proceed(chain.request())
+
+    @Volatile
+    private var token: String = ""
+
+    fun setToken(newToken: String) {
+        token = newToken
+    }
+
+    fun clearToken() {
+        token = ""
+    }
+
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val original = chain.request()
+        // 已经有 Authorization 头就不重复加
+        if (token.isBlank() || original.header("Authorization") != null) {
+            return chain.proceed(original)
+        }
+        val newRequest = original.newBuilder()
+            .header("Authorization", "Bearer $token")
+            .build()
+        return chain.proceed(newRequest)
+    }
 }

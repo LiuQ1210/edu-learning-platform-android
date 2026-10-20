@@ -8,8 +8,11 @@ import com.github.learningplatform.data.remote.CategoryApi
 import com.github.learningplatform.data.remote.CheckinApi
 import com.github.learningplatform.data.remote.CourseApi
 import com.github.learningplatform.data.remote.FileApi
+import com.github.learningplatform.data.remote.FollowApi
 import com.github.learningplatform.data.remote.InteractionApi
 import com.github.learningplatform.data.remote.NoteApi
+import com.github.learningplatform.data.remote.NotificationApi
+import com.github.learningplatform.data.remote.RatingApi
 import com.github.learningplatform.data.remote.ResourceApi
 import com.github.learningplatform.data.remote.SearchApi
 import com.github.learningplatform.data.remote.TodoApi
@@ -65,4 +68,16 @@ object NetworkModule {
     /** 文件上传（v3.1 增补 15.1 / 15.2）*/
     @Provides @Singleton
     fun provideFileApi(client: RetrofitClient): FileApi = client.create()
+
+    /** 评分 */
+    @Provides @Singleton
+    fun provideRatingApi(client: RetrofitClient): RatingApi = client.create()
+
+    /** 关注 */
+    @Provides @Singleton
+    fun provideFollowApi(client: RetrofitClient): FollowApi = client.create()
+
+    /** 通知 */
+    @Provides @Singleton
+    fun provideNotificationApi(client: RetrofitClient): NotificationApi = client.create()
 }

@@ -8,13 +8,15 @@ import kotlinx.serialization.json.JsonElement
 // ---------------------------------------------------------------------------
 
 /**
- * 后端 Shiro 版统一响应格式 AjaxResult。
- * 成功 code=200，失败 code=500；登录成功时额外带 userId/phonenumber/userName/roles。
+ * 后端 v1 版统一响应格式 AjaxResult。
+ * 成功 code=0，失败 code=500；登录成功时额外带 token/expireTime/userId/phonenumber/userName/roles。
  */
 @Serializable
 data class AjaxResultDto(
     val code: Int = 0,
     val msg: String = "",
+    val token: String? = null,
+    val expireTime: String? = null,
     val userId: Long? = null,
     val phonenumber: String? = null,
     val userName: String? = null,

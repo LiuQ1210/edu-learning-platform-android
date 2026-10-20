@@ -1,27 +1,19 @@
 package com.github.learningplatform.data.repository
 
-import com.github.learningplatform.core.network.safeApiCall
-import com.github.learningplatform.core.network.safeApiCallForUnit
+import com.github.learningplatform.core.network.ApiException
 import com.github.learningplatform.data.demo.DemoData
-import com.github.learningplatform.data.demo.contentPreview
-import com.github.learningplatform.data.demo.contentPreviewUnit
 import com.github.learningplatform.data.local.CacheKeys
 import com.github.learningplatform.data.local.CacheStore
 import com.github.learningplatform.data.local.CacheTtl
 import com.github.learningplatform.data.local.cachedObject
 import com.github.learningplatform.data.remote.CourseApi
-import com.github.learningplatform.data.remote.dto.CourseDetailDto
 import com.github.learningplatform.data.remote.dto.CourseDto
 import com.github.learningplatform.data.remote.dto.PageData
-import com.github.learningplatform.data.remote.dto.PlayInfoDto
-import com.github.learningplatform.data.remote.dto.ProgressSyncRequest
-import com.github.learningplatform.data.remote.dto.RatingDto
-import com.github.learningplatform.data.remote.dto.RatingRequest
-import com.github.learningplatform.data.remote.dto.RatingResultDto
+import com.github.learningplatform.data.remote.dto.TableDataInfo
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** 课程视频仓库（接口文档 v3.0 第六章） */
+/** 课程仓库（对接后端 ApiV1 接口） */
 @Singleton
 class CourseRepository @Inject constructor(
     private val courseApi: CourseApi,
@@ -29,11 +21,12 @@ class CourseRepository @Inject constructor(
 ) {
 
     /**
-     * 课程列表（6.1）。
-     *
-     * @param videoType 1 短视频 2 长视频
-     * @param sort 1 最新 2 最热 3 评分
-     * @param forceRefresh 下拉刷新传 true，跳过缓存强制回源
+     * 课程列表
+     * @param categoryId 分类ID
+     * @param videoType 视频类型（兼容旧参数，后端暂不支持）
+     * @param sort 排序（兼容旧参数：1最新 2最热 3评分，后端用 sortBy）
+     * @param sortBy 排序：likeCount / createTime / avgScore
+     * @param forceRefresh 下拉刷新传 true
      */
     suspend fun getCourses(
         pageNum: Int = 1,
@@ -41,104 +34,86 @@ class CourseRepository @Inject constructor(
         categoryId: Long? = null,
         videoType: Int? = null,
         sort: Int? = null,
+        sortBy: String? = null,
         forceRefresh: Boolean = false
     ): PageData<CourseDto> {
-        contentPreview { return DemoData.coursePage(pageNum, pageSize, videoType, categoryId) }
+        // 兼容旧参数：把 sort（1最新 2最热 3评分）转成 sortBy
+        val actualSortBy = sortBy ?: when (sort) {
+            2 -> "likeCount"
+            3 -> "avgScore"
+            else -> "createTime"
+        }
 
         // 只缓存第 1 页；翻页直接走网络
         if (pageNum != 1) {
-            return safeApiCall {
-                courseApi.getCourses(pageNum, pageSize, categoryId, videoType, sort)
-            }
+            return fetchCourseList(pageNum, pageSize, categoryId, actualSortBy)
         }
 
         if (forceRefresh) cache.invalidateModule(MODULE)
 
-        /*
-         * 键必须带上全部影响结果的参数。
-         * 首页会同时请求 sort=1（热门）和 sort=2（排行），漏掉 sort 会让两者互相覆盖 ——
-         * 表现是「热度排行里出现热门课程」，而且不报错，很难查。
-         */
         val key = CacheKeys.page(
             module = MODULE,
             "categoryId" to categoryId,
-            "videoType" to videoType,
-            "sort" to sort,
+            "sortBy" to actualSortBy,
             "size" to pageSize
         )
 
-        // 缓存整个 PageData：调用方用 total 判断 hasMore，
-        // 只缓存 list 会让上拉加载失效（详见 CategoryRepository 的说明）。
         return cache.cachedObject(
             key = key,
             ttlMillis = CacheTtl.MEDIUM
         ) {
-            safeApiCall {
-                courseApi.getCourses(pageNum, pageSize, categoryId, videoType, sort)
-            }
+            fetchCourseList(pageNum, pageSize, categoryId, actualSortBy)
         }
     }
 
-    /** 课程详情（6.2）：变动慢，用 LOOSE 档 */
-    suspend fun getCourseDetail(courseId: Long, forceRefresh: Boolean = false): CourseDetailDto {
-        contentPreview { return DemoData.courseDetail(courseId) }
-
-        val key = CacheKeys.detail("course", courseId)
-        if (forceRefresh) cache.remove(key)
-
-        return cache.cachedObject(
-            key = key,
-            ttlMillis = CacheTtl.LOOSE
-        ) {
-            safeApiCall { courseApi.getCourseDetail(courseId) }
+    private suspend fun fetchCourseList(
+        pageNum: Int,
+        pageSize: Int,
+        categoryId: Long?,
+        sortBy: String?
+    ): PageData<CourseDto> {
+        val response = courseApi.getCourseList(
+            pageNum = pageNum,
+            pageSize = pageSize,
+            categoryId = categoryId,
+            sortBy = sortBy
+        )
+        if (!response.isSuccessful) {
+            throw ApiException(response.code(), "HTTP错误: ${response.code()} ${response.message()}")
         }
-    }
-
-    /**
-     * 播放凭证：校验权限后返回带签名的**限时**播放地址。
-     *
-     * **不缓存，也不能缓存**：
-     *  - 地址带签名且有有效期，缓存下来过了有效期播放必然失败
-     *  - 取凭证本身就是一次权限校验，缓存等于绕过校验
-     */
-    suspend fun getPlayInfo(courseId: Long, lessonId: Long? = null): PlayInfoDto {
-        contentPreview { return DemoData.playInfo(courseId, lessonId) }
-        return safeApiCall { courseApi.getPlayInfo(courseId, lessonId) }
-    }
-
-    /** 播放进度心跳（建议 15-30 秒一次）：写操作，不缓存 */
-    suspend fun syncProgress(request: ProgressSyncRequest) {
-        contentPreviewUnit { return }
-        safeApiCallForUnit { courseApi.syncProgress(request) }
-    }
-
-    /** 评分：写操作；成功后让详情与评分列表失效，避免展示旧分数 */
-    suspend fun rateCourse(courseId: Long, score: Double): RatingResultDto {
-        contentPreview { return DemoData.rateResult(score) }
-        val result = safeApiCall { courseApi.rateCourse(courseId, RatingRequest(score)) }
-        cache.remove(CacheKeys.detail("course", courseId))
-        cache.invalidateModule(MODULE_RATING)
-        return result
-    }
-
-    /** 课程评分列表：用户随时可评，变动快，用 TIGHT 档 */
-    suspend fun getRatings(courseId: Long, pageNum: Int = 1, pageSize: Int = 20): PageData<RatingDto> {
-        contentPreview { return DemoData.ratings(courseId) }
-
-        if (pageNum != 1) {
-            return safeApiCall { courseApi.getRatings(courseId, pageNum, pageSize) }
+        val body = response.body() ?: throw ApiException(-1, "响应体为空")
+        if (body.code != 0) {
+            throw ApiException(body.code, body.msg)
         }
+        return PageData(total = body.total, list = body.rows)
+    }
 
-        return cache.cachedObject(
-            key = CacheKeys.page(MODULE_RATING, "courseId" to courseId, "size" to pageSize),
-            ttlMillis = CacheTtl.TIGHT
-        ) {
-            safeApiCall { courseApi.getRatings(courseId, pageNum, pageSize) }
-        }
+    /** 课程详情（后端暂未提供，返回假数据） */
+    suspend fun getCourseDetail(courseId: Long, forceRefresh: Boolean = false): com.github.learningplatform.data.remote.dto.CourseDetailDto {
+        return DemoData.courseDetail(courseId)
+    }
+
+    /** 播放凭证（后端暂未提供，返回假数据） */
+    suspend fun getPlayInfo(courseId: Long, lessonId: Long? = null): com.github.learningplatform.data.remote.dto.PlayInfoDto {
+        return DemoData.playInfo(courseId, lessonId)
+    }
+
+    /** 播放进度心跳（后端暂未提供） */
+    suspend fun syncProgress(request: com.github.learningplatform.data.remote.dto.ProgressSyncRequest) {
+        // 暂不实现
+    }
+
+    /** 评分（后端暂未提供，返回假数据） */
+    suspend fun rateCourse(courseId: Long, score: Double): com.github.learningplatform.data.remote.dto.RatingResultDto {
+        return DemoData.rateResult(score)
+    }
+
+    /** 课程评分列表（后端暂未提供，返回假数据） */
+    suspend fun getRatings(courseId: Long, pageNum: Int = 1, pageSize: Int = 20): PageData<com.github.learningplatform.data.remote.dto.RatingDto> {
+        return DemoData.ratings(courseId)
     }
 
     private companion object {
         const val MODULE = "course_list"
-        const val MODULE_RATING = "course_rating"
     }
 }

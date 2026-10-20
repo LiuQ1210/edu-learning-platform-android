@@ -110,18 +110,7 @@ fun LoginScreen(
             errorMessage = uiState.passwordError.orEmpty()
         )
 
-        Spacer(Modifier.height(10.dp))
-
-        // 图形验证码：只显示图片（后端不校验，点击图片刷新）
-        CaptchaField(
-            imageBase64 = uiState.captchaImg,
-            onRefresh = viewModel::loadCaptcha,
-            loading = uiState.captchaLoading,
-            isError = uiState.captchaError != null,
-            errorMessage = uiState.captchaError.orEmpty()
-        )
-
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(16.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(
@@ -321,64 +310,4 @@ internal fun AuthField(
             )
         }
     }
-}
-
-// ---------------------------------------------------------------------------
-// 【登录注册联调】若依图形验证码组件（登录/注册共用）
-// ---------------------------------------------------------------------------
-
-/**
- * 图形验证码：只显示图片（后端不校验，点击图片刷新）。
- * 图片为 JPEG 流转成的 base64。
- */
-@Composable
-internal fun CaptchaField(
-    imageBase64: String?,
-    onRefresh: () -> Unit,
-    loading: Boolean,
-    isError: Boolean,
-    errorMessage: String
-) {
-    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        val bitmap = remember(imageBase64) { decodeBase64Image(imageBase64) }
-        Box(
-            modifier = Modifier
-                .size(width = 120.dp, height = 48.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(surfaceWashBrush())
-                .clickable(enabled = !loading, onClick = onRefresh),
-            contentAlignment = Alignment.Center
-        ) {
-            when {
-                loading -> Text("加载中", color = TextHint, style = MaterialTheme.typography.bodySmall)
-                bitmap != null -> Image(
-                    bitmap = bitmap,
-                    contentDescription = "验证码图片，点击刷新",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize()
-                )
-                else -> Text("点击刷新", color = TextHint, style = MaterialTheme.typography.bodySmall)
-            }
-        }
-
-        if (isError && errorMessage.isNotBlank()) {
-            Text(
-                text = errorMessage,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-        }
-    }
-}
-
-/** base64（可能带 data: 前缀）→ ImageBitmap，解码失败返回 null */
-internal fun decodeBase64Image(base64: String?): ImageBitmap? {
-    if (base64.isNullOrBlank()) return null
-    val clean = base64.substringAfter("base64,", base64)
-    return runCatching {
-        val bytes = android.util.Base64.decode(clean, android.util.Base64.DEFAULT)
-        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-            ?.asImageBitmap()
-    }.getOrNull()
 }

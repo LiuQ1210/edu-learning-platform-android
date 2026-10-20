@@ -20,11 +20,7 @@ data class LoginUiState(
     val passwordError: String? = null,
     val error: String? = null,
     val loginSuccess: Boolean = false,
-    val rememberMe: Boolean = false,
-    // ---- 图形验证码（图片 base64，后端不校验，仅展示）----
-    val captchaImg: String = "",
-    val captchaLoading: Boolean = false,
-    val captchaError: String? = null
+    val rememberMe: Boolean = false
 )
 
 @HiltViewModel
@@ -34,10 +30,6 @@ class LoginViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
-
-    init {
-        loadCaptcha()
-    }
 
     fun onUsernameChange(value: String) {
         _uiState.value = _uiState.value.copy(username = value, usernameError = null, error = null)
@@ -54,25 +46,6 @@ class LoginViewModel @Inject constructor(
     /** 找回密码（暂未开放） */
     fun notifyForgotPassword() {
         _uiState.value = _uiState.value.copy(error = "找回密码暂未开放，请联系管理员")
-    }
-
-    /** 加载图形验证码图片（JPEG 流转 base64，点击图片刷新） */
-    fun loadCaptcha() {
-        if (_uiState.value.captchaLoading) return
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(captchaLoading = true, captchaError = null)
-            try {
-                val img = authRepository.getCaptchaImage()
-                _uiState.value = _uiState.value.copy(captchaImg = img, captchaLoading = false)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                _uiState.value = _uiState.value.copy(
-                    captchaLoading = false,
-                    captchaError = if (e is ApiException) e.message else "验证码加载失败，点击图片重试"
-                )
-            }
-        }
     }
 
     fun login() {
@@ -98,7 +71,6 @@ class LoginViewModel @Inject constructor(
             } catch (e: Throwable) {
                 val msg = if (e is ApiException) e.message else "网络异常，请稍后重试"
                 _uiState.value = _uiState.value.copy(isLoading = false, error = msg)
-                loadCaptcha()
             }
         }
     }

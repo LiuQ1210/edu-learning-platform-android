@@ -71,16 +71,6 @@ fun RegisterScreen(
         )
         Spacer(Modifier.height(12.dp))
 
-        // 图形验证码：只显示图片（后端不校验，点击图片刷新）
-        CaptchaField(
-            imageBase64 = uiState.captchaImg,
-            onRefresh = viewModel::loadCaptcha,
-            loading = uiState.captchaLoading,
-            isError = uiState.captchaError != null,
-            errorMessage = uiState.captchaError.orEmpty()
-        )
-        Spacer(Modifier.height(12.dp))
-
         AuthField(
             value = uiState.password,
             onValueChange = viewModel::onPasswordChange,

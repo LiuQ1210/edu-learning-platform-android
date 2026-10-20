@@ -22,11 +22,7 @@ data class RegisterUiState(
     val passwordError: String? = null,
     val confirmError: String? = null,
     val error: String? = null,
-    val registerSuccess: Boolean = false,
-    // ---- 图形验证码（图片 base64，后端不校验，仅展示）----
-    val captchaImg: String = "",
-    val captchaLoading: Boolean = false,
-    val captchaError: String? = null
+    val registerSuccess: Boolean = false
 )
 
 @HiltViewModel
@@ -36,10 +32,6 @@ class RegisterViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(RegisterUiState())
     val uiState: StateFlow<RegisterUiState> = _uiState.asStateFlow()
-
-    init {
-        loadCaptcha()
-    }
 
     fun onUsernameChange(value: String) {
         _uiState.value = _uiState.value.copy(username = value, usernameError = null, error = null)
@@ -55,25 +47,6 @@ class RegisterViewModel @Inject constructor(
 
     fun onAgreedChange(value: Boolean) {
         _uiState.value = _uiState.value.copy(agreed = value, error = null)
-    }
-
-    /** 加载图形验证码图片（JPEG 流转 base64） */
-    fun loadCaptcha() {
-        if (_uiState.value.captchaLoading) return
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(captchaLoading = true, captchaError = null)
-            try {
-                val img = authRepository.getCaptchaImage()
-                _uiState.value = _uiState.value.copy(captchaImg = img, captchaLoading = false)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                _uiState.value = _uiState.value.copy(
-                    captchaLoading = false,
-                    captchaError = if (e is ApiException) e.message else "验证码加载失败，点击图片重试"
-                )
-            }
-        }
     }
 
     fun register() {
@@ -115,7 +88,6 @@ class RegisterViewModel @Inject constructor(
                     isLoading = false,
                     error = if (e is ApiException) e.message else "网络异常，请稍后重试"
                 )
-                loadCaptcha()
             }
         }
     }
