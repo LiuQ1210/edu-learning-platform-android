@@ -1,10 +1,38 @@
 package com.github.learningplatform.data.remote
 
-/**
- * 签到接口已废弃。
- *
- * 签到改为平台积分体系（本地/后端均可实现），当前 preview 模式下由
- * [com.github.learningplatform.data.repository.CheckinRepository] 内存模拟，
- * 后端联调时再在此补充 DailySign 相关接口。
- */
-interface CheckinApi
+import com.github.learningplatform.core.network.ApiResponse
+import com.github.learningplatform.data.remote.dto.TableDataInfo
+import retrofit2.Response
+import retrofit2.http.GET
+import retrofit2.http.POST
+import retrofit2.http.Query
+
+/** 签到模块 ApiV1 接口 */
+interface CheckinApi {
+
+    /** 每日签到 */
+    @POST("api/v1/checkin/sign")
+    suspend fun sign(): Response<ApiResponse<Map<String, Any>>>
+
+    /** 签到状态 */
+    @GET("api/v1/checkin/status")
+    suspend fun getStatus(): Response<ApiResponse<Map<String, Any>>>
+
+    /** 签到日历 */
+    @GET("api/v1/checkin/calendar")
+    suspend fun getCalendar(
+        @Query("year") year: Int? = null,
+        @Query("month") month: Int? = null
+    ): Response<ApiResponse<Map<String, Any>>>
+
+    /** 签到记录（分页） */
+    @GET("api/v1/checkin/records")
+    suspend fun getRecords(
+        @Query("pageNum") pageNum: Int = 1,
+        @Query("pageSize") pageSize: Int = 20
+    ): Response<TableDataInfo<Map<String, Any>>>
+
+    /** 签到积分规则 */
+    @GET("api/v1/checkin/rules")
+    suspend fun getRules(): Response<ApiResponse<Map<String, Any>>>
+}

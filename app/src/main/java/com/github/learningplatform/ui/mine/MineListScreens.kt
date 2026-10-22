@@ -197,9 +197,16 @@ private fun MyCourseRow(
 }
 
 internal val favoriteTabs = listOf(
-    null to "全部",
-    1 to "文章",
-    2 to "视频"
+    2 to "课程",
+    3 to "视频",
+    1 to "文章"
+)
+
+/** 观看历史筛选页签：与收藏/点赞一致 */
+internal val historyTabs = listOf(
+    2 to "课程",
+    3 to "视频",
+    1 to "文章"
 )
 
 /** 我的收藏（接口文档 3.7，多态 targetType：1文章 2视频） */
@@ -278,6 +285,12 @@ fun WatchHistoryScreen(
                     Text("清空", color = MaterialTheme.colorScheme.error)
                 }
             }
+        )
+
+        TargetTabs(
+            selected = uiState.targetType,
+            onSelect = viewModel::selectType,
+            tabs = historyTabs
         )
 
         when {

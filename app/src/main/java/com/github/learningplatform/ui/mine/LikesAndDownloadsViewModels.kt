@@ -28,7 +28,7 @@ data class LikesUiState(
     val isLoading: Boolean = false,
     val isLoadingMore: Boolean = false,
     val error: String? = null,
-    val targetType: Int? = null,
+    val targetType: Int? = 2,
     val items: List<UserTargetItemDto> = emptyList(),
     val pageNum: Int = 1,
     val hasMore: Boolean = false,
