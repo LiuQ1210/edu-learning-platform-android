@@ -21,8 +21,8 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // 后端 BaseUrl：本地调试（adb reverse 转发到宿主机 80 端口）
-        buildConfigField("String", "BASE_URL", "\"http://127.0.0.1:18080/\"")
+        // 后端 BaseUrl：线上服务器（http://43.142.9.214:8080）
+        buildConfigField("String", "BASE_URL", "\"http://43.142.9.214:8080/\"")
 
         // UI 预览开关：true 时登录/注册等认证接口直接返回本地假登录，不发任何网络请求。
         val uiPreview = (project.findProperty("uiPreview") as String?)?.toBoolean() ?: false
@@ -108,6 +108,8 @@ android {
 }
 
 dependencies {
+    // Compose BOM 只声明一次，implementation / androidTestImplementation 复用
+    val composeBom = platform(libs.androidx.compose.bom)
     // Core / Lifecycle
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -117,7 +119,7 @@ dependencies {
     implementation(libs.androidx.splashscreen)
 
     // Compose
-    implementation(platform(libs.androidx.compose.bom))
+    implementation(composeBom)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
@@ -173,7 +175,7 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(composeBom)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
 }
 
