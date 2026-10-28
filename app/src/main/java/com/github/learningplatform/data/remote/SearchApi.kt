@@ -1,6 +1,7 @@
 package com.github.learningplatform.data.remote
 
 import com.github.learningplatform.core.network.ApiResponse
+import com.github.learningplatform.core.network.RawTableData
 import com.github.learningplatform.data.remote.dto.ContentItemDto
 import com.github.learningplatform.data.remote.dto.CourseDto
 import com.github.learningplatform.data.remote.dto.HotWordListDto
@@ -27,7 +28,7 @@ interface SearchApi {
         @Query("keyword") keyword: String?,
         @Query("pageNum") pageNum: Int = 1,
         @Query("pageSize") pageSize: Int = 20
-    ): Response<TableDataInfo<Map<String, Any>>>
+    ): Response<RawTableData>
 
     /** 帖子搜索 */
     @GET("api/v1/search/post")
@@ -35,7 +36,7 @@ interface SearchApi {
         @Query("keyword") keyword: String?,
         @Query("pageNum") pageNum: Int = 1,
         @Query("pageSize") pageSize: Int = 20
-    ): Response<TableDataInfo<Map<String, Any>>>
+    ): Response<RawTableData>
 
     /** 旧搜索接口（兼容，后端暂未对接） */
     @GET("content/search")

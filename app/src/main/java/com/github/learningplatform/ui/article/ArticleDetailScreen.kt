@@ -99,6 +99,9 @@ fun ArticleDetailScreen(
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var commentInput by remember { mutableStateOf("") }
+    // 回复目标：parentId 决定「挂到哪条评论下」，name 只用于输入框上方的提示
+    var replyToCommentId by remember { mutableStateOf<Long?>(null) }
+    var replyToName by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(articleId) { viewModel.load(articleId) }
 
@@ -178,10 +181,18 @@ fun ArticleDetailScreen(
                 isFavorited = uiState.isFavorited,
                 commentInput = commentInput,
                 onCommentChange = { commentInput = it },
+                replyToName = replyToName,
+                onCancelReply = {
+                    replyToName = null
+                    replyToCommentId = null
+                },
                 onSendComment = {
                     if (commentInput.isNotBlank()) {
-                        viewModel.postComment(commentInput)
+                        // 回复时带 parentId，后端才会把它挂到该评论的 children 下
+                        viewModel.postComment(commentInput, replyToCommentId ?: 0L)
                         commentInput = ""
+                        replyToName = null
+                        replyToCommentId = null
                     }
                 },
                 onToggleLike = viewModel::toggleLike,
@@ -244,7 +255,8 @@ fun ArticleDetailScreen(
                             onToggleLike = { viewModel.toggleCommentLike(comment.commentId) },
                             onDelete = { viewModel.deleteComment(comment.commentId) },
                             onReply = {
-                                commentInput = "回复 @${comment.userName}："
+                                replyToCommentId = comment.commentId
+                                replyToName = comment.userName
                             }
                         )
                     }
@@ -527,14 +539,7 @@ private fun CommentItem(
             }
         }
 
-        if (comment.replyCount > 0) {
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = "共 ${comment.replyCount} 条回复",
-                style = MaterialTheme.typography.labelSmall,
-                color = Primary
-            )
-        }
+        // 二级回复已在上面的缩进块里全部展示，这里不再重复「共 N 条回复」
     }
     Box(
         modifier = Modifier
@@ -554,6 +559,8 @@ private fun ArticleBottomBar(
     isFavorited: Boolean,
     commentInput: String,
     onCommentChange: (String) -> Unit,
+    replyToName: String?,
+    onCancelReply: () -> Unit,
     onSendComment: () -> Unit,
     onToggleLike: () -> Unit,
     onToggleFavorite: () -> Unit,
@@ -561,6 +568,25 @@ private fun ArticleBottomBar(
 ) {
     Surface(shadowElevation = 8.dp) {
         Column {
+            // 正在回复某人时给出明确提示，避免误以为还在发顶级评论
+            if (replyToName != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 14.dp, end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "回复 @$replyToName",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Primary
+                    )
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = onCancelReply) {
+                        Text("取消", color = TextHint, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -581,7 +607,11 @@ private fun ArticleBottomBar(
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     decorationBox = { inner ->
                         if (commentInput.isEmpty()) {
-                            Text("说点什么...", color = TextHint, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                text = if (replyToName != null) "回复 @$replyToName..." else "说点什么...",
+                                color = TextHint,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
                         }
                         inner()
                     }

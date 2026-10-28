@@ -1,4 +1,4 @@
-﻿package com.github.learningplatform.data.demo
+package com.github.learningplatform.data.demo
 
 import com.github.learningplatform.BuildConfig
 import com.github.learningplatform.data.remote.dto.AdSlotDto
@@ -460,7 +460,7 @@ object DemoData {
             UserTargetItemDto(1, 5001, "Kotlin 协程取消机制完全指南", cover("article0"), "2026-09-10 10:00:00"),
             UserTargetItemDto(2, 1003, "Java 高并发编程", cover("course2"), "2026-09-09 09:00:00"),
             UserTargetItemDto(1, 5004, "后端接口设计中的 10 个常见错误", cover("article3"), "2026-09-08 21:00:00"),
-            UserTargetItemDto(2, 2001, "Machine Learning 从入门到实战", cover("short0"), "2026-09-07 18:00:00")
+            UserTargetItemDto(3, 2001, "Machine Learning 从入门到实战", cover("short0"), "2026-09-07 18:00:00")
         )
     )
 
@@ -477,7 +477,7 @@ object DemoData {
         list = listOf(
             UserTargetItemDto(2, 1001, "Machine Learning 从入门到实战", cover("course0"), "2026-09-16 20:10:00"),
             UserTargetItemDto(1, 5002, "结构化并发为什么必须向上抛 CancellationException", cover("article1"), "2026-09-15 22:40:00"),
-            UserTargetItemDto(2, 2002, "Data Science 数据分析实战", cover("short1"), "2026-09-14 19:05:00"),
+            UserTargetItemDto(3, 2002, "Data Science 数据分析实战", cover("short1"), "2026-09-14 19:05:00"),
             UserTargetItemDto(1, 5003, "Compose 重组优化实战", cover("article2"), "2026-09-13 11:20:00"),
             UserTargetItemDto(2, 1004, "Android 性能优化", cover("course3"), "2026-09-12 08:45:00")
         )
@@ -488,7 +488,7 @@ object DemoData {
         list = listOf(
             ViewHistoryItemDto(2, 1001, "Machine Learning 从入门到实战", cover("course0"), 1320, "2026-09-17 21:10:00"),
             ViewHistoryItemDto(1, 5001, "Kotlin 协程取消机制完全指南", cover("article0"), 0, "2026-09-16 22:30:00"),
-            ViewHistoryItemDto(2, 2002, "Data Science 数据分析实战", cover("short1"), 480, "2026-09-15 20:15:00"),
+            ViewHistoryItemDto(3, 2002, "Data Science 数据分析实战", cover("short1"), 480, "2026-09-15 20:15:00"),
             ViewHistoryItemDto(1, 5003, "Compose 重组优化实战", cover("article2"), 0, "2026-09-14 09:50:00")
         )
     )

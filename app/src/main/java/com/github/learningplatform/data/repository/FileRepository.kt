@@ -1,8 +1,10 @@
 package com.github.learningplatform.data.repository
 
 import android.content.Context
-import com.github.learningplatform.core.network.safeApiCall
-import com.github.learningplatform.core.network.safeApiCallForUnit
+import androidx.core.graphics.scale
+import com.github.learningplatform.core.network.okBody
+import com.github.learningplatform.core.network.payload
+import com.github.learningplatform.core.network.str
 import com.github.learningplatform.data.remote.FileApi
 import com.github.learningplatform.data.remote.dto.UploadFileDto
 import com.github.learningplatform.data.remote.dto.UploadScene
@@ -12,7 +14,6 @@ import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
-import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.io.FileOutputStream
 import javax.inject.Inject
@@ -65,15 +66,23 @@ class FileRepository @Inject constructor(
             file.name,
             file.asRequestBody(mimeTypeOf(file).toMediaTypeOrNull())
         )
-        val sceneBody = scene.code.toRequestBody("text/plain".toMediaTypeOrNull())
 
-        return safeApiCall { fileApi.upload(part, sceneBody) }
+        // 后端 POST /api/v1/upload 只认 file 字段，返回平铺的 {code,msg,url,fileName}
+        val data = fileApi.upload(part).okBody().payload()
+        return UploadFileDto(
+            url = data.str("url"),
+            fileName = data.str("fileName").ifEmpty { file.name }
+        )
     }
 
-    /** 删除文件（替换头像/封面后清理旧文件） */
+    /**
+     * 删除文件。
+     *
+     * 后端未提供 `DELETE /api/v1/files/{fileId}`，这里保持空实现，
+     * 避免发出必然 404 的请求。替换头像/封面时旧文件交由服务端自行清理。
+     */
     suspend fun delete(fileId: String) {
         if (fileId.isBlank()) return
-        safeApiCallForUnit { fileApi.deleteFile(fileId) }
     }
 
     /**
@@ -97,15 +106,13 @@ class FileRepository @Inject constructor(
             val decoded = android.graphics.BitmapFactory.decodeFile(source.absolutePath, options)
                 ?: return@runCatching source
 
-            // 精修：按长边缩放到上限
+            // 精修：按长边缩放到上限（androidx.core 的 Bitmap.scale 即 createScaledBitmap 的 KTX 封装）
             val longEdge = maxOf(decoded.width, decoded.height)
             val scaled = if (longEdge > maxImageEdge) {
                 val ratio = maxImageEdge.toFloat() / longEdge
-                android.graphics.Bitmap.createScaledBitmap(
-                    decoded,
+                decoded.scale(
                     (decoded.width * ratio).toInt().coerceAtLeast(1),
-                    (decoded.height * ratio).toInt().coerceAtLeast(1),
-                    true
+                    (decoded.height * ratio).toInt().coerceAtLeast(1)
                 ).also { if (it !== decoded) decoded.recycle() }
             } else {
                 decoded

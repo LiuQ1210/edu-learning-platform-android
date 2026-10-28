@@ -146,7 +146,6 @@ class PlayerViewModel @Inject constructor(
      * onCleared 里改用 NonCancellable 挂在 Application 作用域上发送。
      */
     override fun onCleared() {
-        super.onCleared()
         if (courseId == 0L) return
         val position = lastKnownSeconds
         val finished = if (completed) 1 else 0

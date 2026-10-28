@@ -83,7 +83,7 @@ data class FavoritesUiState(
     val isLoading: Boolean = false,
     val isLoadingMore: Boolean = false,
     val error: String? = null,
-    val targetType: Int? = null,
+    val targetType: Int? = 2,
     val items: List<UserTargetItemDto> = emptyList(),
     val pageNum: Int = 1,
     val hasMore: Boolean = false,
@@ -162,6 +162,7 @@ data class WatchHistoryUiState(
     val isLoading: Boolean = false,
     val isLoadingMore: Boolean = false,
     val error: String? = null,
+    val targetType: Int? = 2,
     val items: List<ViewHistoryItemDto> = emptyList(),
     val pageNum: Int = 1,
     val hasMore: Boolean = false,
@@ -180,6 +181,12 @@ class WatchHistoryViewModel @Inject constructor(
     init { load(reset = true) }
 
     fun refresh() = load(reset = true)
+
+    fun selectType(targetType: Int?) {
+        if (targetType == _uiState.value.targetType) return
+        _uiState.value = _uiState.value.copy(targetType = targetType)
+        load(reset = true)
+    }
 
     fun loadMore() {
         val state = _uiState.value
@@ -215,7 +222,7 @@ class WatchHistoryViewModel @Inject constructor(
                 generation = generation
             )
             try {
-                val page = userRepository.getViewHistory(nextPage, 20, null)
+                val page = userRepository.getViewHistory(nextPage, 20, snapshot.targetType)
                 if (_uiState.value.isStaleRequest(generation)) return@launch
                 val accumulated = if (reset) page.list else snapshot.items + page.list
                 _uiState.value = _uiState.value.copy(

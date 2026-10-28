@@ -156,8 +156,8 @@ internal fun formatTimestamp(seconds: Int): String {
     val m = (seconds % 3600) / 60
     val s = seconds % 60
     return if (h > 0) {
-        String.format("%d:%02d:%02d", h, m, s)
+        String.format(java.util.Locale.ROOT, "%d:%02d:%02d", h, m, s)
     } else {
-        String.format("%02d:%02d", m, s)
+        String.format(java.util.Locale.ROOT, "%02d:%02d", m, s)
     }
 }

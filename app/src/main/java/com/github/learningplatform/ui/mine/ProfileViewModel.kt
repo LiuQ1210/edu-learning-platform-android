@@ -23,6 +23,14 @@ data class ProfileUiState(
     val nickname: String = "",
     val avatar: String = "",
     val bio: String = "",
+    /** 性别文案（后端 sexLabel：男 / 女 / 不公开） */
+    val sexLabel: String = "",
+    /** 我关注了多少人（/user/home 的 followCount） */
+    val followCount: Int = 0,
+    /** 多少人关注我（/user/home 的 fansCount） */
+    val fansCount: Int = 0,
+    /** 我获得的点赞总数（/user/home 的 likeReceivedCount） */
+    val likeReceivedCount: Int = 0,
     val continueSignDay: Int = 0,
     val lastSignDate: String = "",
     val unreadCount: Int = 0,
@@ -76,14 +84,18 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
-                val profile = userRepository.getProfile()
+                // 用 /user/home 一次拿到资料 + 关注数 / 粉丝数 / 获赞数，
+                // 避免再单独调 /user/profile 与 /follow/count
+                val home = userRepository.getUserHome()
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    nickname = profile.nickname.ifBlank { profile.username },
-                    avatar = profile.avatar,
-                    bio = profile.bio,
-                    continueSignDay = profile.continueSignDay,
-                    lastSignDate = profile.lastSignDate
+                    nickname = home.userName,
+                    avatar = home.avatar,
+                    bio = home.bio,
+                    sexLabel = home.sexLabel,
+                    followCount = home.followCount,
+                    fansCount = home.fansCount,
+                    likeReceivedCount = home.likeReceivedCount
                 )
             } catch (e: CancellationException) {
                 throw e

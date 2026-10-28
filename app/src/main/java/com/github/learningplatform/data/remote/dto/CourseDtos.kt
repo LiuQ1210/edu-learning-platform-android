@@ -24,6 +24,10 @@ data class CourseDto(
     val status: String = "0",
     val categoryName: String = "",
     val avgScore: Double? = null,
+    /** 后端 createTime：yyyy-MM-dd HH:mm:ss，「最新」排序与卡片日期都用它 */
+    val createTime: String = "",
+    /** 后端 updateTime：yyyy-MM-dd HH:mm:ss */
+    val updateTime: String = "",
     // 前端兼容字段（UI 还在用，后续慢慢替换）
     val title: String = courseName,
     val videoType: Int = 1,

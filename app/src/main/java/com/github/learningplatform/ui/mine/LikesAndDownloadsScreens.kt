@@ -46,9 +46,9 @@ import com.github.learningplatform.ui.theme.pageGradientBrush
 
 /** 「我的点赞」「我的下载记录」共用的分类页签 */
 private val likeTabs = listOf(
-    null to "全部",
-    1 to "文章",
-    2 to "视频"
+    2 to "课程",
+    3 to "视频",
+    1 to "文章"
 )
 
 /** 下载记录按资源类型筛，与点赞的 targetType 是两套语义，不要混用 */
@@ -262,7 +262,7 @@ private fun DownloadRow(
 internal fun formatFileSize(bytes: Long): String = when {
     bytes <= 0L -> "未知大小"
     bytes < 1024L -> "${bytes} B"
-    bytes < 1024L * 1024L -> String.format("%.0f KB", bytes / 1024.0)
-    bytes < 1024L * 1024L * 1024L -> String.format("%.1f MB", bytes / 1024.0 / 1024.0)
-    else -> String.format("%.2f GB", bytes / 1024.0 / 1024.0 / 1024.0)
+    bytes < 1024L * 1024L -> String.format(java.util.Locale.ROOT, "%.0f KB", bytes / 1024.0)
+    bytes < 1024L * 1024L * 1024L -> String.format(java.util.Locale.ROOT, "%.1f MB", bytes / 1024.0 / 1024.0)
+    else -> String.format(java.util.Locale.ROOT, "%.2f GB", bytes / 1024.0 / 1024.0 / 1024.0)
 }

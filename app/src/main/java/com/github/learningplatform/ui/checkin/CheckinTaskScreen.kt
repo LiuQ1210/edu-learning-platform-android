@@ -97,8 +97,14 @@ fun CheckinTaskScreen(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 顶部积分卡片
-            item { PointsCard(status.points, status.continuousDays, status.totalSigns) }
+            // 顶部积分卡片（余额优先用 /points/account，服务端为准）
+            item {
+                PointsCard(
+                    points = uiState.account?.balance ?: status.points,
+                    continuousDays = status.continuousDays,
+                    totalSigns = status.totalSigns
+                )
+            }
 
             // 签到按钮
             item {
@@ -110,8 +116,13 @@ fun CheckinTaskScreen(
                 )
             }
 
-            // 免广告状态
-            item { AdFreeStatusCard(status.adFreeUntil) }
+            // 免广告状态：直接用服务端算好的 adFree / adFreeRemainMinutes
+            item {
+                AdFreeStatusCard(
+                    active = uiState.account?.adFree == true,
+                    remainMinutes = uiState.account?.adFreeRemainMinutes ?: 0
+                )
+            }
 
             // 积分规则入口
             item {
@@ -141,7 +152,7 @@ fun CheckinTaskScreen(
                 val reward = uiState.rewards[i]
                 RewardItem(
                     reward = reward,
-                    canAfford = status.points >= reward.costPoints,
+                    canAfford = (uiState.account?.balance ?: status.points) >= reward.costPoints,
                     onExchange = { viewModel.exchange(reward) }
                 )
             }
@@ -205,10 +216,7 @@ private fun SignButton(
 }
 
 @Composable
-private fun AdFreeStatusCard(adFreeUntil: Long) {
-    val now = System.currentTimeMillis()
-    val active = adFreeUntil > now
-    val remainMinutes = if (active) ((adFreeUntil - now) / 60000).toInt() else 0
+private fun AdFreeStatusCard(active: Boolean, remainMinutes: Int) {
     val text = if (active) "免广告生效中，剩余 $remainMinutes 分钟" else "当前无免广告权益"
 
     Card(

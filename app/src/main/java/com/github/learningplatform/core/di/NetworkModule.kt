@@ -12,6 +12,7 @@ import com.github.learningplatform.data.remote.FollowApi
 import com.github.learningplatform.data.remote.InteractionApi
 import com.github.learningplatform.data.remote.NoteApi
 import com.github.learningplatform.data.remote.NotificationApi
+import com.github.learningplatform.data.remote.PointsApi
 import com.github.learningplatform.data.remote.RatingApi
 import com.github.learningplatform.data.remote.ResourceApi
 import com.github.learningplatform.data.remote.SearchApi
@@ -80,4 +81,8 @@ object NetworkModule {
     /** 通知 */
     @Provides @Singleton
     fun provideNotificationApi(client: RetrofitClient): NotificationApi = client.create()
+
+    /** 积分 */
+    @Provides @Singleton
+    fun providePointsApi(client: RetrofitClient): PointsApi = client.create()
 }

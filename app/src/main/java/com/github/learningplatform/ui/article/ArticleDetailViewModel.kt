@@ -143,7 +143,12 @@ class ArticleDetailViewModel @Inject constructor(
         }
     }
 
-    fun postComment(content: String) {
+    /**
+     * 发评论 / 回复。
+     *
+     * @param parentId 0 = 新盖一楼；> 0 = 回复某条评论（后端会挂到该评论的 children 下）
+     */
+    fun postComment(content: String, parentId: Long = 0L) {
         viewModelScope.launch {
             try {
                 val result = interactionRepository.createComment(
@@ -151,7 +156,7 @@ class ArticleDetailViewModel @Inject constructor(
                         targetType = Constants.TARGET_ARTICLE,
                         targetId = articleId,
                         rootId = 0,
-                        parentId = 0,
+                        parentId = parentId,
                         content = content
                     )
                 )

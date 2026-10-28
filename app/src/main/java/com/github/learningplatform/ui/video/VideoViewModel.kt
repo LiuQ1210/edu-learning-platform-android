@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.learningplatform.core.constants.Constants
 import com.github.learningplatform.data.remote.dto.CommentDto
+import com.github.learningplatform.data.remote.dto.CreateCommentRequest
 import com.github.learningplatform.data.remote.dto.CourseDto
 import com.github.learningplatform.data.repository.CourseRepository
 import com.github.learningplatform.data.repository.InteractionRepository
@@ -223,25 +224,50 @@ class VideoViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(commentsTarget = null)
     }
 
-    /** 发评论（preview 模式下本地插到列表最前） */
-    fun postComment(text: String) {
+    /**
+     * 发评论：调后端 `POST /api/v1/comment/add`，成功后重新拉列表并给评论数 +1。
+     *
+     * 之前的实现只在本地列表插一条假评论（userName="我"），既没落库也不会让
+     * `course.commentCount` 变化 —— 表现为"发了评论但刷新就没了、评论数不增加"。
+     *
+     * 注意 targetType 用数字（Constants.TARGET_COURSE=2），后端评论接口只认数字。
+     */
+    fun postComment(text: String, parentId: Long = 0L) {
         val target = _uiState.value.commentsTarget ?: return
-        if (text.isBlank()) return
-        val newComment = CommentDto(
-            commentId = System.currentTimeMillis(),
-            userId = 0,
-            userName = "我",
-            userAvatar = "",
-            content = text,
-            likeCount = 0,
-            replyCount = 0,
-            isLiked = false,
-            createTime = "刚刚",
-            hotReplies = emptyList()
-        )
-        _uiState.value = _uiState.value.copy(
-            comments = listOf(newComment) + _uiState.value.comments
-        )
+        val content = text.trim()
+        if (content.isEmpty()) return
+
+        viewModelScope.launch {
+            try {
+                interactionRepository.createComment(
+                    CreateCommentRequest(
+                        targetType = Constants.TARGET_COURSE,
+                        targetId = target,
+                        rootId = 0,
+                        // parentId > 0 才是「回复某条评论」，后端会把这条挂到该评论的 children 下
+                        parentId = parentId,
+                        content = content
+                    )
+                )
+                // 评论数 +1：右侧操作栏的评论数取自 CourseDto.commentCount
+                _uiState.value = _uiState.value.copy(
+                    message = "评论成功",
+                    videos = _uiState.value.videos.map {
+                        if (it.courseId == target) {
+                            it.copy(commentCount = it.commentCount + 1)
+                        } else {
+                            it
+                        }
+                    }
+                )
+                // 重新拉一遍，用后端返回的正式数据（评论 ID / 头像 / 时间）替换本地态
+                loadComments(target, reset = true)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                _uiState.value = _uiState.value.copy(message = e.readableMessage())
+            }
+        }
     }
 
     fun loadMoreComments() {

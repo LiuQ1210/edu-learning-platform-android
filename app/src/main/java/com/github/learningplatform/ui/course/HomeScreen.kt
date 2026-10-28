@@ -1,4 +1,4 @@
-﻿package com.github.learningplatform.ui.course
+package com.github.learningplatform.ui.course
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.lazy.LazyRow
@@ -30,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -192,8 +193,8 @@ private fun CourseFeed(
 
         // 排序筛选标签
         item {
-            val sorts = listOf("高分", "热门", "最新")
-            var selectedSort by remember { mutableStateOf("高分") }
+            val sorts = CourseSort.entries
+            var selectedSort by remember { mutableStateOf(CourseSort.SCORE) }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -203,7 +204,7 @@ private fun CourseFeed(
                 sorts.forEach { s ->
                     val selected = s == selectedSort
                     Text(
-                        text = s,
+                        text = s.label,
                         fontSize = 14.sp,
                         color = if (selected) TextPrimary else TextHint,
                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
@@ -212,11 +213,11 @@ private fun CourseFeed(
                 }
             }
             // 排序后的课程列表 - 2列网格
+            // 高分 → 评分降序；热门 → 点赞数降序；最新 → 创建时间降序（yyyy-MM-dd HH:mm:ss 可直接按字符串比较）
             val sortedCourses = when (selectedSort) {
-                "高分" -> uiState.hotCourses.sortedByDescending { it.averageScore }
-                "热门" -> uiState.hotCourses.sortedByDescending { it.likeCount }
-                "最新" -> uiState.hotCourses.sortedByDescending { it.courseId }
-                else -> uiState.hotCourses
+                CourseSort.SCORE -> uiState.hotCourses.sortedByDescending { it.averageScore }
+                CourseSort.HOT -> uiState.hotCourses.sortedByDescending { it.likeCount }
+                CourseSort.NEWEST -> uiState.hotCourses.sortedByDescending { it.createTime }
             }
             if (sortedCourses.isEmpty()) {
                 Box(
@@ -239,6 +240,7 @@ private fun CourseFeed(
                         rowItems.forEach { course ->
                             CourseCard(
                                 course = course,
+                                sort = selectedSort,
                                 onOpenCourse = onOpenCourse,
                                 modifier = Modifier.weight(1f)
                             )
@@ -327,11 +329,19 @@ private fun HotCourseGroup(courses: List<CourseDto>, onOpenCourse: (Long) -> Uni
     }
 }
 
+/** 首页课程排序方式：高分（评分）/ 热门（点赞数）/ 最新（创建时间） */
+private enum class CourseSort(val label: String) {
+    SCORE("高分"),
+    HOT("热门"),
+    NEWEST("最新")
+}
+
 @Composable
 private fun CourseCard(
     course: CourseDto,
-    onOpenCourse: (Long) -> Unit,
-    modifier: Modifier = Modifier
+    sort: CourseSort,
+    modifier: Modifier = Modifier,
+    onOpenCourse: (Long) -> Unit
 ) {
     Column(
         modifier = modifier
@@ -367,8 +377,21 @@ private fun CourseCard(
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(Modifier.height(4.dp))
+            // 卡片副标题跟随当前 tab：高分看评分、热门看点赞数（用心形）、最新看创建日期
+            val metric = when (sort) {
+                CourseSort.SCORE -> String.format(Locale.CHINA, "%.1f分", course.averageScore)
+                // 用「数量 + ❤️」代替「数量 + 赞」，更直观也不占字宽
+                CourseSort.HOT -> formatCount(course.likeCount) + "❤️"
+                CourseSort.NEWEST -> course.createTime.take(10).ifBlank { "—" }
+            }
+            // viewCount 后端暂不返回（恒 0），为 0 时不显示，避免误导成「0 人观看」
+            val viewers = if (course.viewCount > 0) {
+                " · " + formatCount(course.viewCount) + "人观看"
+            } else {
+                ""
+            }
             Text(
-                text = String.format(Locale.CHINA, "%.1f分 · %s人观看", course.averageScore, formatCount(course.viewCount)),
+                text = metric + viewers,
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary
             )
@@ -442,7 +465,13 @@ private fun FeaturedCourseCarousel(
     val scope = rememberCoroutineScope()
     var autoScrollSuspended by remember { mutableStateOf(false) }
 
-    val currentPage = listState.firstVisibleItemIndex.coerceIn(0, courses.lastIndex)
+    // firstVisibleItemIndex 是 @FrequentlyChangingValue（滚动时每一帧都变），
+    // 直接读会在滚动期间触发整页重组；用 derivedStateOf 只在「页码变化」时才通知 UI。
+    val currentPage by remember(courses.size) {
+        derivedStateOf {
+            if (courses.isEmpty()) 0 else listState.firstVisibleItemIndex.coerceIn(0, courses.lastIndex)
+        }
+    }
 
     // 用户一动手就暂停自动播放，8 秒后恢复，避免「刚滑过去又被自动翻走」
     LaunchedEffect(listState.isScrollInProgress) {

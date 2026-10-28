@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
+import com.github.learningplatform.core.network.ImageUrl
 import com.github.learningplatform.data.remote.dto.ArticleDto
 import com.github.learningplatform.data.remote.dto.CourseDto
 import com.github.learningplatform.ui.nav.NavIcons
@@ -103,9 +104,11 @@ fun NetImage(
             .background(Divider)
     ) {
         if (url.isNotBlank()) {
-            val request = remember(url, targetSize) {
+            // 后端可能回相对路径（/profile/upload/xxx.jpg），Coil 不认，先补全成绝对地址
+            val resolved = ImageUrl.resolve(url)
+            val request = remember(resolved, targetSize) {
                 ImageRequest.Builder(context)
-                    .data(url)
+                    .data(resolved)
                     .apply {
                         if (targetSize.width > 0 && targetSize.height > 0) {
                             size(targetSize.width, targetSize.height)
@@ -128,8 +131,8 @@ fun NetImage(
 fun Avatar(
     url: String,
     name: String,
-    size: Dp = 40.dp,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    size: Dp = 40.dp
 ) {
     Box(
         modifier = modifier
@@ -143,9 +146,10 @@ fun Avatar(
             // LocalContext/LocalDensity 都是 @Composable 读取，须在 remember 外取值。
             val context = LocalContext.current
             val density = LocalDensity.current
-            val request = remember(url, size) {
+            val resolved = ImageUrl.resolve(url)
+            val request = remember(resolved, size) {
                 ImageRequest.Builder(context)
-                    .data(url)
+                    .data(resolved)
                     .size(with(density) { size.toPx() }.toInt())
                     .build()
             }
@@ -478,8 +482,9 @@ fun ArticleRowCard(
 
 /** 120 万 / 1.2万 / 999 之类的中文计数 */
 fun formatCount(value: Int): String = when {
-    value >= 100_000_000 -> String.format("%.1f亿", value / 100_000_000.0)
-    value >= 10_000 -> String.format("%.1f万", value / 10_000.0)
+    // 显式 Locale.ROOT：否则部分区域会输出本地数字，中文语境下反而读不懂
+    value >= 100_000_000 -> String.format(java.util.Locale.ROOT, "%.1f亿", value / 100_000_000.0)
+    value >= 10_000 -> String.format(java.util.Locale.ROOT, "%.1f万", value / 10_000.0)
     else -> value.toString()
 }
 // ---------------------------------------------------------------------------

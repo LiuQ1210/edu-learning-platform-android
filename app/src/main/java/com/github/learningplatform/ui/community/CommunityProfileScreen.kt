@@ -24,8 +24,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,15 +47,19 @@ fun CommunityProfileScreen(
     onBack: () -> Unit,
     onOpenArticle: (Long) -> Unit,
     isSelf: Boolean = false,
-    onEdit: (() -> Unit)? = null
+    onEdit: (() -> Unit)? = null,
+    viewModel: CommunityProfileViewModel = hiltViewModel()
 ) {
-    // demo 用户数据
+    val profileState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // 进入页面时拉取关注/粉丝数与关注状态（后端接口：follow/count、follow/status）
+    androidx.compose.runtime.LaunchedEffect(userId, isSelf) {
+        viewModel.load(userId, isSelf)
+    }
+
+    // 昵称/简介/文章列表：后端暂无「按 userId 查他人资料」的接口，仍用本地样例
     val userName = if (isSelf) "张三" else if (userId == 3001L) "小明" else "小红"
     val bio = "热爱学习，正在补 Android 和算法。"
-    var following by remember { mutableIntStateOf(128) }
-    var followers by remember { mutableIntStateOf(356) }
-    var liked by remember { mutableIntStateOf(1024) }
-    var isFollowed by remember { mutableStateOf(false) }
     var pendingDeleteId by remember { mutableStateOf<Long?>(null) }
 
     var userArticles by remember { mutableStateOf(listOf(
@@ -113,9 +118,13 @@ fun CommunityProfileScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        StatColumn(following.toString(), "关注")
-                        StatColumn(followers.toString(), "粉丝")
-                        StatColumn(liked.toString(), "获赞")
+                        StatColumn(profileState.followCount.toString(), "关注")
+                        StatColumn(profileState.fansCount.toString(), "粉丝")
+                        // 获赞：只有「我自己」能从 /user/home 拿到；他人后端未提供
+                        StatColumn(
+                            if (isSelf) profileState.likeReceivedCount.toString() else "—",
+                            "获赞"
+                        )
                     }
                     Spacer(Modifier.height(14.dp))
 
@@ -127,17 +136,30 @@ fun CommunityProfileScreen(
                             Text("编辑主页", color = Primary, fontWeight = FontWeight.Bold)
                         }
                     } else {
+                        val followed = profileState.isFollowed
                         OutlinedButton(
-                            onClick = {
-                                isFollowed = !isFollowed
-                                followers = if (isFollowed) followers + 1 else followers - 1
-                            },
+                            onClick = { viewModel.toggleFollow(userId) },
+                            enabled = !profileState.submitting && !profileState.isLoading,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                if (isFollowed) "已关注" else "关注",
-                                color = if (isFollowed) TextSecondary else Primary,
+                                when {
+                                    profileState.submitting -> if (followed) "取消中..." else "关注中..."
+                                    followed -> "已关注"
+                                    else -> "关注"
+                                },
+                                color = if (followed) TextSecondary else Primary,
                                 fontWeight = FontWeight.Bold
+                            )
+                        }
+                        // 失败/提示信息（后端返回的业务文案）
+                        val tip = profileState.error ?: profileState.message
+                        if (!tip.isNullOrBlank()) {
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                text = tip,
+                                fontSize = 12.sp,
+                                color = if (profileState.error != null) MaterialTheme.colorScheme.error else TextSecondary
                             )
                         }
                     }
@@ -172,7 +194,7 @@ fun CommunityProfileScreen(
                         }
                     }
                     Text(
-                        "等 $followers 人关注",
+                        "等 ${profileState.fansCount} 人关注",
                         fontSize = 13.sp,
                         color = TextSecondary
                     )
