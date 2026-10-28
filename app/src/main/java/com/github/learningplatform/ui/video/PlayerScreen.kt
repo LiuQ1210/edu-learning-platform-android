@@ -1,4 +1,4 @@
-﻿package com.github.learningplatform.ui.video
+package com.github.learningplatform.ui.video
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -69,6 +69,10 @@ import timber.log.Timber
  * 进度上报：每 20 秒一次（文档建议 15-30 秒），退出时补一次，
  * 携带 deviceType=3 表示 Android。
  */
+// media3 的 PlayerView 等 API 标记为 @UnstableApi，需要显式 opt-in 才能通过 lint。
+// 播放页会主动切横屏/竖屏（视频全屏体验），因此抑制「锁定屏幕方向」的 lint 警告。
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+@Suppress("SourceLockedOrientationActivity")
 @Composable
 fun PlayerScreen(
     courseId: Long,
@@ -451,7 +455,7 @@ fun PlayerScreen(
                 .padding(start = 8.dp, top = 120.dp)
                 .size(48.dp)
                 .clickable {
-                    android.util.Log.d("PlayerScreen", "BACK_CLICKED")
+                    // 调试用的 Log.d 已移除：Release 包不需要，且 lint 会报 LogNotTimber
                     onBack()
                 },
             contentAlignment = Alignment.Center

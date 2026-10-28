@@ -1,27 +1,25 @@
 package com.github.learningplatform.data.remote
 
-import com.github.learningplatform.core.network.ApiResponse
-import com.github.learningplatform.data.remote.dto.CategoryNodeDto
-import com.github.learningplatform.data.remote.dto.ContentItemDto
-import com.github.learningplatform.data.remote.dto.PageData
+import com.github.learningplatform.core.network.RawTableData
 import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.Query
 
-/** 分类模块 APP 端（接口文档 v3.0 4.1 / 4.2，均匿名可访问） */
+/**
+ * 类别接口（对齐后端 ApiV1CategoryController）。
+ *
+ * 课程与社区文章共用 learning_category，用 `categoryType` 区分：
+ *  - `course`  课程类别
+ *  - `article` 社区文章类别
+ *
+ * 返回 `{code, rows:[{categoryId, categoryName}], total}`（不分页，按显示顺序升序）。
+ * 客户端拿到 categoryId 后再传给 `/api/v1/course/list` 或 `/api/v1/post/list`。
+ */
 interface CategoryApi {
 
-    /** @param type 1-文章分类 2-视频课程分类 */
-    @GET("category/tree")
-    suspend fun getTree(@Query("type") type: Int): Response<ApiResponse<List<CategoryNodeDto>>>
-
-    /** @param sort 选填，1最新 2最热 */
-    @GET("category/content-list")
-    suspend fun getContentList(
-        @Query("categoryId") categoryId: Long,
-        @Query("type") type: Int,
-        @Query("pageNum") pageNum: Int = 1,
-        @Query("pageSize") pageSize: Int = 20,
-        @Query("sort") sort: Int? = null
-    ): Response<ApiResponse<PageData<ContentItemDto>>>
+    /** @param categoryType course / article（必传，后端会校验） */
+    @GET("api/v1/category/list")
+    suspend fun getCategories(
+        @Query("categoryType") categoryType: String
+    ): Response<RawTableData>
 }

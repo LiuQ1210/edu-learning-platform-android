@@ -1,10 +1,12 @@
 package com.github.learningplatform.data.repository
 
-import com.github.learningplatform.core.network.safeApiCall
-import com.github.learningplatform.core.network.safeApiCallForUnit
+import com.github.learningplatform.core.network.int
+import com.github.learningplatform.core.network.long
+import com.github.learningplatform.core.network.okBody
+import com.github.learningplatform.core.network.okTable
+import com.github.learningplatform.core.network.payload
+import com.github.learningplatform.core.network.str
 import com.github.learningplatform.data.demo.DemoData
-import com.github.learningplatform.data.demo.contentPreview
-import com.github.learningplatform.data.demo.contentPreviewUnit
 import com.github.learningplatform.data.remote.ArticleApi
 import com.github.learningplatform.data.remote.dto.ArticleDetailDto
 import com.github.learningplatform.data.remote.dto.ArticleDto
@@ -14,16 +16,31 @@ import com.github.learningplatform.data.remote.dto.CreateArticleResponse
 import com.github.learningplatform.data.remote.dto.PageData
 import com.github.learningplatform.data.remote.dto.ReportRequest
 import com.github.learningplatform.data.remote.dto.UpdateArticleRequest
+import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** 社区文章仓库（接口文档 v3.0 第七章） */
+/**
+ * 社区文章仓库。
+ *
+ * 已与后端对齐：详情 / 我的发布 / 删除（后端 post 系列，字段名是 postId/postTitle）。
+ * 后端尚未提供、继续用本地样例：文章列表流、发布、编辑、撤回、标签、举报。
+ */
 @Singleton
 class ArticleRepository @Inject constructor(
     private val articleApi: ArticleApi
 ) {
 
-    /** @param sort 1最新 2最热 3精华 */
+    /**
+     * 社区文章列表流（对接后端 `/api/v1/post/list`）。
+     *
+     * 后端返回字段按设计稿裁剪：postId / postTitle / userName / avatar /
+     * viewCount / likeCount / favoriteCount / commentCount（**不含 createTime**），
+     * 所以列表页的发布时间会是空串。
+     *
+     * 支持按 categoryId 筛选；排序固定为发布时间倒序，
+     * `sort`（最新/最热/精华）后端暂未支持，传了不生效。
+     */
     suspend fun getArticles(
         pageNum: Int = 1,
         pageSize: Int = 20,
@@ -31,51 +48,80 @@ class ArticleRepository @Inject constructor(
         tagId: Long? = null,
         sort: Int? = null
     ): PageData<ArticleDto> {
-        contentPreview { return DemoData.articlePage(pageNum, pageSize, categoryId, sort) }
-        return safeApiCall {
-            articleApi.getArticles(pageNum, pageSize, categoryId, tagId, sort)
-        }
+        val table = articleApi.getPublishedArticles(
+            categoryId = categoryId,
+            pageNum = pageNum,
+            pageSize = pageSize
+        ).okTable()
+        return PageData(total = table.total, list = table.rows.map { it.toArticle() })
     }
 
-    suspend fun getArticleDetail(articleId: Long): ArticleDetailDto {
-        contentPreview { return DemoData.articleDetail(articleId) }
-        return safeApiCall { articleApi.getArticleDetail(articleId) }
-    }
+    suspend fun getArticleDetail(articleId: Long): ArticleDetailDto =
+        articleApi.getArticleDetail(articleId).okBody().payload().toArticleDetail()
 
-    /** @param publish 0-存草稿 1-提交发布 */
-    suspend fun createArticle(request: CreateArticleRequest): CreateArticleResponse {
-        contentPreview { return CreateArticleResponse(articleId = 5999L, status = request.publish) }
-        return safeApiCall { articleApi.createArticle(request) }
-    }
+    /** 发布：后端未提供，本地返回成功 */
+    suspend fun createArticle(request: CreateArticleRequest): CreateArticleResponse =
+        CreateArticleResponse(articleId = 5999L, status = request.publish)
 
-    suspend fun updateArticle(articleId: Long, request: UpdateArticleRequest) {
-        contentPreviewUnit { return }
-        safeApiCallForUnit { articleApi.updateArticle(articleId, request) }
-    }
+    /** 编辑：后端未提供 */
+    suspend fun updateArticle(articleId: Long, request: UpdateArticleRequest) = Unit
 
     suspend fun deleteArticle(articleId: Long) {
-        contentPreviewUnit { return }
-        safeApiCallForUnit { articleApi.deleteArticle(articleId) }
+        articleApi.deleteArticle(articleId).okBody()
     }
 
-    /** 我的发布。status: 0草稿 1待审核 2已发布 3驳回 4下架 */
-    suspend fun getMyArticles(pageNum: Int = 1, pageSize: Int = 20, status: Int? = null): PageData<ArticleDto> {
-        contentPreview { return DemoData.myArticles(status) }
-        return safeApiCall { articleApi.getMyArticles(pageNum, pageSize, status) }
+    /** 我的发布（后端只返回当前登录用户） */
+    suspend fun getMyArticles(
+        pageNum: Int = 1,
+        pageSize: Int = 20,
+        status: Int? = null
+    ): PageData<ArticleDto> {
+        val table = articleApi.getMyArticles(pageNum, pageSize).okTable()
+        val list = table.rows.map { it.toArticle() }
+        return PageData(total = table.total, list = list)
     }
 
-    suspend fun withdrawArticle(articleId: Long) {
-        contentPreviewUnit { return }
-        safeApiCallForUnit { articleApi.withdrawArticle(articleId) }
-    }
+    /** 撤回为草稿：后端未提供 */
+    suspend fun withdrawArticle(articleId: Long) = Unit
 
-    suspend fun getTags(): List<ArticleTagDto> {
-        contentPreview { return DemoData.articleTags }
-        return safeApiCall { articleApi.getTags() }
-    }
+    /** 标签：后端未提供，使用本地样例 */
+    suspend fun getTags(): List<ArticleTagDto> = DemoData.articleTags
 
-    suspend fun reportArticle(articleId: Long, request: ReportRequest) {
-        contentPreviewUnit { return }
-        safeApiCallForUnit { articleApi.reportArticle(articleId, request) }
-    }
+    /** 举报：后端未提供 */
+    suspend fun reportArticle(articleId: Long, request: ReportRequest) = Unit
 }
+
+private fun JsonObject.toArticle(): ArticleDto = ArticleDto(
+    articleId = long("postId"),
+    title = str("postTitle"),
+    summary = str("summary"),
+    coverUrl = str("coverUrl"),
+    authorId = long("userId"),
+    authorName = str("userName"),
+    authorAvatar = str("userAvatar"),
+    categoryName = str("categoryName"),
+    viewCount = int("viewCount"),
+    likeCount = int("likeCount"),
+    commentCount = int("commentCount"),
+    publishTime = str("createTime"),
+    // 后端 status 是字符串："0"=已发布；客户端 0草稿 1待审核 2已发布 3驳回 4下架
+    status = if (str("status") == "0") 2 else 2
+)
+
+private fun JsonObject.toArticleDetail(): ArticleDetailDto = ArticleDetailDto(
+    articleId = long("postId"),
+    title = str("postTitle"),
+    summary = str("summary"),
+    content = str("content"),
+    coverUrl = str("coverUrl"),
+    authorId = long("userId"),
+    authorName = str("userName"),
+    authorAvatar = str("userAvatar"),
+    categoryId = long("categoryId"),
+    categoryName = str("categoryName"),
+    viewCount = int("viewCount"),
+    likeCount = int("likeCount"),
+    commentCount = int("commentCount"),
+    favoriteCount = int("favoriteCount"),
+    publishTime = str("createTime")
+)

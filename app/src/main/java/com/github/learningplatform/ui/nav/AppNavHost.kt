@@ -1,4 +1,4 @@
-﻿package com.github.learningplatform.ui.nav
+package com.github.learningplatform.ui.nav
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
@@ -503,7 +503,8 @@ fun MainScaffold(
             composable(Routes.CHANGE_PASSWORD) {
                 ChangePasswordScreen(
                     onBack = { navController.popBackStack() },
-                    onDone = { navController.popBackStack() }
+                    // 改密成功后后端已吊销全部 Token，必须回根图的登录页
+                    onDone = onLoggedOut
                 )
             }
 

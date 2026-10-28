@@ -1,101 +1,74 @@
 package com.github.learningplatform.data.remote
 
-import com.github.learningplatform.core.network.ApiResponse
-import com.github.learningplatform.data.remote.dto.BlogHomeDto
-import com.github.learningplatform.data.remote.dto.DownloadRecordDto
-import com.github.learningplatform.data.remote.dto.JoinedResultDto
-import com.github.learningplatform.data.remote.dto.MyCourseDto
-import com.github.learningplatform.data.remote.dto.PageData
-import com.github.learningplatform.data.remote.dto.SignCalendarDto
-import com.github.learningplatform.data.remote.dto.UpdateProfileRequest
-import com.github.learningplatform.data.remote.dto.UserProfileDto
-import com.github.learningplatform.data.remote.dto.UserTargetItemDto
-import com.github.learningplatform.data.remote.dto.ViewHistoryItemDto
+import com.github.learningplatform.core.network.RawTableData
+import kotlinx.serialization.json.JsonObject
 import retrofit2.Response
-import retrofit2.http.Body
-import retrofit2.http.DELETE
+import retrofit2.http.Field
+import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
 import retrofit2.http.POST
-import retrofit2.http.PUT
-import retrofit2.http.Path
 import retrofit2.http.Query
 
 /**
- * 用户中心模块（接口文档 v3.0 第三章，12 个接口）。
- * 除 blog-home 外均需登录。
+ * 用户中心 / 互动列表接口（只声明后端**已实现**的端点）。
+ *
+ * 后端对应：
+ *  - `ApiV1UserProfileController`  GET  /api/v1/user/profile
+ *                                  POST /api/v1/user/profile（表单 userName/avatar/sex/bio）
+ *  - `ApiV1InteractionController`  GET  /api/v1/interaction/myFavorites?targetType=
+ *                                  GET  /api/v1/interaction/myLikes?targetType=
+ *  - `ApiV1WatchHistoryController` GET  /api/v1/history/list?targetType=
+ *                                  POST /api/v1/history/clear?targetType=
+ *
+ * 我的课程 / 加入退出课程 / 下载记录 / 他人博客主页 / 签到日历 后端尚未提供，
+ * 这些功能在 Repository 里继续用本地样例数据渲染。
  */
 interface UserApi {
 
-    // 3.1 / 3.2 个人资料
-    @GET("user/profile")
-    suspend fun getProfile(): Response<ApiResponse<UserProfileDto>>
+    /** 个人资料，后端平铺返回 userId/userName/avatar/sex/sexLabel/bio… */
+    @GET("api/v1/user/profile")
+    suspend fun getProfile(): Response<JsonObject>
 
-    @PUT("user/profile")
-    suspend fun updateProfile(@Body body: UpdateProfileRequest): Response<ApiResponse<Unit>>
+    /**
+     * 我的主页聚合数据（对齐后端 `GET /api/v1/user/home`）。
+     *
+     * 平铺返回：`userId / userName / avatar / sex / sexLabel / bio /
+     * followCount（关注数）/ fansCount（粉丝数）/ likeReceivedCount（获赞数）/ fanPreview`
+     */
+    @GET("api/v1/user/home")
+    suspend fun getUserHome(): Response<JsonObject>
 
-    /** 3.3 他人博客主页（公开） */
-    @GET("user/blog-home/{userId}")
-    suspend fun getBlogHome(
-        @Path("userId") userId: Long,
-        @Query("pageNum") pageNum: Int = 1,
-        @Query("pageSize") pageSize: Int = 20
-    ): Response<ApiResponse<BlogHomeDto>>
+    /** 保存资料（表单提交，字段同后端 update(userName, avatar, sex, bio)） */
+    @FormUrlEncoded
+    @POST("api/v1/user/profile")
+    suspend fun updateProfile(
+        @Field("userName") userName: String? = null,
+        @Field("avatar") avatar: String? = null,
+        @Field("sex") sex: String? = null,
+        @Field("bio") bio: String? = null
+    ): Response<JsonObject>
 
-    // 3.4 - 3.6 我的课程
-    @GET("user/courses")
-    suspend fun getMyCourses(
-        @Query("pageNum") pageNum: Int = 1,
-        @Query("pageSize") pageSize: Int = 20,
-        @Query("keyword") keyword: String? = null
-    ): Response<ApiResponse<PageData<MyCourseDto>>>
-
-    @POST("user/courses/{courseId}")
-    suspend fun joinCourse(@Path("courseId") courseId: Long): Response<ApiResponse<JoinedResultDto>>
-
-    @DELETE("user/courses/{courseId}")
-    suspend fun quitCourse(@Path("courseId") courseId: Long): Response<ApiResponse<Unit>>
-
-    // 3.7 / 3.8 收藏与点赞
-    @GET("user/favorites")
+    /** 我的收藏（行结构见后端 MyInteraction） */
+    @GET("api/v1/interaction/myFavorites")
     suspend fun getFavorites(
-        @Query("pageNum") pageNum: Int = 1,
-        @Query("pageSize") pageSize: Int = 20,
-        @Query("targetType") targetType: Int? = null
-    ): Response<ApiResponse<PageData<UserTargetItemDto>>>
+        @Query("targetType") targetType: String? = null
+    ): Response<RawTableData>
 
-    @GET("user/likes")
+    /** 我的点赞（行结构同收藏） */
+    @GET("api/v1/interaction/myLikes")
     suspend fun getLikes(
-        @Query("pageNum") pageNum: Int = 1,
-        @Query("pageSize") pageSize: Int = 20,
-        @Query("targetType") targetType: Int? = null
-    ): Response<ApiResponse<PageData<UserTargetItemDto>>>
+        @Query("targetType") targetType: String? = null
+    ): Response<RawTableData>
 
-    // 3.9 / 3.10 浏览历史
-    @GET("user/view-history")
+    /** 观看历史（行结构见后端 WatchHistory） */
+    @GET("api/v1/history/list")
     suspend fun getViewHistory(
-        @Query("pageNum") pageNum: Int = 1,
-        @Query("pageSize") pageSize: Int = 20,
-        @Query("targetType") targetType: Int? = null
-    ): Response<ApiResponse<PageData<ViewHistoryItemDto>>>
+        @Query("targetType") targetType: String? = null
+    ): Response<RawTableData>
 
-    /** 不传 targetType 则清空全部 */
-    @DELETE("user/view-history")
+    /** 清空观看历史 */
+    @POST("api/v1/history/clear")
     suspend fun clearViewHistory(
-        @Query("targetType") targetType: Int? = null
-    ): Response<ApiResponse<Unit>>
-
-    // 3.11 下载记录
-    @GET("user/download-records")
-    suspend fun getDownloadRecords(
-        @Query("pageNum") pageNum: Int = 1,
-        @Query("pageSize") pageSize: Int = 20,
-        @Query("resourceType") resourceType: Int? = null
-    ): Response<ApiResponse<PageData<DownloadRecordDto>>>
-
-    // 3.12 签到日历
-    @GET("user/sign-calendar")
-    suspend fun getSignCalendar(
-        @Query("year") year: Int,
-        @Query("month") month: Int
-    ): Response<ApiResponse<SignCalendarDto>>
+        @Query("targetType") targetType: String? = null
+    ): Response<JsonObject>
 }

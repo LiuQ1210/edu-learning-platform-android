@@ -1,12 +1,16 @@
 package com.github.learningplatform.data.repository
 
-import com.github.learningplatform.core.network.ApiException
+import com.github.learningplatform.core.network.double
+import com.github.learningplatform.core.network.int
+import com.github.learningplatform.core.network.okBody
+import com.github.learningplatform.core.network.payload
+import com.github.learningplatform.core.network.toAnyMap
 import com.github.learningplatform.data.remote.RatingApi
 import com.github.learningplatform.data.remote.dto.RatingResultDto
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** 评分仓库（对接后端 ApiV1 接口） */
+/** 评分仓库（对接后端 ApiV1 接口，字段平铺） */
 @Singleton
 class RatingRepository @Inject constructor(
     private val ratingApi: RatingApi
@@ -14,46 +18,23 @@ class RatingRepository @Inject constructor(
 
     /** 新增评分 */
     suspend fun addRating(courseId: Long, score: Int): RatingResultDto {
-        val response = ratingApi.addRating(courseId, score)
-        if (!response.isSuccessful) {
-            throw ApiException(response.code(), "HTTP错误: ${response.code()}")
-        }
-        val body = response.body() ?: throw ApiException(-1, "响应体为空")
-        if (body.code != 0) {
-            throw ApiException(body.code, body.message)
-        }
-        val data = body.data ?: emptyMap()
-        val avgScore = (data["avgScore"] as? Number)?.toDouble() ?: 0.0
-        val ratingCount = (data["ratingCount"] as? Number)?.toInt() ?: 0
-        return RatingResultDto(averageScore = avgScore, ratingCount = ratingCount)
+        val data = ratingApi.addRating(courseId, score).okBody().payload()
+        return RatingResultDto(
+            averageScore = data.double("avgScore"),
+            ratingCount = data.int("ratingCount")
+        )
     }
 
     /** 修改评分 */
     suspend fun updateRating(courseId: Long, score: Int): RatingResultDto {
-        val response = ratingApi.updateRating(courseId, score)
-        if (!response.isSuccessful) {
-            throw ApiException(response.code(), "HTTP错误: ${response.code()}")
-        }
-        val body = response.body() ?: throw ApiException(-1, "响应体为空")
-        if (body.code != 0) {
-            throw ApiException(body.code, body.message)
-        }
-        val data = body.data ?: emptyMap()
-        val avgScore = (data["avgScore"] as? Number)?.toDouble() ?: 0.0
-        val ratingCount = (data["ratingCount"] as? Number)?.toInt() ?: 0
-        return RatingResultDto(averageScore = avgScore, ratingCount = ratingCount)
+        val data = ratingApi.updateRating(courseId, score).okBody().payload()
+        return RatingResultDto(
+            averageScore = data.double("avgScore"),
+            ratingCount = data.int("ratingCount")
+        )
     }
 
-    /** 查询评分信息 */
-    suspend fun getRatingInfo(courseId: Long): Map<String, Any> {
-        val response = ratingApi.getRatingInfo(courseId)
-        if (!response.isSuccessful) {
-            throw ApiException(response.code(), "HTTP错误: ${response.code()}")
-        }
-        val body = response.body() ?: throw ApiException(-1, "响应体为空")
-        if (body.code != 0) {
-            throw ApiException(body.code, body.message)
-        }
-        return body.data ?: emptyMap()
-    }
+    /** 查询评分信息：myScore / avgScore / ratingCount */
+    suspend fun getRatingInfo(courseId: Long): Map<String, Any> =
+        ratingApi.getRatingInfo(courseId).okBody().payload().toAnyMap()
 }

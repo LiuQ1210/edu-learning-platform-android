@@ -1,4 +1,4 @@
-﻿package com.github.learningplatform.ui.mine
+package com.github.learningplatform.ui.mine
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -130,6 +130,10 @@ fun ProfileScreen(
                 nickname = uiState.nickname,
                 avatar = uiState.avatar,
                 bio = uiState.bio,
+                sexLabel = uiState.sexLabel,
+                followCount = uiState.followCount,
+                fansCount = uiState.fansCount,
+                likeReceivedCount = uiState.likeReceivedCount,
                 continueSignDay = uiState.continueSignDay,
                 signedToday = uiState.signedToday,
                 onOpenCheckin = onOpenCheckin,
@@ -215,6 +219,10 @@ private fun ProfileHeader(
     nickname: String,
     avatar: String,
     bio: String,
+    sexLabel: String,
+    followCount: Int,
+    fansCount: Int,
+    likeReceivedCount: Int,
     continueSignDay: Int,
     signedToday: Boolean,
     onOpenCheckin: () -> Unit,
@@ -233,12 +241,12 @@ private fun ProfileHeader(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 头像 + 粉丝数
+            // 头像 + 粉丝数（真实值来自 /api/v1/user/home 的 fansCount）
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Avatar(url = avatar, name = nickname, size = 64.dp)
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    text = "356 粉丝",
+                    text = "$fansCount 粉丝",
                     style = MaterialTheme.typography.labelSmall,
                     color = TextSecondary
                 )
@@ -260,7 +268,13 @@ private fun ProfileHeader(
                     MetaText(bio, modifier = Modifier.fillMaxWidth())
                 }
                 Spacer(Modifier.height(2.dp))
-                MetaText("男", modifier = Modifier.fillMaxWidth())
+                // 关注 / 获赞 也都是 /user/home 返回的真实值；性别用后端 sexLabel
+                val stats = buildList {
+                    if (sexLabel.isNotBlank()) add(sexLabel)
+                    add("关注 $followCount")
+                    add("获赞 $likeReceivedCount")
+                }.joinToString(" · ")
+                MetaText(stats, modifier = Modifier.fillMaxWidth())
             }
         }
     }

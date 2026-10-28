@@ -303,6 +303,9 @@ private fun VideoAction(
  * 只在所在页可见时创建，离开页面立即 release —— 短视频流里同时存活多个
  * ExoPlayer 会瞬间吃满解码器并触发 OOM。
  */
+// PlayerView / setShutterBackgroundColor 标记为 @UnstableApi，
+// 用 androidx.annotation.OptIn（而不是 Kotlin 的 @file:OptIn）才能真正让 lint 认可
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 private fun ShortVideoPlayer(playUrl: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
@@ -399,7 +402,7 @@ private fun CommentsSheet(
     error: String?,
     hasMore: Boolean,
     onLoadMore: () -> Unit,
-    onPostComment: (String) -> Unit,
+    onPostComment: (String, Long) -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -410,7 +413,9 @@ private fun CommentsSheet(
                 .height(420.dp)
                 .padding(horizontal = 16.dp)
         ) {
+            // 回复目标：既要知道「回复谁」（用于提示），也要知道「回复哪条评论」（parentId）
             var replyToUser by remember { mutableStateOf<String?>(null) }
+            var replyToCommentId by remember { mutableStateOf<Long?>(null) }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "评论",
@@ -440,7 +445,10 @@ private fun CommentsSheet(
                     items(comments, key = { it.commentId }) { comment ->
                         CommentRow(
                             comment = comment,
-                            onReply = { replyToUser = comment.userName }
+                            onReply = {
+                                replyToCommentId = comment.commentId
+                                replyToUser = comment.userName
+                            }
                         )
                     }
                     if (hasMore) {
@@ -469,7 +477,10 @@ private fun CommentsSheet(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("回复 @$replyToUser", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.weight(1f))
-                    TextButton(onClick = { replyToUser = null }) { Text("取消", color = TextHint) }
+                    TextButton(onClick = {
+                        replyToUser = null
+                        replyToCommentId = null
+                    }) { Text("取消", color = TextHint) }
                 }
             }
             Row(
@@ -489,9 +500,12 @@ private fun CommentsSheet(
                 androidx.compose.material3.TextButton(
                     onClick = {
                         if (input.isNotBlank()) {
-                            onPostComment(if (replyToUser != null) "回复 @$replyToUser: ${input.trim()}" else input.trim())
+                            // 正文只存用户输入的内容；「回复谁」由 parentId + replyToName 表达，
+                            // 不再把「回复 @xxx:」拼进正文（否则会变成一条普通顶级评论）
+                            onPostComment(input.trim(), replyToCommentId ?: 0L)
                             input = ""
                             replyToUser = null
+                            replyToCommentId = null
                         }
                     }
                 ) {
@@ -530,16 +544,18 @@ private fun CommentRow(comment: CommentDto, onReply: () -> Unit = {}) {
                 color = if (comment.replyCount > 0)     Primary else TextHint,
                 modifier = if (comment.replyCount > 0) Modifier.clickable { expanded = !expanded } else Modifier
             )
-            // 展开显示回复
-            if (expanded) {
-                comment.hotReplies.forEach { reply ->
-                    Spacer(Modifier.height(6.dp))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color.Black.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
-                            .padding(8.dp)
-                    ) {
+            // 展开显示回复：缩进在父评论下方（抖音式），不再与顶级评论平铺在一行
+            if (expanded && comment.hotReplies.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Column(
+                    modifier = Modifier
+                        .padding(start = 12.dp)
+                        .fillMaxWidth()
+                        .background(Color.Black.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 8.dp)
+                ) {
+                    comment.hotReplies.forEachIndexed { index, reply ->
+                        if (index > 0) Spacer(Modifier.height(6.dp))
                         Text(
                             text = reply.userName + (reply.replyToName?.let { " 回复 $it" } ?: "") + "：" + reply.content,
                             style = MaterialTheme.typography.bodySmall,

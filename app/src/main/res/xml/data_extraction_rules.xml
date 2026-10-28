@@ -1,19 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+   Android 12+ 的备份/迁移规则（cloud-backup = 云备份，device-transfer = 换机直传）。
+
+   本 App 的数据分两类：
+    1. 需要保留的小数据：DataStore 里的用户偏好与登录态（learn_platform_prefs）
+    2. 可重建的缓存：Room 数据库（learn_platform.db，课程/文章缓存）、Coil 图片磁盘缓存
+
+   缓存体积大且能重新拉取，备份/迁移时一律排除；只保留 DataStore。
+   说明见 https://developer.android.com/about/versions/12/backup-restore#xml-changes
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <!-- 只备份 DataStore（用户偏好 + 登录态） -->
+        <include domain="file" path="datastore/" />
+
+        <!-- 排除 Room 缓存库及其 WAL/SHM 日志 -->
+        <exclude domain="database" path="learn_platform.db" />
+        <exclude domain="database" path="learn_platform.db-shm" />
+        <exclude domain="database" path="learn_platform.db-wal" />
+
+        <!-- 排除图片磁盘缓存与其它可重建文件 -->
+        <exclude domain="file" path="image_cache/" />
+        <exclude domain="file" path="cache/" />
+        <exclude domain="external" path="." />
     </cloud-backup>
-    <!--
+
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <!-- 换机时同样只带走 DataStore，避免把几百 MB 缓存复制过去 -->
+        <include domain="file" path="datastore/" />
+
+        <exclude domain="database" path="learn_platform.db" />
+        <exclude domain="database" path="learn_platform.db-shm" />
+        <exclude domain="database" path="learn_platform.db-wal" />
+
+        <exclude domain="file" path="image_cache/" />
+        <exclude domain="file" path="cache/" />
+        <exclude domain="external" path="." />
     </device-transfer>
-    -->
 </data-extraction-rules>

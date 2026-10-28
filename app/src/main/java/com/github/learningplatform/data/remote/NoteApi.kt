@@ -1,16 +1,21 @@
 package com.github.learningplatform.data.remote
 
-import com.github.learningplatform.core.network.ApiResponse
-import com.github.learningplatform.data.remote.dto.TableDataInfo
+import com.github.learningplatform.core.network.RawTableData
+import kotlinx.serialization.json.JsonObject
 import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
 
-/** 笔记模块 ApiV1 接口 */
+/**
+ * 笔记模块 ApiV1 接口（对齐后端 ApiV1NoteController）。
+ *
+ * 参数名与后端一致：targetType / targetId / noteTitle / noteContent / progress。
+ * 返回：add 平铺 noteId；info 为 `data` 包裹；list 为 TableDataInfo。
+ */
 interface NoteApi {
 
-    /** 新增笔记 */
+    /** 新增笔记，返回平铺字段 noteId */
     @POST("api/v1/note/add")
     suspend fun addNote(
         @Query("targetType") targetType: String,
@@ -18,7 +23,7 @@ interface NoteApi {
         @Query("noteTitle") noteTitle: String,
         @Query("noteContent") noteContent: String,
         @Query("progress") progress: Int? = null
-    ): Response<ApiResponse<Map<String, Any>>>
+    ): Response<JsonObject>
 
     /** 修改笔记 */
     @POST("api/v1/note/edit")
@@ -26,13 +31,13 @@ interface NoteApi {
         @Query("noteId") noteId: Long,
         @Query("noteTitle") noteTitle: String,
         @Query("noteContent") noteContent: String
-    ): Response<ApiResponse<Unit>>
+    ): Response<JsonObject>
 
     /** 删除笔记 */
     @POST("api/v1/note/remove")
     suspend fun removeNote(
         @Query("noteId") noteId: Long
-    ): Response<ApiResponse<Unit>>
+    ): Response<JsonObject>
 
     /** 我的笔记列表（分页） */
     @GET("api/v1/note/list")
@@ -42,11 +47,11 @@ interface NoteApi {
         @Query("keyword") keyword: String? = null,
         @Query("pageNum") pageNum: Int = 1,
         @Query("pageSize") pageSize: Int = 20
-    ): Response<TableDataInfo<Map<String, Any>>>
+    ): Response<RawTableData>
 
-    /** 笔记详情 */
+    /** 笔记详情（`data` 包裹） */
     @GET("api/v1/note/info")
     suspend fun getNoteInfo(
         @Query("noteId") noteId: Long
-    ): Response<ApiResponse<Map<String, Any>>>
+    ): Response<JsonObject>
 }

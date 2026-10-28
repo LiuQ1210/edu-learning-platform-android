@@ -3,6 +3,7 @@ package com.github.learningplatform.data.repository
 import android.util.Base64
 import com.github.learningplatform.core.network.ApiException
 import com.github.learningplatform.core.network.AuthInterceptor
+import com.github.learningplatform.core.network.okBody
 import com.github.learningplatform.data.local.UserPreferences
 import com.github.learningplatform.data.remote.AuthApi
 import com.github.learningplatform.domain.model.User
@@ -75,5 +76,24 @@ class AuthRepository @Inject constructor(
         }
         authInterceptor.clearToken()
         userPreferences.clear()
+    }
+
+    /**
+     * 修改密码（后端 v1 新增）。
+     *
+     * 后端改密成功后会在同一事务里吊销该账号**全部 Token**（含当前设备），
+     * 所以这里不论返回什么都要清掉本地登录态，让 UI 回登录页重新登录。
+     */
+    suspend fun changePassword(
+        oldPassword: String,
+        newPassword: String,
+        confirmPassword: String
+    ) {
+        try {
+            authApi.changePassword(oldPassword, newPassword, confirmPassword).okBody()
+        } finally {
+            authInterceptor.clearToken()
+            userPreferences.clear()
+        }
     }
 }

@@ -31,7 +31,7 @@ fun LoadingState(modifier: Modifier = Modifier) {
  */
 @Composable
 fun EmptyState(
-    message: String = "暂无数据",
+    message: String,
     modifier: Modifier = Modifier,
     onRetry: (() -> Unit)? = null
 ) {
@@ -53,7 +53,7 @@ fun EmptyState(
  */
 @Composable
 fun ErrorState(
-    message: String = "加载失败",
+    message: String,
     modifier: Modifier = Modifier,
     onRetry: (() -> Unit)? = null
 ) {

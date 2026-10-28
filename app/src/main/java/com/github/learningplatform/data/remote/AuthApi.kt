@@ -1,6 +1,7 @@
 package com.github.learningplatform.data.remote
 
 import com.github.learningplatform.data.remote.dto.AjaxResultDto
+import kotlinx.serialization.json.JsonObject
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Field
@@ -46,4 +47,19 @@ interface AuthApi {
     /** 退出登录（v1，吊销 token） */
     @POST("api/v1/logout")
     suspend fun logout(): Response<AjaxResultDto>
+
+    /**
+     * 修改当前用户密码（后端 v1 新增，对齐 ApiV1UserPasswordController）。
+     *
+     * 表单字段：oldPassword / newPassword / confirmPassword。
+     * 成功返回 `{code:0, msg:"密码修改成功，请重新登录", reLoginRequired:true}`，
+     * 且后端会**吊销该账号全部 Token**（含当前设备），客户端必须清本地凭证并回登录页。
+     */
+    @FormUrlEncoded
+    @POST("api/v1/user/password")
+    suspend fun changePassword(
+        @Field("oldPassword") oldPassword: String,
+        @Field("newPassword") newPassword: String,
+        @Field("confirmPassword") confirmPassword: String
+    ): Response<JsonObject>
 }

@@ -35,9 +35,9 @@ import com.github.learningplatform.ui.theme.TextHint
  */
 @Composable
 fun AdSlotPlaceholder(
-    slotCode: String? = null,
-    height: Dp? = 64.dp,
-    modifier: Modifier = Modifier
+    slotCode: String?,
+    modifier: Modifier = Modifier,
+    height: Dp? = 64.dp
 ) {
     Box(
         modifier = modifier

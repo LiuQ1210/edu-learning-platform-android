@@ -75,3 +75,27 @@ data class SignCalendarDto(
     val totalSignDay: Int = 0,
     val signedDates: List<String> = emptyList()
 )
+
+/**
+ * 我的主页聚合数据（后端 `GET /api/v1/user/home`）。
+ *
+ * 后端一次返回资料 + 关注数 + 粉丝数 + 获赞数，避免首页连调三个接口。
+ * 注意：该接口只返回**当前登录用户**，不接收 userId
+ * （他人主页的资料后端暂未提供，只能查到关注/粉丝数与关注状态）。
+ */
+@Serializable
+data class UserHomeDto(
+    val userId: Long = 0,
+    val userName: String = "",
+    val avatar: String = "",
+    /** 后端 sex：0男 1女 2不公开 */
+    val sex: Int = 2,
+    val sexLabel: String = "",
+    val bio: String = "",
+    /** 我关注了多少人 */
+    val followCount: Int = 0,
+    /** 多少人关注我 */
+    val fansCount: Int = 0,
+    /** 我发布内容获得的点赞总数 */
+    val likeReceivedCount: Int = 0
+)

@@ -184,7 +184,11 @@ class HomeViewModel @Inject constructor(
                     hotCourses = accumulated,
                     rankCourses = rank,
                     pageNum = nextPage,
-                    hasMore = true // demo 模式下无限加载
+                    // 用后端返回的 total 判断是否还有下一页。
+                    // 之前写死 true（demo 遗留）会导致无限 loadMore，而后端 PageHelper
+                    // 对越界页会回退到最后一页（reasonable），于是同一批课程被反复追加，
+                    // 首页出现重复卡片。
+                    hasMore = accumulated.size < page.total
                 )
             } catch (e: CancellationException) {
                 throw e

@@ -1,12 +1,18 @@
 package com.github.learningplatform.data.repository
 
-import com.github.learningplatform.core.network.ApiException
-import com.github.learningplatform.data.demo.DemoData
+import com.github.learningplatform.core.network.int
+import com.github.learningplatform.core.network.long
+import com.github.learningplatform.core.network.okBody
+import com.github.learningplatform.core.network.okTable
+import com.github.learningplatform.core.network.payload
+import com.github.learningplatform.core.network.str
+import com.github.learningplatform.data.remote.ApiTargetType
 import com.github.learningplatform.data.remote.NoteApi
+import com.github.learningplatform.data.remote.dto.CreateNoteRequest
 import com.github.learningplatform.data.remote.dto.NoteDto
 import com.github.learningplatform.data.remote.dto.PageData
-import com.github.learningplatform.data.remote.dto.CreateNoteRequest
 import com.github.learningplatform.data.remote.dto.UpdateNoteRequest
+import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,29 +28,57 @@ class NoteRepository @Inject constructor(
         sourceType: Int? = null,
         keyword: String? = null
     ): PageData<NoteDto> {
-        // 后端接口还没完全对接好，返回假数据
-        val filtered = if (sourceType == null) DemoData.notes
-        else DemoData.notes.copy(list = DemoData.notes.list.filter { it.sourceType == sourceType })
-        return filtered
+        val table = noteApi.getNoteList(
+            targetType = ApiTargetType.ofNote(sourceType),
+            keyword = keyword,
+            pageNum = pageNum,
+            pageSize = pageSize
+        ).okTable()
+        return PageData(total = table.total, list = table.rows.map { it.toNote() })
     }
 
     /** @return 新建笔记 ID */
-    suspend fun createNote(request: CreateNoteRequest): Long {
-        // 后端接口还没完全对接好，返回假数据
-        return 7999L
-    }
+    suspend fun createNote(request: CreateNoteRequest): Long =
+        noteApi.addNote(
+            targetType = ApiTargetType.ofNote(request.sourceType) ?: ApiTargetType.POST,
+            targetId = request.sourceId,
+            noteTitle = request.title,
+            noteContent = request.content,
+            progress = request.videoTimestamp
+        ).okBody().payload().long("noteId")
 
     suspend fun updateNote(noteId: Long, request: UpdateNoteRequest) {
-        // 后端接口还没完全对接好
+        noteApi.editNote(
+            noteId = noteId,
+            noteTitle = request.title.orEmpty(),
+            noteContent = request.content.orEmpty()
+        ).okBody()
     }
 
     suspend fun deleteNote(noteId: Long) {
-        // 后端接口还没完全对接好
+        noteApi.removeNote(noteId).okBody()
     }
 
     /** 某内容下的我的笔记（不分页） */
     suspend fun getNotesBySource(sourceType: Int, sourceId: Long): List<NoteDto> {
-        // 后端接口还没完全对接好，返回假数据
-        return DemoData.notes.list
+        val table = noteApi.getNoteList(
+            targetType = ApiTargetType.ofNote(sourceType),
+            targetId = sourceId,
+            pageNum = 1,
+            pageSize = 100
+        ).okTable()
+        return table.rows.map { it.toNote() }
     }
 }
+
+/** 后端 Note -> 客户端 NoteDto（字段名不同：noteTitle/noteContent/progress） */
+private fun JsonObject.toNote(): NoteDto = NoteDto(
+    noteId = long("noteId"),
+    title = str("noteTitle"),
+    content = str("noteContent"),
+    sourceType = ApiTargetType.toInt(str("targetType")),
+    sourceId = long("targetId"),
+    sourceTitle = str("sourceTitle"),
+    videoTimestamp = int("progress").takeIf { it > 0 },
+    updateTime = str("updateTime").ifEmpty { str("createTime") }
+)
