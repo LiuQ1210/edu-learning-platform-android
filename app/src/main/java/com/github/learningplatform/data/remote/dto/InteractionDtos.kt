@@ -74,9 +74,12 @@ data class LikeToggleResultDto(
     val likeCount: Int = 0
 )
 
-/** 8.9 收藏切换结果 */
+/** 8.9 收藏切换结果（后端 /toggle 同时返回翻转后的状态 active 与实时收藏数 count） */
 @Serializable
-data class FavoriteToggleResultDto(val isFavorited: Boolean = false)
+data class FavoriteToggleResultDto(
+    val isFavorited: Boolean = false,
+    val favoriteCount: Int = 0
+)
 
 /** 8.9 / 8.10 切换请求 */
 @Serializable

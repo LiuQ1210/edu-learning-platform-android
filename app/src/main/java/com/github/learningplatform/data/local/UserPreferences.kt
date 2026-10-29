@@ -76,7 +76,8 @@ class UserPreferences @Inject constructor(
         userId: String,
         userName: String,
         phone: String,
-        avatar: String = ""
+        avatar: String = "",
+        nickname: String = ""
     ) {
         context.dataStore.edit {
             it[Keys.TOKEN] = token
@@ -84,6 +85,8 @@ class UserPreferences @Inject constructor(
             it[Keys.USER_NAME] = userName
             it[Keys.PHONE] = phone
             it[Keys.AVATAR] = avatar
+            // 昵称单独存一份，个人主页首屏缓存与后端资料保持一致
+            if (nickname.isNotBlank()) it[Keys.NICKNAME] = nickname
         }
     }
 

@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -13,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -58,6 +60,8 @@ import com.github.learningplatform.ui.mine.ProfileScreen
 import com.github.learningplatform.ui.mine.StudyStatsScreen
 import com.github.learningplatform.ui.mine.StudyPathScreen
 import com.github.learningplatform.ui.mine.NotificationsScreen
+import com.github.learningplatform.ui.mine.FollowingScreen
+import com.github.learningplatform.ui.mine.FansScreen
 import com.github.learningplatform.ui.community.CommunityProfileScreen
 import com.github.learningplatform.ui.mine.SettingsScreen
 import com.github.learningplatform.ui.mine.WatchHistoryScreen
@@ -205,7 +209,9 @@ fun MainScaffold(
                     // 显式给底色：NavigationBar 默认取 surfaceContainer（带紫调的基线色）。
                     // 这里纯白底，选中态由每个 Tab 自己的 ink / wash 决定
                     containerColor = BottomNavContainer,
-                    contentColor = BottomNavUnselected
+                    contentColor = BottomNavUnselected,
+                    modifier = Modifier.height(80.dp),
+                    windowInsets = androidx.compose.foundation.layout.WindowInsets(0)
                 ) {
                     BottomNavItem.entries.forEach { item ->
                         val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
@@ -279,7 +285,8 @@ fun MainScaffold(
                 ProfileScreen(
                     onOpenNotifications = { navController.navigate(Routes.NOTIFICATIONS) },
                     onOpenCheckin = onOpenCheckin,
-                    onOpenEditProfile = { navController.navigate(Routes.EDIT_PROFILE) },
+                    onOpenFollowing = { navController.navigate(Routes.FOLLOWING) },
+                    onOpenFans = { navController.navigate(Routes.FANS) },
                     onOpenCommunityProfile = { navController.navigate(Routes.blogHome(0L, self = true)) },
                     onOpenMyCourses = { navController.navigate(Routes.MY_COURSES) },
                     onOpenStudyStats = { navController.navigate(Routes.STUDY_STATS) },
@@ -525,6 +532,20 @@ fun MainScaffold(
                         },
                     onOpenUser = { userId -> navController.navigate(Routes.blogHome(userId)) },
                     onOpenTodos = { navController.navigate(Routes.TODOS) }
+                )
+            }
+
+            composable(Routes.FOLLOWING) {
+                FollowingScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenUser = { userId -> navController.navigate(Routes.blogHome(userId)) }
+                )
+            }
+
+            composable(Routes.FANS) {
+                FansScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenUser = { userId -> navController.navigate(Routes.blogHome(userId)) }
                 )
             }
 

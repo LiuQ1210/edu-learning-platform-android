@@ -51,19 +51,25 @@ interface UserApi {
     /** 我的收藏（行结构见后端 MyInteraction） */
     @GET("api/v1/interaction/myFavorites")
     suspend fun getFavorites(
-        @Query("targetType") targetType: String? = null
+        @Query("targetType") targetType: String? = null,
+        @Query("pageNum") pageNum: Int = 1,
+        @Query("pageSize") pageSize: Int = 20
     ): Response<RawTableData>
 
     /** 我的点赞（行结构同收藏） */
     @GET("api/v1/interaction/myLikes")
     suspend fun getLikes(
-        @Query("targetType") targetType: String? = null
+        @Query("targetType") targetType: String? = null,
+        @Query("pageNum") pageNum: Int = 1,
+        @Query("pageSize") pageSize: Int = 20
     ): Response<RawTableData>
 
     /** 观看历史（行结构见后端 WatchHistory） */
     @GET("api/v1/history/list")
     suspend fun getViewHistory(
-        @Query("targetType") targetType: String? = null
+        @Query("targetType") targetType: String? = null,
+        @Query("pageNum") pageNum: Int = 1,
+        @Query("pageSize") pageSize: Int = 20
     ): Response<RawTableData>
 
     /** 清空观看历史 */

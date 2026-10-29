@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,11 +22,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.github.learningplatform.ui.common.Avatar
 import com.github.learningplatform.ui.common.BackTopBar
 import com.github.learningplatform.ui.theme.pageGradientBrush
 import com.github.learningplatform.ui.theme.TextPrimary
@@ -52,14 +59,26 @@ fun CommunityProfileScreen(
 ) {
     val profileState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // 进入页面时拉取关注/粉丝数与关注状态（后端接口：follow/count、follow/status）
-    androidx.compose.runtime.LaunchedEffect(userId, isSelf) {
+    // 进入页面时拉取资料与关注/粉丝数（自己走 /user/home，他人走 follow/count、follow/status）
+    LaunchedEffect(userId, isSelf) {
         viewModel.load(userId, isSelf)
     }
 
-    // 昵称/简介/文章列表：后端暂无「按 userId 查他人资料」的接口，仍用本地样例
-    val userName = if (isSelf) "张三" else if (userId == 3001L) "小明" else "小红"
-    val bio = "热爱学习，正在补 Android 和算法。"
+    // 从编辑主页返回时（页面回到前台 ON_RESUME）重新拉一次，保证保存后的昵称/简介/计数即时刷新
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, userId, isSelf) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.load(userId, isSelf)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // 昵称/简介：自己来自 /user/home（与底部个人主页同源）；他人后端无资料接口，用占位文案
+    val userName = if (isSelf) profileState.nickname.ifBlank { "未设置昵称" } else "小红"
+    val bio = if (isSelf) profileState.bio else "热爱学习，正在补 Android 和算法。"
     var pendingDeleteId by remember { mutableStateOf<Long?>(null) }
 
     var userArticles by remember { mutableStateOf(listOf(
@@ -80,40 +99,68 @@ fun CommunityProfileScreen(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // 头像 + 昵称 + 简介
+            // 头像 + 昵称 + 简介（左右布局）
             item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
                         .background(MaterialTheme.colorScheme.surface)
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .padding(12.dp)
                 ) {
-                    // 头像（首字母圆形）
-                    Box(
-                        modifier = Modifier
-                            .size(72.dp)
-                            .clip(CircleShape)
-                            .background(Primary),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = userName.take(1),
-                            color = Color.White,
-                            fontSize = 30.sp,
-                            fontWeight = FontWeight.Bold
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // 头像：自己用后端头像地址，空地址由 Avatar 用昵称首字母兜底；他人保持首字母占位
+                        Avatar(
+                            url = if (isSelf) profileState.avatar else "",
+                            name = userName,
+                            size = 56.dp
                         )
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(userName, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                            if (bio.isNotBlank()) {
+                                Spacer(Modifier.height(2.dp))
+                                Text(bio, fontSize = 12.sp, color = TextSecondary)
+                            }
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                if (isSelf) profileState.sexLabel.ifBlank { "不公开" } else "男",
+                                fontSize = 12.sp,
+                                color = TextSecondary
+                            )
+                        }
+                        // 右上角按钮：自己显示编辑，别人显示关注/取消关注
+                        if (isSelf && onEdit != null) {
+                            OutlinedButton(
+                                onClick = onEdit,
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                            ) {
+                                Text("编辑", color = Primary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        } else {
+                            val followed = profileState.isFollowed
+                            OutlinedButton(
+                                onClick = { viewModel.toggleFollow(userId) },
+                                enabled = !profileState.submitting && !profileState.isLoading,
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    when {
+                                        profileState.submitting -> if (followed) "取消中..." else "关注中..."
+                                        followed -> "已关注"
+                                        else -> "关注"
+                                    },
+                                    color = if (followed) TextSecondary else Primary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
                     }
-                    Spacer(Modifier.height(10.dp))
-                    Text(userName, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                    Spacer(Modifier.height(6.dp))
-                    Text(bio, fontSize = 13.sp, color = TextSecondary)
-                    Spacer(Modifier.height(4.dp))
-                    Text("男", fontSize = 13.sp, color = TextSecondary)
-                    Spacer(Modifier.height(14.dp))
 
-                    // 关注/粉丝/获赞 数据
+                    Spacer(Modifier.height(8.dp))
+
+                    // 关注/粉丝/获赞 数据（小一点，横排）
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
@@ -126,42 +173,16 @@ fun CommunityProfileScreen(
                             "获赞"
                         )
                     }
-                    Spacer(Modifier.height(14.dp))
 
-                    if (isSelf && onEdit != null) {
-                        OutlinedButton(
-                            onClick = onEdit,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("编辑主页", color = Primary, fontWeight = FontWeight.Bold)
-                        }
-                    } else {
-                        val followed = profileState.isFollowed
-                        OutlinedButton(
-                            onClick = { viewModel.toggleFollow(userId) },
-                            enabled = !profileState.submitting && !profileState.isLoading,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                when {
-                                    profileState.submitting -> if (followed) "取消中..." else "关注中..."
-                                    followed -> "已关注"
-                                    else -> "关注"
-                                },
-                                color = if (followed) TextSecondary else Primary,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        // 失败/提示信息（后端返回的业务文案）
-                        val tip = profileState.error ?: profileState.message
-                        if (!tip.isNullOrBlank()) {
-                            Spacer(Modifier.height(6.dp))
-                            Text(
-                                text = tip,
-                                fontSize = 12.sp,
-                                color = if (profileState.error != null) MaterialTheme.colorScheme.error else TextSecondary
-                            )
-                        }
+                    // 失败/提示信息（后端返回的业务文案）
+                    val tip = profileState.error ?: profileState.message
+                    if (!tip.isNullOrBlank()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = tip,
+                            fontSize = 12.sp,
+                            color = if (profileState.error != null) MaterialTheme.colorScheme.error else TextSecondary
+                        )
                     }
                 }
             }
@@ -266,7 +287,7 @@ fun CommunityProfileScreen(
 @Composable
 private fun StatColumn(value: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-        Text(label, fontSize = 12.sp, color = TextSecondary)
+        Text(value, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+        Text(label, fontSize = 11.sp, color = TextSecondary)
     }
 }

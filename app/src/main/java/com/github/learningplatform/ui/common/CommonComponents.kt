@@ -294,7 +294,8 @@ fun CategoryTabs(
     items: List<Pair<Long?, String>>,
     selectedId: Long?,
     onSelect: (Long?) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    selectedColor: Color = Primary
 ) {
     LazyRow(
         modifier = modifier.fillMaxWidth(),
@@ -305,10 +306,10 @@ fun CategoryTabs(
             val selected = id == selectedId
             Surface(
                 shape = RoundedCornerShape(50),
-                color = if (selected) Primary.copy(alpha = 0.08f) else SurfaceWashStart,
+                color = if (selected) selectedColor.copy(alpha = 0.1f) else Color.White,
                 border = androidx.compose.foundation.BorderStroke(
                     width = if (selected) 1.5.dp else 1.dp,
-                    color = if (selected) Primary else Divider
+                    color = if (selected) selectedColor else Divider
                 ),
                 // 再次点击已选中的分类不取消选择：「全部」是稳定的默认态
                 modifier = Modifier.clickable { onSelect(id) }
@@ -316,7 +317,7 @@ fun CategoryTabs(
                 Text(
                     text = name,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (selected) Primary else TextSecondary,
+                    color = if (selected) selectedColor else TextSecondary,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 1,
                     modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)

@@ -57,7 +57,8 @@ import com.github.learningplatform.ui.theme.TextSecondary
 fun ProfileScreen(
     onOpenNotifications: () -> Unit,
     onOpenCheckin: () -> Unit,
-    onOpenEditProfile: () -> Unit,
+    onOpenFollowing: () -> Unit,
+    onOpenFans: () -> Unit,
     onOpenCommunityProfile: () -> Unit,
     onOpenMyCourses: () -> Unit,
     onOpenStudyStats: () -> Unit,
@@ -79,7 +80,7 @@ fun ProfileScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(pageGradientBrush(strong = true))
+            .background(pageGradientBrush(strong = true, theme = "profile"))
     ) {
         // 顶栏
         Row(
@@ -138,7 +139,8 @@ fun ProfileScreen(
                 signedToday = uiState.signedToday,
                 onOpenCheckin = onOpenCheckin,
                 onOpenCommunityProfile = onOpenCommunityProfile,
-                onOpenEditProfile = onOpenEditProfile
+                onOpenFollowing = onOpenFollowing,
+                onOpenFans = onOpenFans
             )
 
             /*
@@ -171,39 +173,37 @@ fun ProfileScreen(
 
             Spacer(Modifier.height(14.dp))
 
+            // 宫格菜单：方框图标 + 底部文字
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(surfaceWashBrush())
+                    .background(Color.White)
+                    .padding(vertical = 16.dp, horizontal = 8.dp)
             ) {
-                MenuDivider()
-                MenuRow(NavIcons.Check, "任务中心", onOpenCheckin)
-                MenuDivider()
-                MenuRow(NavIcons.Calendar, "学习数据", onOpenStudyStats)
-                MenuDivider()
-                                MenuRow(NavIcons.History, "观看历史", onOpenHistory)
-                MenuDivider()
-                MenuRow(NavIcons.Star, "我的收藏", onOpenFavorites)
-                MenuDivider()
-                MenuRow(NavIcons.Favorite, "我的点赞", onOpenLikes)
-                MenuDivider()
-                MenuDivider()
-                MenuRow(NavIcons.Note, "笔记本", onOpenNotes)
-                MenuDivider()
-            }
-
-            Spacer(Modifier.height(14.dp))
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(surfaceWashBrush())
-            ) {
-                MenuRow(NavIcons.Settings, "设置", onOpenSettings)
-                MenuDivider()
-                MenuRow(NavIcons.Logout, "退出登录", viewModel::logout, tint = MaterialTheme.colorScheme.error)
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    GridMenuItem(NavIcons.Check, "任务中心", onOpenCheckin, tint = Color(0xFF4CAF50), modifier = Modifier.weight(1f))
+                    GridMenuItem(NavIcons.Calendar, "学习数据", onOpenStudyStats, tint = Color(0xFF2196F3), modifier = Modifier.weight(1f))
+                    GridMenuItem(NavIcons.History, "观看历史", onOpenHistory, tint = Color(0xFFFF9800), modifier = Modifier.weight(1f))
+                }
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    GridMenuItem(NavIcons.Star, "我的收藏", onOpenFavorites, tint = Color(0xFFFFC107), modifier = Modifier.weight(1f))
+                    GridMenuItem(NavIcons.Favorite, "我的点赞", onOpenLikes, tint = Color(0xFFE91E63), modifier = Modifier.weight(1f))
+                    GridMenuItem(NavIcons.Note, "笔记本", onOpenNotes, tint = Color(0xFF9C27B0), modifier = Modifier.weight(1f))
+                }
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    GridMenuItem(NavIcons.Settings, "设置", onOpenSettings, tint = Color(0xFF607D8B), modifier = Modifier.weight(1f))
+                    GridMenuItem(NavIcons.Logout, "退出登录", viewModel::logout, tint = Color(0xFFF44336), modifier = Modifier.weight(1f))
+                    Spacer(Modifier.weight(1f))
+                }
             }
         }
     }
@@ -226,38 +226,32 @@ private fun ProfileHeader(
     continueSignDay: Int,
     signedToday: Boolean,
     onOpenCheckin: () -> Unit,
-    onOpenEditProfile: () -> Unit,
-    onOpenCommunityProfile: () -> Unit
+    onOpenCommunityProfile: () -> Unit,
+    onOpenFollowing: () -> Unit,
+    onOpenFans: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White)
             .clickable(onClick = onOpenCommunityProfile)
-            .background(WarmYellowGradient)
-            .padding(16.dp)
+            .padding(12.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 头像 + 粉丝数（真实值来自 /api/v1/user/home 的 fansCount）
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Avatar(url = avatar, name = nickname, size = 64.dp)
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = "$fansCount 粉丝",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextSecondary
-                )
-            }
+            // 头像
+            Avatar(url = avatar, name = nickname, size = 52.dp)
 
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(12.dp))
 
+            // 昵称 + 简介（个人主页不显示编辑入口，编辑资料统一在社区个人主页里操作）
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = nickname.ifBlank { "未登录" },
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary,
                     maxLines = 1,
@@ -267,16 +261,49 @@ private fun ProfileHeader(
                     Spacer(Modifier.height(2.dp))
                     MetaText(bio, modifier = Modifier.fillMaxWidth())
                 }
-                Spacer(Modifier.height(2.dp))
-                // 关注 / 获赞 也都是 /user/home 返回的真实值；性别用后端 sexLabel
-                val stats = buildList {
-                    if (sexLabel.isNotBlank()) add(sexLabel)
-                    add("关注 $followCount")
-                    add("获赞 $likeReceivedCount")
-                }.joinToString(" · ")
-                MetaText(stats, modifier = Modifier.fillMaxWidth())
             }
         }
+
+        Spacer(Modifier.height(12.dp))
+
+        // 统计卡片：关注 / 粉丝 / 获赞（单独放在下面，三个小卡片）
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            StatItem(title = "关注", count = followCount, onClick = onOpenFollowing, modifier = Modifier.weight(1f))
+            StatItem(title = "粉丝", count = fansCount, onClick = onOpenFans, modifier = Modifier.weight(1f))
+            StatItem(title = "获赞", count = likeReceivedCount, onClick = {}, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun StatItem(
+    title: String,
+    count: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFFF5F5F5))
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = count.toString(),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = TextPrimary
+        )
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary
+        )
     }
 }
 
@@ -320,4 +347,36 @@ private fun MenuDivider() {
             .height(1.dp)
             .background(MaterialTheme.colorScheme.outlineVariant)
     )
+}
+
+@Composable
+private fun GridMenuItem(
+    icon: ImageVector,
+    title: String,
+    onClick: () -> Unit,
+    tint: Color = Primary,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(tint.copy(alpha = 0.1f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodySmall,
+            color = TextPrimary
+        )
+    }
 }

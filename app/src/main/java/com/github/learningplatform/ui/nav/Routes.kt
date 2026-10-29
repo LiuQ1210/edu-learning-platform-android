@@ -51,6 +51,8 @@ object Routes {
     const val TODOS = "todos"
     const val SETTINGS = "settings"
     const val CHANGE_PASSWORD = "change_password"
+    const val FOLLOWING = "following"
+    const val FANS = "fans"
 
     // ---- 通知 ----
     const val NOTIFICATIONS = "notifications"
@@ -71,7 +73,7 @@ object Routes {
         COURSE_DETAIL, SEARCH, CATEGORY_ALL,
         ARTICLE_DETAIL, ARTICLE_PUBLISH, ARTICLE_EDIT, MY_ARTICLES, TAG_ARTICLES, BLOG_HOME,
         EDIT_PROFILE, MY_COURSES, MY_FAVORITES, MY_LIKES, MY_DOWNLOADS, WATCH_HISTORY,
-        NOTES, NOTE_DETAIL, TODOS, SETTINGS, CHANGE_PASSWORD
+        NOTES, NOTE_DETAIL, TODOS, SETTINGS, CHANGE_PASSWORD, FOLLOWING, FANS
     )
 
     /**

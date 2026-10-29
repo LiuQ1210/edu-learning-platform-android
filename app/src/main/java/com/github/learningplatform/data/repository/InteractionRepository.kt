@@ -58,7 +58,10 @@ class InteractionRepository @Inject constructor(
             targetId = targetId,
             type = "2" // 2=收藏
         ).okBody().payload()
-        return FavoriteToggleResultDto(isFavorited = data.bool("active"))
+        return FavoriteToggleResultDto(
+            isFavorited = data.bool("active"),
+            favoriteCount = data.int("count")
+        )
     }
 
     /** 查询当前用户在一批目标上是否已点赞/收藏 */

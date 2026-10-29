@@ -88,8 +88,8 @@ fun HomeScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            // 与登录页一致的奶油渐变（只铺顶部一段；列表页整屏渐变会让长时间阅读很累）
-            .background(pageGradientBrush(strong = false))
+            // 首页：藏青淡蓝系渐变
+            .background(pageGradientBrush(strong = false, theme = "home"))
     ) {
         HomeTopBar(onOpenSearch = onOpenSearch, onOpenMenu = onOpenAllCategories, onOpenNotifications = onOpenNotifications)
 
@@ -98,7 +98,8 @@ fun HomeScreen(
                 items = listOf(null to "全部") + uiState.categories,
                 selectedId = uiState.selectedCategoryId,
                 onSelect = viewModel::selectCategory,
-                modifier = Modifier.padding(bottom = 4.dp)
+                modifier = Modifier.padding(bottom = 4.dp),
+                selectedColor = com.github.learningplatform.ui.theme.HomePrimary
             )
         }
 
@@ -133,7 +134,7 @@ private fun HomeTopBar(onOpenSearch: () -> Unit, onOpenMenu: () -> Unit, onOpenN
                 .weight(1f)
                 .height(40.dp)
                 .clip(RoundedCornerShape(50))
-                .background(surfaceWashBrush())
+                .background(Color.White)
                 .clickable(onClick = onOpenSearch)
                 .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -168,7 +169,7 @@ private fun CourseFeed(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(pageGradientBrush(strong = false)),
+            .background(pageGradientBrush(strong = false, theme = "home")),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
         item { Spacer(Modifier.height(8.dp)) }

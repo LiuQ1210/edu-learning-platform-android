@@ -18,6 +18,7 @@ import com.github.learningplatform.data.remote.ResourceApi
 import com.github.learningplatform.data.remote.SearchApi
 import com.github.learningplatform.data.remote.TodoApi
 import com.github.learningplatform.data.remote.UserApi
+import com.github.learningplatform.data.remote.VideoApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -43,6 +44,9 @@ object NetworkModule {
 
     @Provides @Singleton
     fun provideCourseApi(client: RetrofitClient): CourseApi = client.create()
+
+    @Provides @Singleton
+    fun provideVideoApi(client: RetrofitClient): VideoApi = client.create()
 
     @Provides @Singleton
     fun provideArticleApi(client: RetrofitClient): ArticleApi = client.create()

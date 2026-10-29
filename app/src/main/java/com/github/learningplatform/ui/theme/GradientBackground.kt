@@ -37,6 +37,9 @@ fun GradientBackground(
     showGlow: Boolean = true,
     glowCenterY: Float = 0.42f,
     glowRadiusRatio: Float = 1.15f,
+    topColor: Color = GradTop,
+    midColor: Color = GradCream,
+    bottomColor: Color = GradBottom,
     content: @Composable BoxScope.() -> Unit
 ) {
     val dark = LocalAppDarkTheme.current
@@ -52,11 +55,9 @@ fun GradientBackground(
                     )
                 } else {
                     Brush.verticalGradient(
-                        0.00f to GradTop,
-                        0.22f to GradCream,
-                        0.38f to GradPeach,
-                        0.72f to GradBlush,
-                        1.00f to GradBottom
+                        0.00f to topColor,
+                        0.5f to midColor,
+                        1.00f to bottomColor
                     )
                 }
             )
@@ -174,7 +175,7 @@ val SurfaceWashEnd: Color get() = Color(0xFFFEF8F4)
  *               false 用于长列表页，顶部奶白往下很快回到中性底，避免长时间阅读疲劳
  */
 @Composable
-fun pageGradientBrush(strong: Boolean = true): Brush {
+fun pageGradientBrush(strong: Boolean = true, theme: String = "default"): Brush {
     val dark = LocalAppDarkTheme.current
     return if (dark) {
         // 深色：深蓝灰微渐变，顶部稍亮做层次
@@ -182,21 +183,74 @@ fun pageGradientBrush(strong: Boolean = true): Brush {
             0.00f to DarkSurface,
             1.00f to DarkBackground
         )
-    } else if (strong) {
-        Brush.verticalGradient(
-            0.00f to GradTop,
-            0.12f to GradCream,
-            0.34f to GradPeach,
-            0.72f to GradBlush,
-            1.00f to GradBottom
-        )
-    } else {
-        Brush.verticalGradient(
-            0.00f to GradPeach,
-            0.10f to GradCream,
-            0.28f to Background,
-            1.00f to Background
-        )
+    } else when (theme) {
+        "home" -> {
+            // 首页：藏青淡蓝系渐变
+            if (strong) {
+                Brush.verticalGradient(
+                    0.00f to Color(0xFFF0F4FF),
+                    0.4f to Color(0xFFDCE6FF),
+                    1.00f to Color(0xFFF7F9FC)
+                )
+            } else {
+                Brush.verticalGradient(
+                    0.00f to Color(0xFFDCE6FF),
+                    0.2f to Color(0xFFF0F4FF),
+                    1.00f to Background
+                )
+            }
+        }
+        "community" -> {
+            // 社区：砖红淡粉系渐变
+            if (strong) {
+                Brush.verticalGradient(
+                    0.00f to Color(0xFFFDF0ED),
+                    0.4f to Color(0xFFF8D8D2),
+                    1.00f to Color(0xFFF7F9FC)
+                )
+            } else {
+                Brush.verticalGradient(
+                    0.00f to Color(0xFFF8D8D2),
+                    0.2f to Color(0xFFFDF0ED),
+                    1.00f to Background
+                )
+            }
+        }
+        "profile" -> {
+            // 个人主页：赭金淡黄系渐变
+            if (strong) {
+                Brush.verticalGradient(
+                    0.00f to Color(0xFFFEF6E0),
+                    0.4f to Color(0xFFF9E7B8),
+                    1.00f to Color(0xFFF7F9FC)
+                )
+            } else {
+                Brush.verticalGradient(
+                    0.00f to Color(0xFFF9E7B8),
+                    0.2f to Color(0xFFFEF6E0),
+                    1.00f to Background
+                )
+            }
+        }
+        else -> {
+            // 默认：奶油系
+            if (strong) {
+                Brush.verticalGradient(
+                    0.00f to GradTop,
+                    0.12f to GradCream,
+                    0.34f to GradPeach,
+                    0.72f to GradBlush,
+                    1.00f to GradBottom
+                )
+            } else {
+                Brush.verticalGradient(
+                    0.00f to GradPeach,
+                    0.10f to GradCream,
+                    0.28f to Background,
+                    1.00f to Background
+                )
+            }
+        }
     }
 }
 

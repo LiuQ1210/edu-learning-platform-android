@@ -94,5 +94,6 @@ object Constants {
     // ---- 多态目标类型（统一互动模块）----
     const val TARGET_ARTICLE = 1
     const val TARGET_COURSE = 2
+    const val TARGET_SHORT_VIDEO = 3
     const val TARGET_COMMENT = 3
 }

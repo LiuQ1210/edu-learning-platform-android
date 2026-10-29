@@ -30,11 +30,6 @@ data class VideoUiState(
     val videos: List<CourseDto> = emptyList(),
     /** courseId -> 限时签名播放地址（接口 6.3） */
     val playUrls: Map<Long, String> = emptyMap(),
-    val likedIds: Set<Long> = emptySet(),
-    val favoritedIds: Set<Long> = emptySet(),
-    /** 本地点赞偏移：toggle 后 +1/-1，实时更新数字 */
-    val likeDelta: Map<Long, Int> = emptyMap(),
-    val favDelta: Map<Long, Int> = emptyMap(),
     val shareDelta: Map<Long, Int> = emptyMap(),
     val pageNum: Int = 1,
     val hasMore: Boolean = false,
@@ -48,6 +43,19 @@ data class VideoUiState(
 )
 
 /**
+ * 单个视频的点赞/收藏状态与计数。
+ *
+ * 单独放到独立 StateFlow：点赞/收藏只更新这一张小表，操作栏子组件按 courseId 订阅，
+ * 不再改写主 [VideoUiState]，避免触发根组件与 Pager 内多页 VideoPage（含播放器）重组卡顿。
+ */
+data class InteractionMeta(
+    val isLiked: Boolean = false,
+    val isFavorited: Boolean = false,
+    val likeCount: Int = 0,
+    val favoriteCount: Int = 0
+)
+
+/**
  * 短视频流。
  *
  * 播放凭证按需拉取：滑到某一页才请求 6.3，避免一次请求 20 条签名 URL
@@ -56,11 +64,16 @@ data class VideoUiState(
 @HiltViewModel
 class VideoViewModel @Inject constructor(
     private val courseRepository: CourseRepository,
-    private val interactionRepository: InteractionRepository
+    private val interactionRepository: InteractionRepository,
+    private val videoApi: com.github.learningplatform.data.remote.VideoApi
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(VideoUiState())
     val uiState: StateFlow<VideoUiState> = _uiState.asStateFlow()
+
+    /** courseId -> 点赞/收藏状态与计数；独立于 [uiState]，点赞收藏不刷新主列表状态 */
+    private val _interaction = MutableStateFlow<Map<Long, InteractionMeta>>(emptyMap())
+    val interaction: StateFlow<Map<Long, InteractionMeta>> = _interaction.asStateFlow()
 
     private var currentPage = -1
 
@@ -119,23 +132,50 @@ class VideoViewModel @Inject constructor(
                 error = if (reset) null else snapshot.error
             )
             try {
-                val page = courseRepository.getCourses(
-                    pageNum = nextPage,
-                    pageSize = 10,
-                    videoType = VIDEO_TYPE_SHORT,
-                    sort = 2
-                )
-                val accumulated = if (reset) page.list else snapshot.videos + page.list
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    isLoadingMore = false,
-                    error = null,
-                    videos = accumulated,
-                    pageNum = nextPage,
-                    hasMore = accumulated.size < page.total
-                )
-                // 首页就把第一页的凭证取回来，进页面即可播放
-                accumulated.take(2).forEach { ensurePlayUrl(it.courseId) }
+                // 调用短视频接口
+                val resp = videoApi.getVideoList(pageNum = nextPage, pageSize = 10)
+                if (resp.isSuccessful && resp.body() != null) {
+                    val page = resp.body()!!
+                    // 把 ShortVideoDto 映射成 CourseDto，复用现有 UI
+                    val videoList = page.rows.map { shortVideo ->
+                        CourseDto(
+                            courseId = shortVideo.videoId,
+                            courseName = shortVideo.videoTitle,
+                            title = shortVideo.videoTitle,
+                            coverUrl = com.github.learningplatform.core.network.ImageUrl.resolve(shortVideo.coverUrl),
+                            intro = shortVideo.intro,
+                            likeCount = shortVideo.likeCount,
+                            favoriteCount = shortVideo.favoriteCount,
+                            commentCount = shortVideo.commentCount,
+                            viewCount = shortVideo.viewCount,
+                            duration = shortVideo.duration
+                        )
+                    }
+                    // 短视频的 videoUrl 直接就是播放地址，拼接完整 URL 后存到 playUrls
+                    val newPlayUrls = page.rows.associate {
+                        it.videoId to com.github.learningplatform.core.network.ImageUrl.resolve(it.videoUrl)
+                    }
+                    val accumulated = if (reset) videoList else snapshot.videos + videoList
+                    // 基准点赞/收藏计数进独立互动表：首屏重置，翻页合并；是否已赞/藏由后续 toggle 结果回写
+                    val newMeta = videoList.associate {
+                        it.courseId to InteractionMeta(
+                            likeCount = it.likeCount,
+                            favoriteCount = it.favoriteCount
+                        )
+                    }
+                    _interaction.value = if (reset) newMeta else _interaction.value + newMeta
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        isLoadingMore = false,
+                        error = null,
+                        videos = accumulated,
+                        playUrls = _uiState.value.playUrls + newPlayUrls,
+                        pageNum = nextPage,
+                        hasMore = accumulated.size < page.total
+                    )
+                } else {
+                    throw Exception("接口返回失败")
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -148,39 +188,71 @@ class VideoViewModel @Inject constructor(
         }
     }
 
+    // 同一目标点赞/收藏请求进行中集合：请求未返回前忽略重复点击。
+    // 否则多个协程会基于同一份旧快照并发叠加，网络返回顺序交错后，
+    // 图标亮灭与计数会互相打架、数字漂移。
+    private val likePending = mutableSetOf<Long>()
+    private val favPending = mutableSetOf<Long>()
+
     fun toggleLike(courseId: Long) {
-        val currentlyLiked = _uiState.value.likedIds.contains(courseId)
-        val nowLiked = !currentlyLiked
+        // 已有一次点赞请求在飞，直接忽略本次连点，不重复发请求
+        if (!likePending.add(courseId)) return
+        // 点击前快照，失败时据此回滚
+        val before = _interaction.value[courseId] ?: InteractionMeta()
+        // 乐观更新：先在本地翻转图标与计数，UI 毫秒级响应，不再干等后端往返；
+        // 后端链路慢（远程库串行多条 SQL），等回包才亮按钮会明显卡顿。
+        val optimisticActive = !before.isLiked
+        val optimisticCount = (before.likeCount + if (optimisticActive) 1 else -1).coerceAtLeast(0)
+        _interaction.value = _interaction.value + (courseId to before.copy(
+            isLiked = optimisticActive,
+            likeCount = optimisticCount
+        ))
         viewModelScope.launch {
             try {
-                interactionRepository.toggleLike(Constants.TARGET_COURSE, courseId)
+                val result = interactionRepository.toggleLike(Constants.TARGET_SHORT_VIDEO, courseId)
+                // 回包后以后端权威状态与计数覆盖，纠正乐观估算可能的偏差
+                val current = _interaction.value[courseId] ?: InteractionMeta()
+                _interaction.value = _interaction.value + (courseId to current.copy(
+                    isLiked = result.isLiked,
+                    likeCount = result.likeCount
+                ))
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Throwable) {
-                // preview/离线时忽略接口异常，本地状态照常切换
+                // 请求失败：回滚到点击前状态，图标与计数都不保留乐观结果
+                _interaction.value = _interaction.value + (courseId to before)
+            } finally {
+                likePending.remove(courseId)
             }
-            val curLikes = _uiState.value.likeDelta.getOrDefault(courseId, 0)
-            _uiState.value = _uiState.value.copy(
-                likedIds = if (nowLiked) _uiState.value.likedIds + courseId
-                else _uiState.value.likedIds - courseId,
-                likeDelta = _uiState.value.likeDelta + (courseId to (if (nowLiked) curLikes + 1 else curLikes - 1))
-            )
         }
     }
 
     fun toggleFavorite(courseId: Long) {
-        val currentlyFaved = _uiState.value.favoritedIds.contains(courseId)
-        val nowFaved = !currentlyFaved
+        // 已有一次收藏请求在飞，直接忽略本次连点，不重复发请求
+        if (!favPending.add(courseId)) return
+        val before = _interaction.value[courseId] ?: InteractionMeta()
+        val optimisticActive = !before.isFavorited
+        val optimisticCount = (before.favoriteCount + if (optimisticActive) 1 else -1).coerceAtLeast(0)
+        _interaction.value = _interaction.value + (courseId to before.copy(
+            isFavorited = optimisticActive,
+            favoriteCount = optimisticCount
+        ))
         viewModelScope.launch {
             try {
-                interactionRepository.toggleFavorite(Constants.TARGET_COURSE, courseId)
+                val result = interactionRepository.toggleFavorite(Constants.TARGET_SHORT_VIDEO, courseId)
+                val current = _interaction.value[courseId] ?: InteractionMeta()
+                _interaction.value = _interaction.value + (courseId to current.copy(
+                    isFavorited = result.isFavorited,
+                    favoriteCount = result.favoriteCount
+                ))
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Throwable) {
-                // preview/离线时忽略接口异常，本地状态照常切换
+                // 请求失败：回滚到点击前状态
+                _interaction.value = _interaction.value + (courseId to before)
+            } finally {
+                favPending.remove(courseId)
             }
-            val curFav = _uiState.value.favDelta.getOrDefault(courseId, 0)
-            _uiState.value = _uiState.value.copy(
-                favoritedIds = if (nowFaved) _uiState.value.favoritedIds + courseId
-                else _uiState.value.favoritedIds - courseId,
-                favDelta = _uiState.value.favDelta + (courseId to (if (nowFaved) curFav + 1 else curFav - 1))
-            )
         }
     }
 
@@ -194,7 +266,7 @@ class VideoViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 interactionRepository.recordShare(
-                    Constants.TARGET_COURSE,
+                    Constants.TARGET_SHORT_VIDEO,
                     course.courseId,
                     SHARE_PLATFORM_COPY_LINK
                 )
@@ -241,7 +313,7 @@ class VideoViewModel @Inject constructor(
             try {
                 interactionRepository.createComment(
                     CreateCommentRequest(
-                        targetType = Constants.TARGET_COURSE,
+                        targetType = Constants.TARGET_SHORT_VIDEO,
                         targetId = target,
                         rootId = 0,
                         // parentId > 0 才是「回复某条评论」，后端会把这条挂到该评论的 children 下
@@ -288,7 +360,7 @@ class VideoViewModel @Inject constructor(
             )
             try {
                 val page = interactionRepository.getComments(
-                    targetType = Constants.TARGET_COURSE,
+                    targetType = Constants.TARGET_SHORT_VIDEO,
                     targetId = courseId,
                     cursor = if (reset) null else _uiState.value.commentsCursor
                 )

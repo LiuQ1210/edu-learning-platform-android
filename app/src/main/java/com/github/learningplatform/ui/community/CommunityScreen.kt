@@ -76,7 +76,7 @@ fun CommunityScreen(
 
     Box(modifier = Modifier
         .fillMaxSize()
-        .background(pageGradientBrush(strong = false))
+        .background(pageGradientBrush(strong = false, theme = "community"))
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             CommunityTopBar(onOpenPublish = onOpenPublish, onOpenSearch = onOpenSearch)
@@ -84,7 +84,8 @@ fun CommunityScreen(
             CategoryTabs(
                 items = listOf(null to "全部") + uiState.categories,
                 selectedId = uiState.selectedCategoryId,
-                onSelect = viewModel::selectCategory
+                onSelect = viewModel::selectCategory,
+                selectedColor = com.github.learningplatform.ui.theme.CommunityPrimary
             )
 
             Spacer(Modifier.height(8.dp))
@@ -99,7 +100,7 @@ fun CommunityScreen(
                 else -> LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(pageGradientBrush(strong = false)),
+                        .background(pageGradientBrush(strong = false, theme = "community")),
                     contentPadding = PaddingValues(bottom = 88.dp)
                 ) {
                     // 【广告位预留】社区列表广告位：固定预留区域，接入 Taku 时替换内部
@@ -115,13 +116,6 @@ fun CommunityScreen(
                         ArticleCard(
                             article = article,
                             onClick = { onOpenArticle(article.articleId) },
-                        )
-                        Box(
-                            modifier = Modifier
-                                .padding(start = 16.dp)
-                                .fillMaxWidth()
-                                .height(1.dp)
-                                .background(Divider)
                         )
                     }
 
@@ -180,7 +174,7 @@ private fun CommunityTopBar(onOpenPublish: () -> Unit, onOpenSearch: () -> Unit)
                 .weight(1f)
                 .height(36.dp)
                 .clip(RoundedCornerShape(50))
-                .background(surfaceWashBrush())
+                .background(Color.White)
                 .clickable(onClick = onOpenSearch)
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -251,8 +245,11 @@ private fun ArticleCard(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 0.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.White)
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .padding(12.dp)
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(

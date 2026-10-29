@@ -50,6 +50,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -120,21 +122,22 @@ fun VideoScreen(
                     modifier = Modifier.fillMaxSize()
                 ) { page ->
                     val course = uiState.videos[page]
+                    // 回调按 courseId 固定引用：避免每次主 state 刷新生成新 lambda、
+                    // 导致相邻预加载页 VideoPage 因参数不等被迫重组。
+                    val onToggleLike = remember(course.courseId) { { viewModel.toggleLike(course.courseId) } }
+                    val onToggleFavorite = remember(course.courseId) { { viewModel.toggleFavorite(course.courseId) } }
+                    val onOpenComments = remember(course.courseId) { { viewModel.openComments(course.courseId) } }
+                    val onOpenDetail = remember(course.courseId) { { onOpenCourse(course.courseId) } }
                     VideoPage(
                         course = course,
                         isActive = page == pagerState.currentPage,
                         playUrl = uiState.playUrls[course.courseId].orEmpty(),
-                        isLiked = uiState.likedIds.contains(course.courseId),
-                        isFavorited = uiState.favoritedIds.contains(course.courseId),
-                        likeCount = course.likeCount + uiState.likeDelta.getOrDefault(course.courseId, 0),
                         commentCount = course.commentCount,
-                        favoriteCount = course.favoriteCount + uiState.favDelta.getOrDefault(course.courseId, 0),
-                        shareCount = course.shareCount + uiState.shareDelta.getOrDefault(course.courseId, 0),
-                        onToggleLike = { viewModel.toggleLike(course.courseId) },
-                        onToggleFavorite = { viewModel.toggleFavorite(course.courseId) },
-                        onOpenComments = { viewModel.openComments(course.courseId) },
-                        onShare = { viewModel.share(course) },
-                        onOpenDetail = { onOpenCourse(course.courseId) }
+                        viewModel = viewModel,
+                        onToggleLike = onToggleLike,
+                        onToggleFavorite = onToggleFavorite,
+                        onOpenComments = onOpenComments,
+                        onOpenDetail = onOpenDetail
                     )
                 }
             }
@@ -164,16 +167,11 @@ private fun VideoPage(
     course: CourseDto,
     isActive: Boolean,
     playUrl: String,
-    isLiked: Boolean,
-    isFavorited: Boolean,
-    likeCount: Int,
     commentCount: Int,
-    favoriteCount: Int,
-    shareCount: Int,
+    viewModel: VideoViewModel,
     onToggleLike: () -> Unit,
     onToggleFavorite: () -> Unit,
     onOpenComments: () -> Unit,
-    onShare: () -> Unit,
     onOpenDetail: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
@@ -181,12 +179,44 @@ private fun VideoPage(
         if (isActive && playUrl.isNotBlank()) {
             ShortVideoPlayer(playUrl = playUrl, modifier = Modifier.fillMaxSize())
         } else {
-            NetImage(
-                url = course.coverUrl,
-                modifier = Modifier.fillMaxSize(),
-                radius = 0.dp
-            )
-            if (isActive) {
+            if (course.coverUrl.isNotBlank()) {
+                NetImage(
+                    url = course.coverUrl,
+                    modifier = Modifier.fillMaxSize(),
+                    radius = 0.dp
+                )
+            } else {
+                // 后端未传封面（coverUrl 为空）时的兜底占位：深色背景 + 居中播放图标，
+                // 避免非当前页只剩一块空白灰底；标题/时长仍由底部信息层叠加在上方。
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.radialGradient(
+                                listOf(Color(0xFF2B2B33), Color.Black)
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.18f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            NavIcons.Play,
+                            contentDescription = "封面占位",
+                            tint = Color.White,
+                            modifier = Modifier.size(34.dp)
+                        )
+                    }
+                }
+            }
+            // 当前页还在等待播放地址下发（playUrl 为空）时显示转圈；
+            // 进入播放器后的首帧缓冲由 ShortVideoPlayer 内部监听 STATE_BUFFERING 处理。
+            if (isActive && playUrl.isBlank()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Color.White)
                 }
@@ -208,39 +238,22 @@ private fun VideoPage(
                 )
         )
 
-        // 右侧操作栏
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 12.dp, bottom = 80.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(18.dp)
-        ) {
-            VideoAction(
-                icon = NavIcons.Favorite,
-                label = formatCount(likeCount),
-                tint = if (isLiked) Color(0xFFFF4D6A) else Color.White,
-                onClick = onToggleLike
-            )
-            VideoAction(
-                icon = NavIcons.Comment,
-                label = formatCount(commentCount),
-                onClick = onOpenComments
-            )
-            VideoAction(
-                icon = NavIcons.Bookmark,
-                label = formatCount(favoriteCount),
-                tint = if (isFavorited) Color(0xFFFFC107) else Color.White,
-                onClick = onToggleFavorite
-            )
-            // 分享按钮已移除
-        }
+        // 右侧操作栏：点赞/收藏状态由 VideoActionBar 内部按 courseId 订阅独立互动流，
+        // 点赞收藏只刷新这一栏，不牵动播放器与其他页面重组。
+        VideoActionBar(
+            courseId = course.courseId,
+            viewModel = viewModel,
+            commentCount = commentCount,
+            onOpenComments = onOpenComments,
+            onToggleLike = onToggleLike,
+            onToggleFavorite = onToggleFavorite
+        )
 
         // 左下信息
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 16.dp, end = 80.dp, bottom = 80.dp)
+                .padding(start = 16.dp, end = 80.dp, bottom = 46.dp)
         ) {
             Text(
                 text = course.title,
@@ -264,6 +277,55 @@ private fun VideoPage(
                     color = Color.White.copy(alpha = 0.8f)
                 )
             }
+        }
+    }
+}
+
+/**
+ * 右侧点赞/评论/收藏操作栏。
+ *
+ * 只订阅本 courseId 对应的互动状态：点赞/收藏回包只更新这一条 meta，
+ * 本栏单独重组；父级 VideoPage、播放器、相邻页面都不参与刷新。
+ */
+@Composable
+private fun VideoActionBar(
+    courseId: Long,
+    viewModel: VideoViewModel,
+    commentCount: Int,
+    onToggleLike: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onOpenComments: () -> Unit
+) {
+    val meta by remember(courseId) {
+        viewModel.interaction.map { it[courseId] }.distinctUntilChanged()
+    }.collectAsStateWithLifecycle(initialValue = null)
+    val current = meta ?: InteractionMeta()
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 12.dp, bottom = 46.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            VideoAction(
+                icon = NavIcons.Favorite,
+                label = formatCount(current.likeCount),
+                tint = if (current.isLiked) Color(0xFFFF4D6A) else Color.White,
+                onClick = onToggleLike
+            )
+            VideoAction(
+                icon = NavIcons.Comment,
+                label = formatCount(commentCount),
+                onClick = onOpenComments
+            )
+            VideoAction(
+                icon = NavIcons.Bookmark,
+                label = formatCount(current.favoriteCount),
+                tint = if (current.isFavorited) Color(0xFFFFC107) else Color.White,
+                onClick = onToggleFavorite
+            )
         }
     }
 }
@@ -317,11 +379,24 @@ private fun ShortVideoPlayer(playUrl: String, modifier: Modifier = Modifier) {
             prepare()
         }
     }
-    DisposableEffect(player) { onDispose { player.release() } }
-
     var isPlaying by remember { mutableStateOf(false) }
+    // 首帧缓冲中：prepare 到 STATE_READY 之间保持 true，中央显示转圈，避免黑屏像卡死
+    var isBuffering by remember { mutableStateOf(true) }
     var pos by remember { mutableStateOf(0L) }
     var dur by remember { mutableStateOf(0L) }
+
+    DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onPlaybackStateChanged(state: Int) {
+                isBuffering = state == Player.STATE_BUFFERING || state == Player.STATE_IDLE
+            }
+        }
+        player.addListener(listener)
+        onDispose {
+            player.removeListener(listener)
+            player.release()
+        }
+    }
 
     LaunchedEffect(player) {
         while (true) {
@@ -338,7 +413,7 @@ private fun ShortVideoPlayer(playUrl: String, modifier: Modifier = Modifier) {
                 PlayerView(it).apply {
                     useController = false
                     this.player = player
-                    setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    setShutterBackgroundColor(android.graphics.Color.BLACK)
                 }
             },
             modifier = Modifier.fillMaxSize()
@@ -351,8 +426,15 @@ private fun ShortVideoPlayer(playUrl: String, modifier: Modifier = Modifier) {
                 .clickable { if (player.isPlaying) player.pause() else player.play() }
         )
 
-        // 暂停时中央显示播放按钮
-        if (!isPlaying) {
+        // 首帧缓冲中：中央转圈，优先于暂停按钮，避免远程视频缓冲期间黑屏无反馈
+        if (isBuffering) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Color.White)
+            }
+        }
+
+        // 暂停时中央显示播放按钮（缓冲中不叠加，避免两个控件重叠）
+        if (!isPlaying && !isBuffering) {
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
@@ -372,7 +454,7 @@ private fun ShortVideoPlayer(playUrl: String, modifier: Modifier = Modifier) {
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(bottom = 90.dp, start = 12.dp, end = 12.dp)
+                .padding(bottom = 16.dp, start = 12.dp, end = 12.dp)
         ) {
             Text(fmt(pos), style = MaterialTheme.typography.labelSmall, color = Color.White)
             Slider(
