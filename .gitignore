@@ -19,3 +19,11 @@ app/build/
 
 # Mac系统垃圾
 .DS_Store
+
+# 本机联调脚本（含本机 adb 路径/后端地址，因人而异，不入库）
+/run-local.ps1
+/run-local.cmd
+
+# 临时调试产物（截图、模拟器日志等）
+/.tmp/
+*.log

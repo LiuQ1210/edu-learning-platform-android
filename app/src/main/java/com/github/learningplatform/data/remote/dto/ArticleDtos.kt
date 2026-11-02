@@ -19,13 +19,26 @@ data class ArticleDto(
     val likeCount: Int = 0,
     val commentCount: Int = 0,
     val publishTime: String = "",
+    /** 是否精华（后端 `isFeatured`：1/0，「精华」tab 就是 featured=true 过滤出来的） */
+    val isFeatured: Boolean = false,
     /**
-     * 文章状态：0草稿 1待审核 2已发布 3已驳回 4已下架。
-     * 文档 7.1 未列出该字段，但 7.6「我的发布」按 status 筛选，列表项必然回传，
-     * 这里补上并给默认值 2（已发布），避免解析失败。
+     * 文章状态，取值见 [PostStatus]：
+     * 0 已发布 / 1 草稿 / 2 已下架 / 3 待审核。
+     *
+     * 注意：这里以前按「0草稿 1待审核 2已发布 3已驳回 4已下架」写过，与后端定义完全错位，
+     * 已按 `Post.java` 的 STATUS_* 常量修正。默认值取 0（已发布），因为 `/post/list`
+     * 只会返回已发布文章；`/post/myList` 会带真实状态。
      */
-    val status: Int = 2
+    val status: Int = PostStatus.PUBLISHED
 )
+
+/** 后端 Post.java 的文章状态常量 */
+object PostStatus {
+    const val PUBLISHED = 0
+    const val DRAFT = 1
+    const val OFFLINE = 2
+    const val PENDING = 3
+}
 
 /** 7.2 文章详情 */
 @Serializable
@@ -74,6 +87,22 @@ data class CreateArticleRequest(
 
 @Serializable
 data class CreateArticleResponse(val articleId: Long, val status: Int)
+
+/**
+ * 发布文章的请求体（后端 `POST /api/v1/post/add`，JSON）。
+ *
+ * 后端只接收三个字段：作者、状态、各类计数一律由服务端赋值；
+ * 普通用户提交后状态固定为「待审核」，所以这里没有 publish/status 参数。
+ */
+@Serializable
+data class PublishArticleRequest(
+    /** 后端字段名是 postTitle */
+    val postTitle: String,
+    /** 后端用 Convert.toLong 解析，传字符串可避免类型不匹配 */
+    val categoryId: String,
+    /** 正文（后端按 Markdown/HTML 原样存，长度上限 65535） */
+    val content: String
+)
 
 /** 7.4 编辑文章 */
 @Serializable

@@ -3,7 +3,7 @@ package com.github.learningplatform.ui.article
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.learningplatform.data.remote.dto.CreateArticleRequest
-import com.github.learningplatform.data.remote.dto.UpdateArticleRequest
+import com.github.learningplatform.data.remote.dto.PostStatus
 import com.github.learningplatform.data.remote.dto.UploadScene
 import com.github.learningplatform.data.repository.ArticleRepository
 import com.github.learningplatform.data.repository.CategoryRepository
@@ -198,40 +198,42 @@ class ArticleEditViewModel @Inject constructor(
             return
         }
 
+        // 后端目前只有发布接口（POST /post/add），没有 post/edit，也没有草稿接口：
+        //  - 编辑已有文章 → 直接提示，避免走假成功
+        //  - 存草稿      → 后端不支持，提示用户直接发布
+        if (articleId > 0L) {
+            _uiState.value = state.copy(message = "后端暂不支持编辑文章")
+            return
+        }
+        if (publish == 0) {
+            _uiState.value = state.copy(message = "后端暂不支持保存草稿，请直接发布")
+            return
+        }
+
         viewModelScope.launch {
             _uiState.value = state.copy(submitting = true)
             try {
                 val html = plainToHtml(state.content)
-                if (articleId > 0L) {
-                    articleRepository.updateArticle(
-                        articleId,
-                        UpdateArticleRequest(
-                            title = state.title,
-                            summary = state.summary.ifBlank { null },
-                            content = html,
-                            coverUrl = state.coverUrl.ifBlank { null },
-                            categoryId = state.categoryId,
-                            tagIds = state.selectedTagIds.toList(),
-                            publish = publish
-                        )
+                val result = articleRepository.createArticle(
+                    CreateArticleRequest(
+                        title = state.title,
+                        summary = state.summary.ifBlank { null },
+                        content = html,
+                        coverUrl = state.coverUrl.ifBlank { null },
+                        categoryId = state.categoryId ?: 0L,
+                        tagIds = state.selectedTagIds.toList(),
+                        publish = publish
                     )
-                } else {
-                    articleRepository.createArticle(
-                        CreateArticleRequest(
-                            title = state.title,
-                            summary = state.summary.ifBlank { null },
-                            content = html,
-                            coverUrl = state.coverUrl.ifBlank { null },
-                            categoryId = state.categoryId ?: 0L,
-                            tagIds = state.selectedTagIds.toList(),
-                            publish = publish
-                        )
-                    )
-                }
+                )
                 _uiState.value = _uiState.value.copy(
                     submitting = false,
                     finished = true,
-                    message = if (publish == 1) "已提交发布" else "草稿已保存"
+                    // 后端普通用户发帖统一进「待审核」，需管理员审核通过后才公开
+                    message = if (result.status == PostStatus.PENDING) {
+                        "提交成功，等待审核"
+                    } else {
+                        "已提交发布"
+                    }
                 )
             } catch (e: CancellationException) {
                 throw e

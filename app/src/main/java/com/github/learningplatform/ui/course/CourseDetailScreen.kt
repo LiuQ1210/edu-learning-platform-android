@@ -1,4 +1,4 @@
-﻿package com.github.learningplatform.ui.course
+package com.github.learningplatform.ui.course
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -182,7 +182,9 @@ fun CourseDetailScreen(
                     item {
                         CourseHeader(
                             detail = uiState.detail!!,
+                            isLiked = uiState.isLiked,
                             isFavorited = uiState.isFavorited,
+                            onToggleLike = viewModel::toggleLike,
                             onToggleFavorite = viewModel::toggleFavorite
                         )
                     }
@@ -199,8 +201,8 @@ fun CourseDetailScreen(
                         )
                     }
 
-                    // 最近点赞：从通知点进来时能看到是谁赞了
-                    item { RecentLikers(likeCount = detail.studentCount) }
+                    // 最近点赞：用真实 likeCount（原来误用了后端并不返回的 studentCount）
+                    item { RecentLikers(likeCount = detail.likeCount) }
 
                     item { CourseTabs(selected = uiState.tab, onSelect = viewModel::selectTab) }
 
@@ -220,7 +222,9 @@ fun CourseDetailScreen(
 @Composable
 private fun CourseHeader(
     detail: com.github.learningplatform.data.remote.dto.CourseDetailDto,
+    isLiked: Boolean,
     isFavorited: Boolean,
+    onToggleLike: () -> Unit = {},
     onToggleFavorite: () -> Unit = {}
 ) {
     var favLocal by remember { mutableStateOf(isFavorited) }
@@ -238,21 +242,16 @@ private fun CourseHeader(
             color = TextPrimary
         )
         Spacer(Modifier.height(8.dp))
-        // 点赞 / 收藏 行
-        var liked by remember { mutableStateOf(false) }
-        var likeCnt by remember { mutableStateOf(236) }
+        // 点赞 / 收藏 行：点赞数来自后端 likeCount，点击调 interaction/toggle
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     NavIcons.Favorite, contentDescription = "点赞",
-                    tint = if (liked) Color(0xFFFF4D6A) else TextSecondary,
-                    modifier = Modifier.size(18.dp).clickable {
-                        liked = !liked
-                        likeCnt = if (liked) likeCnt + 1 else likeCnt - 1
-                    }
+                    tint = if (isLiked) Color(0xFFFF4D6A) else TextSecondary,
+                    modifier = Modifier.size(18.dp).clickable { onToggleLike() }
                 )
                 Spacer(Modifier.width(4.dp))
-                Text(formatCount(likeCnt), style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                Text(formatCount(detail.likeCount), style = MaterialTheme.typography.bodySmall, color = TextSecondary)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
@@ -289,7 +288,8 @@ private fun CourseHeader(
                 "%.1f 分 · %d 人评价 · %s 人观看过",
                 detail.averageScore,
                 detail.ratingCount,
-                formatCount(detail.studentCount)
+                // viewCount 来自后端 learning_course.view_count（真实阅读数）
+                formatCount(detail.viewCount)
             )
         )
     }

@@ -2,8 +2,10 @@ package com.github.learningplatform.ui.course
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.learningplatform.data.remote.dto.BannerDto
 import com.github.learningplatform.data.remote.dto.CourseDto
 import com.github.learningplatform.data.repository.AppRepository
+import com.github.learningplatform.data.repository.BannerRepository
 import com.github.learningplatform.data.repository.CategoryRepository
 import com.github.learningplatform.data.repository.CourseRepository
 import com.github.learningplatform.ui.isStaleRequest
@@ -38,6 +40,10 @@ data class HomeUiState(
     val selectedCategoryId: Long? = null,
     val hotCourses: List<CourseDto> = emptyList(),
     val rankCourses: List<CourseDto> = emptyList(),
+    /** 首页轮播图（/api/v1/banner/list，按分类窗口）。为空时轮播回落到课程前 5 条 */
+    val banners: List<BannerDto> = emptyList(),
+    /** 轮播图是否已请求过（区分「还没加载」和「后端确实没有配置」） */
+    val bannersLoaded: Boolean = false,
     val adSlots: List<Pair<String, String>> = emptyList(),
     val pageNum: Int = 1,
     val hasMore: Boolean = false,
@@ -67,7 +73,8 @@ data class HomeUiState(
 class HomeViewModel @Inject constructor(
     private val categoryRepository: CategoryRepository,
     private val courseRepository: CourseRepository,
-    private val appRepository: AppRepository
+    private val appRepository: AppRepository,
+    private val bannerRepository: BannerRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -75,6 +82,7 @@ class HomeViewModel @Inject constructor(
 
     init {
         loadCategories()
+        loadBanners()
         loadCourses(reset = true)
         // 广告位延后到首帧之后再取。
         //
@@ -96,12 +104,15 @@ class HomeViewModel @Inject constructor(
      */
     fun refresh() {
         loadCategories()
+        loadBanners()
         loadCourses(reset = true, forceRefresh = true)
     }
 
     fun selectCategory(categoryId: Long?) {
         if (categoryId == _uiState.value.selectedCategoryId) return
         _uiState.value = _uiState.value.copy(selectedCategoryId = categoryId)
+        // 轮播按分类窗口配置（categoryId=0 为全部），切分类时重新拉
+        loadBanners(categoryId)
         loadCourses(reset = true)
     }
 
@@ -126,8 +137,25 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private fun loadAdSlots() {
+    /**
+     * 轮播图（/api/v1/banner/list）。
+     *
+     * 失败不阻塞首页：`banners` 为空时首页轮播会回落到「课程前 5 条」的旧展示。
+     */
+    private fun loadBanners(categoryId: Long? = null) {
         viewModelScope.launch {
+            try {
+                val banners = bannerRepository.getBanners(categoryId)
+                _uiState.value = _uiState.value.copy(banners = banners, bannersLoaded = true)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                // 静默降级；bannersLoaded 保持原值，避免把「请求失败」当成「后台没配轮播」
+            }
+        }
+    }
+
+    private fun loadAdSlots() {        viewModelScope.launch {
             try {
                 val slots = appRepository.getAdSlots("startup")
                 _uiState.value = _uiState.value.copy(

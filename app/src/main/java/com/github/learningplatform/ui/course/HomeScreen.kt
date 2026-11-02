@@ -47,6 +47,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.github.learningplatform.data.remote.dto.BannerDto
 import com.github.learningplatform.data.remote.dto.CourseDto
 import com.github.learningplatform.ui.common.CategoryTabs
 import com.github.learningplatform.ui.common.AdSlotPlaceholder
@@ -173,11 +174,21 @@ private fun CourseFeed(
     ) {
         item { Spacer(Modifier.height(8.dp)) }
         item {
-            FeaturedCourseCarousel(
-                courses = uiState.featuredCourses,
-                onOpenCourse = onOpenCourse,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-            )
+            // 优先用后端配置的轮播图（/api/v1/banner/list）；
+            // 后台没配或请求失败时回落到「课程前 5 条」的旧展示，避免首页顶部空掉。
+            if (uiState.banners.isNotEmpty()) {
+                BannerCarousel(
+                    banners = uiState.banners,
+                    onOpenCourse = onOpenCourse,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
+            } else {
+                FeaturedCourseCarousel(
+                    courses = uiState.featuredCourses,
+                    onOpenCourse = onOpenCourse,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
+            }
         }
 
         // 【广告位预留】首页信息流广告位：后端配了 slot 才渲染。
@@ -384,12 +395,8 @@ private fun CourseCard(
                 CourseSort.HOT -> formatCount(course.likeCount) + "❤️"
                 CourseSort.NEWEST -> course.createTime.take(10).ifBlank { "—" }
             }
-            // viewCount 后端暂不返回（恒 0），为 0 时不显示，避免误导成「0 人观看」
-            val viewers = if (course.viewCount > 0) {
-                " · " + formatCount(course.viewCount) + "人观看"
-            } else {
-                ""
-            }
+            // 观看人数：后端返回了才显示（null = 接口没这个字段，避免硬写「0 人观看」）
+            val viewers = course.viewCount?.let { " · " + formatCount(it) + "人观看" } ?: ""
             Text(
                 text = metric + viewers,
                 style = MaterialTheme.typography.bodySmall,
@@ -599,6 +606,142 @@ private fun FeaturedCourseCarousel(
                                 )
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 首页轮播图（后端 banner 配置）。
+ *
+ * 与 [FeaturedCourseCarousel] 的区别：
+ *  - 图片取 banner.imageUrl（不是课程封面），标题取 banner.title
+ *  - 副标题用关联课程名 courseName
+ *  - 点击按 courseId 跳课程；没有关联课程的 banner 点了不跳
+ *  - 轮播顺序按后端 orderNum
+ */
+@Composable
+private fun BannerCarousel(
+    banners: List<BannerDto>,
+    onOpenCourse: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (banners.isEmpty()) return
+
+    val listState = rememberLazyListState()
+    var autoScrollSuspended by remember { mutableStateOf(false) }
+
+    val currentPage by remember(banners.size) {
+        derivedStateOf {
+            if (banners.isEmpty()) 0 else listState.firstVisibleItemIndex.coerceIn(0, banners.lastIndex)
+        }
+    }
+
+    // 用户手动滑动后暂停 8 秒自动轮播
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) {
+            autoScrollSuspended = true
+        } else if (autoScrollSuspended) {
+            delay(8000)
+            autoScrollSuspended = false
+        }
+    }
+
+    LaunchedEffect(banners.size, autoScrollSuspended) {
+        if (banners.size <= 1 || autoScrollSuspended) return@LaunchedEffect
+        while (true) {
+            delay(4000)
+            val next = (listState.firstVisibleItemIndex + 1) % banners.size
+            runCatching { listState.animateScrollToItem(next) }
+        }
+    }
+
+    val cardWidthRatio = 0.88f
+    val cardSpacing = 10.dp
+
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(168.dp)
+    ) {
+        val cardWidth = maxWidth * cardWidthRatio
+        LazyRow(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.spacedBy(cardSpacing),
+            flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
+        ) {
+            items(banners, key = { it.bannerId }) { banner ->
+                Column(
+                    modifier = Modifier
+                        .width(cardWidth)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable(enabled = banner.courseId > 0) {
+                            onOpenCourse(banner.courseId)
+                        }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                    ) {
+                        NetImage(
+                            url = banner.imageUrl,
+                            modifier = Modifier.fillMaxSize(),
+                            radius = 0.dp
+                        )
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color.Black.copy(alpha = 0.72f))
+                            .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 8.dp)
+                    ) {
+                        Text(
+                            text = banner.title.ifBlank { banner.courseName },
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (banner.courseName.isNotBlank()) {
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = banner.courseName,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.82f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (banners.size > 1) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 46.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                repeat(banners.size) { index ->
+                    val active = index == currentPage
+                    Box(
+                        modifier = Modifier
+                            .height(4.dp)
+                            .width(if (active) 16.dp else 6.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(
+                                if (active) Color.White
+                                else Color.White.copy(alpha = 0.45f)
+                            )
+                    )
                 }
             }
         }

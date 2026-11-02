@@ -1,5 +1,6 @@
 package com.github.learningplatform.data.repository
 
+import com.github.learningplatform.core.network.ApiException
 import com.github.learningplatform.core.network.int
 import com.github.learningplatform.core.network.long
 import com.github.learningplatform.core.network.okBody
@@ -14,6 +15,8 @@ import com.github.learningplatform.data.remote.dto.ArticleTagDto
 import com.github.learningplatform.data.remote.dto.CreateArticleRequest
 import com.github.learningplatform.data.remote.dto.CreateArticleResponse
 import com.github.learningplatform.data.remote.dto.PageData
+import com.github.learningplatform.data.remote.dto.PostStatus
+import com.github.learningplatform.data.remote.dto.PublishArticleRequest
 import com.github.learningplatform.data.remote.dto.ReportRequest
 import com.github.learningplatform.data.remote.dto.UpdateArticleRequest
 import kotlinx.serialization.json.JsonObject
@@ -48,8 +51,18 @@ class ArticleRepository @Inject constructor(
         tagId: Long? = null,
         sort: Int? = null
     ): PageData<ArticleDto> {
+        // 社区排序 tab（1最新 / 2最热 / 3精华）映射到后端参数：
+        //   最新 → sortBy=createTime；最热 → sortBy=likeCount；精华 → featured=true
+        val featured = if (sort == 3) true else null
+        val sortBy = when (sort) {
+            2 -> "likeCount"
+            1, 3 -> "createTime"
+            else -> null // 不传 = 后端默认 createTime
+        }
         val table = articleApi.getPublishedArticles(
             categoryId = categoryId,
+            featured = featured,
+            sortBy = sortBy,
             pageNum = pageNum,
             pageSize = pageSize
         ).okTable()
@@ -59,12 +72,30 @@ class ArticleRepository @Inject constructor(
     suspend fun getArticleDetail(articleId: Long): ArticleDetailDto =
         articleApi.getArticleDetail(articleId).okBody().payload().toArticleDetail()
 
-    /** 发布：后端未提供，本地返回成功 */
-    suspend fun createArticle(request: CreateArticleRequest): CreateArticleResponse =
-        CreateArticleResponse(articleId = 5999L, status = request.publish)
+    /**
+     * 发布文章（后端 `POST /api/v1/post/add`）。
+     *
+     * 后端只接收「标题 / 分类 / 正文」，普通用户提交后状态为「待审核」，
+     * 返回 `{postId, status:"3"}`（status 是字符串，这里转成 Int）。
+     */
+    suspend fun createArticle(request: CreateArticleRequest): CreateArticleResponse {
+        val body = articleApi.createArticle(
+            PublishArticleRequest(
+                postTitle = request.title,
+                categoryId = request.categoryId.toString(),
+                content = request.content
+            )
+        ).okBody().payload()
+        return CreateArticleResponse(
+            articleId = body.long("postId"),
+            status = body.str("status").toIntOrNull() ?: PostStatus.PENDING
+        )
+    }
 
-    /** 编辑：后端未提供 */
-    suspend fun updateArticle(articleId: Long, request: UpdateArticleRequest) = Unit
+    /** 编辑：后端没有 post/edit 接口，明确报错而不是假装成功 */
+    suspend fun updateArticle(articleId: Long, request: UpdateArticleRequest) {
+        throw ApiException(-1, "后端暂不支持编辑文章")
+    }
 
     suspend fun deleteArticle(articleId: Long) {
         articleApi.deleteArticle(articleId).okBody()
@@ -98,14 +129,16 @@ private fun JsonObject.toArticle(): ArticleDto = ArticleDto(
     coverUrl = str("coverUrl"),
     authorId = long("userId"),
     authorName = str("userName"),
-    authorAvatar = str("userAvatar"),
+    // 后端列表行的头像字段叫 avatar，详情里才是 userAvatar，两者都兜一下
+    authorAvatar = str("avatar").ifBlank { str("userAvatar") },
     categoryName = str("categoryName"),
     viewCount = int("viewCount"),
     likeCount = int("likeCount"),
     commentCount = int("commentCount"),
     publishTime = str("createTime"),
-    // 后端 status 是字符串："0"=已发布；客户端 0草稿 1待审核 2已发布 3驳回 4下架
-    status = if (str("status") == "0") 2 else 2
+    isFeatured = int("isFeatured") == 1,
+    // 后端 status 是字符串："0"已发布 "1"草稿 "2"已下架 "3"待审核（见 PostStatus）
+    status = str("status").toIntOrNull() ?: PostStatus.PUBLISHED
 )
 
 private fun JsonObject.toArticleDetail(): ArticleDetailDto = ArticleDetailDto(

@@ -36,7 +36,7 @@ import com.github.learningplatform.ui.theme.TabCommunityWash
 import com.github.learningplatform.ui.theme.TabProfileInk
 import com.github.learningplatform.ui.theme.TabProfileWash
 import com.github.learningplatform.ui.article.ArticleEditScreen
-import com.github.learningplatform.ui.article.MyArticlesScreen
+import com.github.learningplatform.ui.article.ArticleDetailScreen
 import com.github.learningplatform.ui.article.TagArticlesScreen
 import com.github.learningplatform.ui.auth.LoginScreen
 import com.github.learningplatform.ui.auth.RegisterScreen
@@ -283,7 +283,6 @@ fun MainScaffold(
                     onOpenCommunityProfile = { navController.navigate(Routes.blogHome(0L, self = true)) },
                     onOpenMyCourses = { navController.navigate(Routes.MY_COURSES) },
                     onOpenStudyStats = { navController.navigate(Routes.STUDY_STATS) },
-                    onOpenMyArticles = { navController.navigate(Routes.MY_ARTICLES) },
                     onOpenHistory = { navController.navigate(Routes.WATCH_HISTORY) },
                     onOpenFavorites = { navController.navigate(Routes.MY_FAVORITES) },
                     onOpenLikes = { navController.navigate(Routes.MY_LIKES) },
@@ -372,15 +371,6 @@ fun MainScaffold(
                     articleId = entry.arguments?.getLong("articleId") ?: 0L,
                     onBack = { navController.popBackStack() },
                     onPublished = { navController.popBackStack() }
-                )
-            }
-
-            composable(Routes.MY_ARTICLES) {
-                MyArticlesScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenArticle = { navController.navigate(Routes.articleDetail(it)) },
-                    onEdit = { navController.navigate(Routes.articleEdit(it)) },
-                    onPublish = { navController.navigate(Routes.ARTICLE_PUBLISH) }
                 )
             }
 

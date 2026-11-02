@@ -1,6 +1,8 @@
 package com.github.learningplatform.data.remote.dto
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonNames
 
 // ---------------------------------------------------------------------------
 // 课程视频模块 DTO（接口文档 v3.0 第六章）
@@ -8,6 +10,7 @@ import kotlinx.serialization.Serializable
 // ---------------------------------------------------------------------------
 
 /** 课程列表项（对应后端 learning_course 表） */
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class CourseDto(
     // 后端实际字段
@@ -35,11 +38,22 @@ data class CourseDto(
     val instructorName: String = "",
     val averageScore: Double = avgScore ?: 0.0,
     val studentCount: Int = 0,
-    val viewCount: Int = 0,
+    /**
+     * 观看人数。
+     *
+     * 用可空类型区分两种状态：
+     *  - null  = 后端根本没返回这个字段（别在 UI 上硬写「0 人观看」）
+     *  - 0     = 后端返回了，确实是 0
+     *
+     * 字段名后端还没最终确定，[JsonNames] 让 viewCount / studentCount / learnCount / playCount
+     * 都能反序列化到这一个属性上，避免接口命名一变客户端就显示不出来。
+     */
+    @JsonNames("studentCount", "learnCount", "playCount")
+    val viewCount: Int? = null,
     val shareCount: Int = 0
 )
 
-/** 6.2 课程详情（不含真实播放地址） */
+/** 6.2 课程详情（后端 GET /api/v1/course/{courseId} 映射结果） */
 @Serializable
 data class CourseDetailDto(
     val courseId: Long,
@@ -52,12 +66,20 @@ data class CourseDetailDto(
     val totalLessons: Int = 0,
     val averageScore: Double = 0.0,
     val ratingCount: Int = 0,
+    /** 学习中的人数：后端暂无该字段，保留兼容 */
     val studentCount: Int = 0,
     val viewCount: Int = 0,
+    val likeCount: Int = 0,
+    val favoriteCount: Int = 0,
+    val commentCount: Int = 0,
+    /** 分类名，例如 redis / java */
+    val categoryName: String = "",
     /** 是否免费：1是 0否 */
     val isFree: Int = 0,
     val isJoined: Boolean = false,
-    val chapters: List<CourseChapterDto> = emptyList()
+    val chapters: List<CourseChapterDto> = emptyList(),
+    /** 不属于任何章节的课时（后端 data.videos），与 chapters 合并展示 */
+    val lessons: List<CourseLessonDto> = emptyList()
 )
 
 @Serializable

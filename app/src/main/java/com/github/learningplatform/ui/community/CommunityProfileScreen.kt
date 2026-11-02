@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.learningplatform.ui.common.BackTopBar
 import com.github.learningplatform.ui.theme.pageGradientBrush
+import com.github.learningplatform.ui.theme.TextHint
 import com.github.learningplatform.ui.theme.TextPrimary
 import com.github.learningplatform.ui.theme.TextSecondary
 import com.github.learningplatform.ui.theme.Primary
@@ -57,16 +58,11 @@ fun CommunityProfileScreen(
         viewModel.load(userId, isSelf)
     }
 
-    // 昵称/简介/文章列表：后端暂无「按 userId 查他人资料」的接口，仍用本地样例
+    // 昵称/简介：后端没有「按 userId 查他人资料」的接口，仅这两项仍用本地样例；
+    // 文章列表已改为 /api/v1/post/myList（仅自己）
     val userName = if (isSelf) "张三" else if (userId == 3001L) "小明" else "小红"
     val bio = "热爱学习，正在补 Android 和算法。"
     var pendingDeleteId by remember { mutableStateOf<Long?>(null) }
-
-    var userArticles by remember { mutableStateOf(listOf(
-        Triple(5001L, "Kotlin 协程取消机制完全指南", "1.2k 阅读 · 32 赞"),
-        Triple(5002L, "Compose 重组优化实战笔记", "860 阅读 · 18 赞"),
-        Triple(5003L, "Android 性能优化从入门到实战", "2.1k 阅读 · 56 赞")
-    )) }
 
     Column(
         modifier = Modifier
@@ -201,23 +197,49 @@ fun CommunityProfileScreen(
                 }
             }
 
-            // TA 的文章
+            // 文章：自己来自 /post/myList；他人后端无按作者查询接口，故为空
             item {
                 Text(if (isSelf) "我的文章" else "TA 的文章", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
             }
-            items(userArticles) { (id, title, meta) ->
+            if (profileState.articles.isEmpty()) {
+                item {
+                    Text(
+                        text = if (isSelf) "还没有发布文章" else "暂无文章",
+                        fontSize = 13.sp,
+                        color = TextHint,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(20.dp)
+                    )
+                }
+            }
+            items(profileState.articles, key = { it.articleId }) { article ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.surface)
-                        .clickable { onOpenArticle(id) }
+                        .clickable { onOpenArticle(article.articleId) }
                         .padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = TextPrimary)
+                        Text(
+                            text = article.title,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = TextPrimary,
+                            maxLines = 2
+                        )
                         Spacer(Modifier.height(4.dp))
+                        // 阅读 / 点赞 / 发布时间全部来自后端字段
+                        val meta = buildList {
+                            add("${article.viewCount} 阅读")
+                            add("${article.likeCount} 赞")
+                            if (article.publishTime.isNotBlank()) add(article.publishTime.take(10))
+                        }.joinToString(" · ")
                         Text(meta, fontSize = 12.sp, color = TextSecondary)
                     }
                     if (isSelf) {
@@ -227,7 +249,7 @@ fun CommunityProfileScreen(
                             color = Primary,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
-                                .clickable { onOpenArticle(id) }
+                                .clickable { onOpenArticle(article.articleId) }
                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                         )
                         Text(
@@ -236,7 +258,7 @@ fun CommunityProfileScreen(
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
-                                .clickable { pendingDeleteId = id }
+                                .clickable { pendingDeleteId = article.articleId }
                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                         )
                     }
@@ -252,7 +274,7 @@ fun CommunityProfileScreen(
             text = { Text("确定要彻底删除这篇文章吗？删除后不可恢复。") },
             confirmButton = {
                 androidx.compose.material3.TextButton(onClick = {
-                    userArticles = userArticles.filter { it.first != pendingDeleteId }
+                    pendingDeleteId?.let { viewModel.deleteArticle(it) }
                     pendingDeleteId = null
                 }) { Text("删除", color = MaterialTheme.colorScheme.error) }
             },

@@ -183,7 +183,8 @@ object DemoData {
             averageScore = base.averageScore,
             ratingCount = 128,
             studentCount = base.studentCount,
-            viewCount = base.viewCount,
+            // CourseDto.viewCount 可空（区分「后端没返回」与「真的是 0」），样例数据里补 0
+            viewCount = base.viewCount ?: 0,
             isFree = if (isShort) 1 else 0,
             // 让第一章第一节免费试看，用来验证「未加入也能试看」这条规则
             isJoined = false,
@@ -396,7 +397,8 @@ object DemoData {
                     id = it.courseId, type = 2, title = it.title, summary = "系统讲解 + 实战演练",
                     coverUrl = it.coverUrl, categoryId = 1L + (idx % 6), categoryName = "IT 解决方案",
                     authorId = 88, authorName = it.instructorName,
-                    viewCount = it.viewCount,
+                    // CourseDto.viewCount 可空，搜索结果用非空字段，缺省补 0
+                    viewCount = it.viewCount ?: 0,
                     duration = it.duration, score = it.averageScore,
                     publishTime = "2026-09-01 10:00:00"
                 )

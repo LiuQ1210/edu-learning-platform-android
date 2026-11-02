@@ -33,7 +33,6 @@ object Routes {
     const val ARTICLE_DETAIL = "article_detail/{articleId}"
     const val ARTICLE_PUBLISH = "article_publish"
     const val ARTICLE_EDIT = "article_edit/{articleId}"
-    const val MY_ARTICLES = "my_articles"
     const val TAG_ARTICLES = "tag_articles/{tagId}"
     const val BLOG_HOME = "blog_home/{userId}"
 
@@ -69,7 +68,7 @@ object Routes {
     val mainRoutes: Set<String> = setOf(
         HOME, VIDEO, COMMUNITY, PROFILE,
         COURSE_DETAIL, SEARCH, CATEGORY_ALL,
-        ARTICLE_DETAIL, ARTICLE_PUBLISH, ARTICLE_EDIT, MY_ARTICLES, TAG_ARTICLES, BLOG_HOME,
+        ARTICLE_DETAIL, ARTICLE_PUBLISH, ARTICLE_EDIT, TAG_ARTICLES, BLOG_HOME,
         EDIT_PROFILE, MY_COURSES, MY_FAVORITES, MY_LIKES, MY_DOWNLOADS, WATCH_HISTORY,
         NOTES, NOTE_DETAIL, TODOS, SETTINGS, CHANGE_PASSWORD
     )

@@ -26,6 +26,8 @@ data class CourseDetailUiState(
     val tab: Int = 0,
     val ratings: List<RatingDto> = emptyList(),
     val myScore: Double = 0.0,
+    /** 当前用户是否已点赞该课程（interaction/status 或点击后由 toggle 返回） */
+    val isLiked: Boolean = false,
     val isFavorited: Boolean = false,
     val joining: Boolean = false,
     val message: String? = null
@@ -60,13 +62,19 @@ class CourseDetailViewModel @Inject constructor(
             try {
                 val detail = courseRepository.getCourseDetail(id)
                 val ratings = runCatching { courseRepository.getRatings(id).list }.getOrDefault(emptyList())
+                // 进页面时同步点赞/收藏态：interaction/status?type=1 点赞、type=2 收藏
+                val likedIds = runCatching {
+                    interactionRepository.getActiveIds(Constants.TARGET_COURSE, 1, listOf(id))
+                }.getOrDefault(emptyList())
+                val favIds = runCatching {
+                    interactionRepository.getActiveIds(Constants.TARGET_COURSE, 2, listOf(id))
+                }.getOrDefault(emptyList())
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     detail = detail,
                     ratings = ratings,
-                    // 详情接口返回 isLiked/isFavorited 之外的收藏态由 8.9 维护，
-                    // v3 的 6.2 未返回 isFavorited，这里先按未收藏展示。
-                    isFavorited = false
+                    isLiked = likedIds.contains(id),
+                    isFavorited = favIds.contains(id)
                 )
             } catch (e: CancellationException) {
                 throw e
@@ -143,6 +151,25 @@ class CourseDetailViewModel @Inject constructor(
                     detail = if (already) _uiState.value.detail?.copy(isJoined = true) else _uiState.value.detail,
                     message = if (already) "已加入课程" else e.readableMessage()
                 )
+            }
+        }
+    }
+
+    /** 点赞 / 取消点赞：后端 interaction/toggle，返回最新状态与计数 */
+    fun toggleLike() {
+        viewModelScope.launch {
+            try {
+                val result = interactionRepository.toggleLike(Constants.TARGET_COURSE, courseId)
+                _uiState.value = _uiState.value.copy(
+                    isLiked = result.isLiked,
+                    // 计数以服务端为准，避免本地 ±1 与真实值漂移
+                    detail = _uiState.value.detail?.copy(likeCount = result.likeCount),
+                    message = if (result.isLiked) "已点赞" else "已取消点赞"
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                _uiState.value = _uiState.value.copy(message = e.readableMessage())
             }
         }
     }
