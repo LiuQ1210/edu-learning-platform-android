@@ -64,7 +64,8 @@ data class InteractionMeta(
 @HiltViewModel
 class VideoViewModel @Inject constructor(
     private val courseRepository: CourseRepository,
-    private val interactionRepository: InteractionRepository
+    private val interactionRepository: InteractionRepository,
+    private val videoApi: com.github.learningplatform.data.remote.VideoApi
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(VideoUiState())
@@ -131,17 +132,50 @@ class VideoViewModel @Inject constructor(
                 error = if (reset) null else snapshot.error
             )
             try {
-                // TODO(合并 master 时留空)：master 的短视频列表改用了 /api/v1/video/list，
-                // 但对应的 VideoApi / ShortVideoDto 在 master 分支上并未提交（任何分支都搜不到），
-                // 因此这里先不接，列表暂时为空；等 master 补上这两个文件后再恢复请求。
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    isLoadingMore = false,
-                    error = null,
-                    videos = snapshot.videos,
-                    pageNum = nextPage,
-                    hasMore = false
-                )
+                // 调用短视频接口
+                val resp = videoApi.getVideoList(pageNum = nextPage, pageSize = 10)
+                if (resp.isSuccessful && resp.body() != null) {
+                    val page = resp.body()!!
+                    // 把 ShortVideoDto 映射成 CourseDto，复用现有 UI
+                    val videoList = page.rows.map { shortVideo ->
+                        CourseDto(
+                            courseId = shortVideo.videoId,
+                            courseName = shortVideo.videoTitle,
+                            title = shortVideo.videoTitle,
+                            coverUrl = com.github.learningplatform.core.network.ImageUrl.resolve(shortVideo.coverUrl),
+                            intro = shortVideo.intro,
+                            likeCount = shortVideo.likeCount,
+                            favoriteCount = shortVideo.favoriteCount,
+                            commentCount = shortVideo.commentCount,
+                            viewCount = shortVideo.viewCount,
+                            duration = shortVideo.duration
+                        )
+                    }
+                    // 短视频的 videoUrl 直接就是播放地址，拼接完整 URL 后存到 playUrls
+                    val newPlayUrls = page.rows.associate {
+                        it.videoId to com.github.learningplatform.core.network.ImageUrl.resolve(it.videoUrl)
+                    }
+                    val accumulated = if (reset) videoList else snapshot.videos + videoList
+                    // 基准点赞/收藏计数进独立互动表：首屏重置，翻页合并；是否已赞/藏由后续 toggle 结果回写
+                    val newMeta = videoList.associate {
+                        it.courseId to InteractionMeta(
+                            likeCount = it.likeCount,
+                            favoriteCount = it.favoriteCount
+                        )
+                    }
+                    _interaction.value = if (reset) newMeta else _interaction.value + newMeta
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        isLoadingMore = false,
+                        error = null,
+                        videos = accumulated,
+                        playUrls = _uiState.value.playUrls + newPlayUrls,
+                        pageNum = nextPage,
+                        hasMore = accumulated.size < page.total
+                    )
+                } else {
+                    throw Exception("接口返回失败")
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {

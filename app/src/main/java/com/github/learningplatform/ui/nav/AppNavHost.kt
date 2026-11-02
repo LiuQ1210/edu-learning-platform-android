@@ -60,7 +60,8 @@ import com.github.learningplatform.ui.mine.ProfileScreen
 import com.github.learningplatform.ui.mine.StudyStatsScreen
 import com.github.learningplatform.ui.mine.StudyPathScreen
 import com.github.learningplatform.ui.mine.NotificationsScreen
-// FollowingScreen / FansScreen：master 侧引用了但从未提交，暂时留空（入口先不跳转）
+import com.github.learningplatform.ui.mine.FollowingScreen
+import com.github.learningplatform.ui.mine.FansScreen
 import com.github.learningplatform.ui.community.CommunityProfileScreen
 import com.github.learningplatform.ui.mine.SettingsScreen
 import com.github.learningplatform.ui.mine.WatchHistoryScreen
@@ -284,9 +285,8 @@ fun MainScaffold(
                 ProfileScreen(
                     onOpenNotifications = { navController.navigate(Routes.NOTIFICATIONS) },
                     onOpenCheckin = onOpenCheckin,
-                    // TODO(master 未提交 FollowingScreen/FansScreen)：页面先留空，入口暂不跳转
-                    onOpenFollowing = { },
-                    onOpenFans = { },
+                    onOpenFollowing = { navController.navigate(Routes.FOLLOWING) },
+                    onOpenFans = { navController.navigate(Routes.FANS) },
                     onOpenCommunityProfile = { navController.navigate(Routes.blogHome(0L, self = true)) },
                     onOpenMyCourses = { navController.navigate(Routes.MY_COURSES) },
                     onOpenStudyStats = { navController.navigate(Routes.STUDY_STATS) },
@@ -525,8 +525,19 @@ fun MainScaffold(
                 )
             }
 
-            // 关注 / 粉丝列表页暂时留空：master 引用了 FollowingScreen / FansScreen，
-            // 但这两个文件在 master 上并未提交，等对方补提交后再恢复路由。
+            composable(Routes.FOLLOWING) {
+                FollowingScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenUser = { userId -> navController.navigate(Routes.blogHome(userId)) }
+                )
+            }
+
+            composable(Routes.FANS) {
+                FansScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenUser = { userId -> navController.navigate(Routes.blogHome(userId)) }
+                )
+            }
 
             composable(
                 route = Routes.BLOG_HOME + "?self={self}",
