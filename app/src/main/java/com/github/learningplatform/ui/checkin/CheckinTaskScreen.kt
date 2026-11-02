@@ -31,6 +31,7 @@ import androidx.compose.material3.TopAppBar
 import com.github.learningplatform.ui.theme.TextPrimary
 import com.github.learningplatform.ui.theme.TextSecondary
 import com.github.learningplatform.ui.theme.Primary
+import com.github.learningplatform.ui.theme.Success
 import com.github.learningplatform.ui.theme.pageGradientBrush
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -222,7 +223,8 @@ private fun AdFreeStatusCard(active: Boolean, remainMinutes: Int) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (active) Color(0xFFE8F5E9) else MaterialTheme.colorScheme.surfaceVariant
+            // active 用 Success 半透明：浅色下仍是淡绿，深色下自动融合，不写死 #E8F5E9
+            containerColor = if (active) Success.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant
         ),
         modifier = Modifier.fillMaxWidth()
     ) {

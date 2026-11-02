@@ -37,7 +37,6 @@ import com.github.learningplatform.ui.theme.Divider
 import com.github.learningplatform.ui.theme.surfaceWashBrush
 import com.github.learningplatform.ui.theme.pageGradientBrush
 import com.github.learningplatform.ui.theme.Primary
-import com.github.learningplatform.ui.theme.Surface
 import com.github.learningplatform.ui.theme.TextPrimary
 import com.github.learningplatform.ui.theme.TextSecondary
 

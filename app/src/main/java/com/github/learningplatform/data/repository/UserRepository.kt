@@ -118,7 +118,8 @@ class UserRepository @Inject constructor(
         pageSize: Int = 20,
         targetType: Int? = null
     ): PageData<UserTargetItemDto> {
-        val rows = userApi.getFavorites(ApiTargetType.of(targetType)).okTable().rows
+        val table = userApi.getFavorites(ApiTargetType.of(targetType), pageNum, pageSize).okTable()
+        val rows = table.rows
         val list = rows.map {
             UserTargetItemDto(
                 targetType = ApiTargetType.toInt(it.str("targetType")),
@@ -128,7 +129,7 @@ class UserRepository @Inject constructor(
                 collectTime = it.str("createTime")
             )
         }
-        return PageData(total = list.size.toLong(), list = list)
+        return PageData(total = table.total, list = list)
     }
 
     suspend fun getLikes(
@@ -136,7 +137,8 @@ class UserRepository @Inject constructor(
         pageSize: Int = 20,
         targetType: Int? = null
     ): PageData<UserTargetItemDto> {
-        val rows = userApi.getLikes(ApiTargetType.of(targetType)).okTable().rows
+        val table = userApi.getLikes(ApiTargetType.of(targetType), pageNum, pageSize).okTable()
+        val rows = table.rows
         val list = rows.map {
             UserTargetItemDto(
                 targetType = ApiTargetType.toInt(it.str("targetType")),
@@ -146,7 +148,7 @@ class UserRepository @Inject constructor(
                 collectTime = it.str("createTime")
             )
         }
-        return PageData(total = list.size.toLong(), list = list)
+        return PageData(total = table.total, list = list)
     }
 
     suspend fun getViewHistory(
@@ -154,7 +156,8 @@ class UserRepository @Inject constructor(
         pageSize: Int = 20,
         targetType: Int? = null
     ): PageData<ViewHistoryItemDto> {
-        val rows = userApi.getViewHistory(ApiTargetType.of(targetType)).okTable().rows
+        val table = userApi.getViewHistory(ApiTargetType.of(targetType), pageNum, pageSize).okTable()
+        val rows = table.rows
         val list = rows.map {
             ViewHistoryItemDto(
                 targetType = ApiTargetType.toInt(it.str("targetType")),
@@ -165,7 +168,7 @@ class UserRepository @Inject constructor(
                 lastViewTime = it.str("lastViewTime")
             )
         }
-        return PageData(total = list.size.toLong(), list = list)
+        return PageData(total = table.total, list = list)
     }
 
     /**

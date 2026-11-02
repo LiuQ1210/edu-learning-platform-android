@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -13,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -58,6 +60,7 @@ import com.github.learningplatform.ui.mine.ProfileScreen
 import com.github.learningplatform.ui.mine.StudyStatsScreen
 import com.github.learningplatform.ui.mine.StudyPathScreen
 import com.github.learningplatform.ui.mine.NotificationsScreen
+// FollowingScreen / FansScreen：master 侧引用了但从未提交，暂时留空（入口先不跳转）
 import com.github.learningplatform.ui.community.CommunityProfileScreen
 import com.github.learningplatform.ui.mine.SettingsScreen
 import com.github.learningplatform.ui.mine.WatchHistoryScreen
@@ -205,7 +208,9 @@ fun MainScaffold(
                     // 显式给底色：NavigationBar 默认取 surfaceContainer（带紫调的基线色）。
                     // 这里纯白底，选中态由每个 Tab 自己的 ink / wash 决定
                     containerColor = BottomNavContainer,
-                    contentColor = BottomNavUnselected
+                    contentColor = BottomNavUnselected,
+                    modifier = Modifier.height(80.dp),
+                    windowInsets = androidx.compose.foundation.layout.WindowInsets(0)
                 ) {
                     BottomNavItem.entries.forEach { item ->
                         val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
@@ -279,7 +284,9 @@ fun MainScaffold(
                 ProfileScreen(
                     onOpenNotifications = { navController.navigate(Routes.NOTIFICATIONS) },
                     onOpenCheckin = onOpenCheckin,
-                    onOpenEditProfile = { navController.navigate(Routes.EDIT_PROFILE) },
+                    // TODO(master 未提交 FollowingScreen/FansScreen)：页面先留空，入口暂不跳转
+                    onOpenFollowing = { },
+                    onOpenFans = { },
                     onOpenCommunityProfile = { navController.navigate(Routes.blogHome(0L, self = true)) },
                     onOpenMyCourses = { navController.navigate(Routes.MY_COURSES) },
                     onOpenStudyStats = { navController.navigate(Routes.STUDY_STATS) },
@@ -517,6 +524,9 @@ fun MainScaffold(
                     onOpenTodos = { navController.navigate(Routes.TODOS) }
                 )
             }
+
+            // 关注 / 粉丝列表页暂时留空：master 引用了 FollowingScreen / FansScreen，
+            // 但这两个文件在 master 上并未提交，等对方补提交后再恢复路由。
 
             composable(
                 route = Routes.BLOG_HOME + "?self={self}",

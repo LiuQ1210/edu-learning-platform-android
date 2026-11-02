@@ -37,6 +37,9 @@ fun GradientBackground(
     showGlow: Boolean = true,
     glowCenterY: Float = 0.42f,
     glowRadiusRatio: Float = 1.15f,
+    topColor: Color = GradTop,
+    midColor: Color = GradCream,
+    bottomColor: Color = GradBottom,
     content: @Composable BoxScope.() -> Unit
 ) {
     val dark = LocalAppDarkTheme.current
@@ -52,11 +55,9 @@ fun GradientBackground(
                     )
                 } else {
                     Brush.verticalGradient(
-                        0.00f to GradTop,
-                        0.22f to GradCream,
-                        0.38f to GradPeach,
-                        0.72f to GradBlush,
-                        1.00f to GradBottom
+                        0.00f to topColor,
+                        0.5f to midColor,
+                        1.00f to bottomColor
                     )
                 }
             )
@@ -116,11 +117,15 @@ fun GlowOrb(
             .size(diameter)
             .clip(CircleShape)
             .background(
+                // 深色下白晕在深底上太刺眼：核心换成品牌蓝、整体透明度压到 1/4，
+                // 变成一团柔和的暗蓝光；浅色完全沿用原来的白→淡蓝过渡。
                 Brush.radialGradient(
-                    0.00f to Color.White.copy(alpha = alpha),
-                    0.35f to Color.White.copy(alpha = alpha * 0.55f),
-                    0.62f to GlowEdge.copy(alpha = alpha * 0.22f),
-                    0.82f to GlowEdge.copy(alpha * 0.07f),
+                    0.00f to (if (LocalAppDarkTheme.current) Primary else Color.White)
+                        .copy(alpha = if (LocalAppDarkTheme.current) alpha * 0.22f else alpha),
+                    0.35f to (if (LocalAppDarkTheme.current) Primary else Color.White)
+                        .copy(alpha = if (LocalAppDarkTheme.current) alpha * 0.12f else alpha * 0.55f),
+                    0.62f to GlowEdge.copy(alpha = alpha * (if (LocalAppDarkTheme.current) 0.06f else 0.22f)),
+                    0.82f to GlowEdge.copy(alpha = alpha * (if (LocalAppDarkTheme.current) 0.03f else 0.07f)),
                     1.00f to Color.Transparent
                 )
             )
@@ -174,7 +179,7 @@ val SurfaceWashEnd: Color get() = Color(0xFFFEF8F4)
  *               false 用于长列表页，顶部奶白往下很快回到中性底，避免长时间阅读疲劳
  */
 @Composable
-fun pageGradientBrush(strong: Boolean = true): Brush {
+fun pageGradientBrush(strong: Boolean = true, theme: String = "default"): Brush {
     val dark = LocalAppDarkTheme.current
     return if (dark) {
         // 深色：深蓝灰微渐变，顶部稍亮做层次
@@ -182,21 +187,74 @@ fun pageGradientBrush(strong: Boolean = true): Brush {
             0.00f to DarkSurface,
             1.00f to DarkBackground
         )
-    } else if (strong) {
-        Brush.verticalGradient(
-            0.00f to GradTop,
-            0.12f to GradCream,
-            0.34f to GradPeach,
-            0.72f to GradBlush,
-            1.00f to GradBottom
-        )
-    } else {
-        Brush.verticalGradient(
-            0.00f to GradPeach,
-            0.10f to GradCream,
-            0.28f to Background,
-            1.00f to Background
-        )
+    } else when (theme) {
+        "home" -> {
+            // 首页：藏青淡蓝系渐变
+            if (strong) {
+                Brush.verticalGradient(
+                    0.00f to Color(0xFFF0F4FF),
+                    0.4f to Color(0xFFDCE6FF),
+                    1.00f to Color(0xFFF7F9FC)
+                )
+            } else {
+                Brush.verticalGradient(
+                    0.00f to Color(0xFFDCE6FF),
+                    0.2f to Color(0xFFF0F4FF),
+                    1.00f to Background
+                )
+            }
+        }
+        "community" -> {
+            // 社区：砖红淡粉系渐变
+            if (strong) {
+                Brush.verticalGradient(
+                    0.00f to Color(0xFFFDF0ED),
+                    0.4f to Color(0xFFF8D8D2),
+                    1.00f to Color(0xFFF7F9FC)
+                )
+            } else {
+                Brush.verticalGradient(
+                    0.00f to Color(0xFFF8D8D2),
+                    0.2f to Color(0xFFFDF0ED),
+                    1.00f to Background
+                )
+            }
+        }
+        "profile" -> {
+            // 个人主页：赭金淡黄系渐变
+            if (strong) {
+                Brush.verticalGradient(
+                    0.00f to Color(0xFFFEF6E0),
+                    0.4f to Color(0xFFF9E7B8),
+                    1.00f to Color(0xFFF7F9FC)
+                )
+            } else {
+                Brush.verticalGradient(
+                    0.00f to Color(0xFFF9E7B8),
+                    0.2f to Color(0xFFFEF6E0),
+                    1.00f to Background
+                )
+            }
+        }
+        else -> {
+            // 默认：奶油系
+            if (strong) {
+                Brush.verticalGradient(
+                    0.00f to GradTop,
+                    0.12f to GradCream,
+                    0.34f to GradPeach,
+                    0.72f to GradBlush,
+                    1.00f to GradBottom
+                )
+            } else {
+                Brush.verticalGradient(
+                    0.00f to GradPeach,
+                    0.10f to GradCream,
+                    0.28f to Background,
+                    1.00f to Background
+                )
+            }
+        }
     }
 }
 
@@ -227,6 +285,30 @@ val SoftPinkGradient: Brush
 /** 淡蓝：品牌、课程类 */
 val SoftBlueGradient: Brush
     get() = Brush.linearGradient(listOf(Color(0xFFE3ECFD), Color(0xFFF6F9FF)))
+
+/**
+ * 淡蓝渐变的可组合版本：浅色下返回 [SoftBlueGradient]（外观不变），
+ * 深色下压暗成同色系渐变，供搜索框等内含文字的容器使用，避免浅底浅字。
+ */
+@Composable
+fun softBlueGradient(): Brush {
+    val dark = LocalAppDarkTheme.current
+    return if (dark) {
+        Brush.linearGradient(listOf(Primary.copy(alpha = 0.28f), DarkSurfaceVariant))
+    } else SoftBlueGradient
+}
+
+/**
+ * 淡青渐变的可组合版本：浅色下返回 [SoftTealGradient]（外观不变），
+ * 深色下压暗，供下载/收件类图标块使用。
+ */
+@Composable
+fun softTealGradient(): Brush {
+    val dark = LocalAppDarkTheme.current
+    return if (dark) {
+        Brush.linearGradient(listOf(Primary.copy(alpha = 0.22f), DarkSurfaceVariant))
+    } else SoftTealGradient
+}
 
 /** 主色渐变：主按钮、选中胶囊等需要质感的元素 */
 val BrandGradient: Brush

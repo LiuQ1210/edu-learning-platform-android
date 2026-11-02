@@ -52,7 +52,8 @@ class AuthRepository @Inject constructor(
             token = token,
             userId = userId,
             userName = userName,
-            phone = phoneNumber
+            phone = phoneNumber,
+            nickname = userName
         )
 
         return User(id = body.userId ?: 0, username = userName, nickname = userName, phone = phoneNumber)

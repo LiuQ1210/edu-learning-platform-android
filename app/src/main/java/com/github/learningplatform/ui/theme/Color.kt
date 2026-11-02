@@ -200,3 +200,33 @@ val TabProfileInk: Color
 val TabProfileWash: Color
     @Composable @ReadOnlyComposable get() =
         if (LocalAppDarkTheme.current) Color(0xFF3D3220) else Color(0xFFFBEFD2)
+
+/**
+ * 定位高亮底色：高亮评论、正在播放的课时行。
+ * 浅色沿用淡橙 #FFF3E0（保持原 UI 不变），深色压成暗暖褐，避免浅底配浅字。
+ */
+val HighlightWash: Color
+    @Composable @ReadOnlyComposable get() =
+        if (LocalAppDarkTheme.current) Color(0xFF3D3220) else Color(0xFFFFF3E0)
+
+// ---------------------------------------------------------------------------
+// 页面专属配色（每个 Tab 页面对应自己的主色调）
+// ---------------------------------------------------------------------------
+
+/** 首页主色：藏青系 */
+val HomePrimary = BrandNavy
+val HomePrimaryLight = Color(0xFFE3E8FB)
+val HomeGradTop = Color(0xFFF5F7FF)
+val HomeGradBottom = Color(0xFFE8ECF8)
+
+/** 社区主色：砖红系 */
+val CommunityPrimary = Color(0xFFA8453C)
+val CommunityPrimaryLight = Color(0xFFFBE4E0)
+val CommunityGradTop = Color(0xFFFFF8F6)
+val CommunityGradBottom = Color(0xFFFBE9E5)
+
+/** 个人主页主色：赭金系 */
+val ProfilePrimary = Color(0xFF96650C)
+val ProfilePrimaryLight = Color(0xFFFBEFD2)
+val ProfileGradTop = Color(0xFFFFFBF2)
+val ProfileGradBottom = Color(0xFFF8F0DD)

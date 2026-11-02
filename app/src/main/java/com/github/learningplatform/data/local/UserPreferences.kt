@@ -45,7 +45,7 @@ class UserPreferences @Inject constructor(
     /** 登录态判断：有 token 即视为已登录 */
     val isLoggedIn: Flow<Boolean> = token.map { it.isNotBlank() }
 
-    /** 主题模式：light / dark，默认浅色 */
+    /** 主题模式：只有浅色/深色两态，未设置时默认浅色，不跟随系统 */
     val themeMode: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
         when (prefs[Keys.THEME_MODE]) {
             "dark" -> ThemeMode.DARK
@@ -76,7 +76,8 @@ class UserPreferences @Inject constructor(
         userId: String,
         userName: String,
         phone: String,
-        avatar: String = ""
+        avatar: String = "",
+        nickname: String = ""
     ) {
         context.dataStore.edit {
             it[Keys.TOKEN] = token
@@ -84,6 +85,8 @@ class UserPreferences @Inject constructor(
             it[Keys.USER_NAME] = userName
             it[Keys.PHONE] = phone
             it[Keys.AVATAR] = avatar
+            // 昵称单独存一份，个人主页首屏缓存与后端资料保持一致
+            if (nickname.isNotBlank()) it[Keys.NICKNAME] = nickname
         }
     }
 

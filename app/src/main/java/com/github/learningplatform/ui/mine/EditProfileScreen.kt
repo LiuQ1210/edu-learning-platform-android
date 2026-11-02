@@ -46,6 +46,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.learningplatform.ui.common.BackTopBar
 import com.github.learningplatform.ui.common.CommonTextField
 import com.github.learningplatform.ui.theme.Primary
+import com.github.learningplatform.ui.theme.HighlightWash
 import com.github.learningplatform.ui.theme.pageGradientBrush
 import com.github.learningplatform.ui.theme.TextHint
 import com.github.learningplatform.ui.theme.TextPrimary
@@ -177,7 +178,8 @@ fun EditProfileScreen(
                     val selected = uiState.gender == value
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = if (selected) Primary else Color(0xFFFFF3E0),
+                        // 未选中用 HighlightWash：浅色保持淡橙，深色自动暗化
+                        color = if (selected) Primary else HighlightWash,
                         modifier = Modifier.clickable { viewModel.onGenderChange(value) }
                     ) {
                         Text(

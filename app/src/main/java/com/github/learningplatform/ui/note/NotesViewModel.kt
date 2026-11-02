@@ -28,7 +28,8 @@ data class NotesUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val keyword: String = "",
-    val sourceType: Int? = null,
+    // 顶部标签已去掉「全部」，进入页面默认选中文章笔记（1）；2=视频笔记
+    val sourceType: Int? = SOURCE_TYPE_ARTICLE,
     val notes: List<NoteDto> = emptyList(),
     val message: String? = null,
     // 详情编辑态

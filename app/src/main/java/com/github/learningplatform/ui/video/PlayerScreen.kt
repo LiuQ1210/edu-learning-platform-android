@@ -443,25 +443,6 @@ fun PlayerScreen(
 
             }
         }
-
-        // 【返回按钮·修复】抽到最外层 Box 的最高 z 序（最后绘制），
-        // 绕过 AndroidView(PlayerView) 原生层对触摸的拦截；原 Row 内按钮已移除。
-        // 按钮放在 TopStart + top=120dp：屏幕最顶部 y≈22-148 区域会被系统状态栏层拦截触摸
-        // （实测：按钮放顶部点击无效，下移后可点击）。最高 z 序 + clickable 保证不受
-        // AndroidView(PlayerView) 全屏原生层影响。
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(start = 8.dp, top = 120.dp)
-                .size(48.dp)
-                .clickable {
-                    // 调试用的 Log.d 已移除：Release 包不需要，且 lint 会报 LogNotTimber
-                    onBack()
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(NavIcons.ArrowBack, contentDescription = "返回", tint = Color.White)
-        }
     }
 
     if (uiState.isLoading) {

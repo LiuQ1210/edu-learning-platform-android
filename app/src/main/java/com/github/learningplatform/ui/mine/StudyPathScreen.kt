@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.learningplatform.ui.common.BackTopBar
 import com.github.learningplatform.ui.theme.Primary
-import com.github.learningplatform.ui.theme.Surface
 import com.github.learningplatform.ui.theme.TextPrimary
 import com.github.learningplatform.ui.theme.TextSecondary
 import com.github.learningplatform.ui.theme.pageGradientBrush
@@ -77,7 +76,7 @@ private data class StudyPath(
 private fun PathCard(path: StudyPath) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable { },
-        colors = CardDefaults.cardColors(containerColor = Surface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {

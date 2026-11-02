@@ -1,10 +1,14 @@
 package com.github.learningplatform.data.repository
 
 import com.github.learningplatform.core.network.int
+import com.github.learningplatform.core.network.long
 import com.github.learningplatform.core.network.longList
 import com.github.learningplatform.core.network.okBody
+import com.github.learningplatform.core.network.okTable
 import com.github.learningplatform.core.network.payload
+import com.github.learningplatform.core.network.str
 import com.github.learningplatform.data.remote.FollowApi
+import com.github.learningplatform.data.remote.dto.PageData
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -41,4 +45,42 @@ class FollowRepository @Inject constructor(
             "followCount" to body.int("followCount")
         )
     }
+
+    /** 我关注的人（分页） */
+    suspend fun getFollowingList(pageNum: Int = 1, pageSize: Int = 20, userId: Long? = null): PageData<FollowUserItem> {
+        val table = followApi.getFollowingList(userId, pageNum, pageSize).okTable()
+        val list = table.rows.map { row ->
+            // 后端返回：userId=我自己、followUserId=被关注人、userName/avatar=被关注人；无 bio 字段
+            FollowUserItem(
+                userId = row.long("followUserId"),
+                userName = row.str("userName"),
+                avatar = row.str("avatar"),
+                bio = ""
+            )
+        }
+        return PageData(total = table.total, list = list)
+    }
+
+    /** 我的粉丝（分页） */
+    suspend fun getFansList(pageNum: Int = 1, pageSize: Int = 20, userId: Long? = null): PageData<FollowUserItem> {
+        val table = followApi.getFansList(userId, pageNum, pageSize).okTable()
+        val list = table.rows.map { row ->
+            // 后端返回：userId=粉丝本人、followUserId=我自己、userName/avatar=粉丝；无 bio 字段
+            FollowUserItem(
+                userId = row.long("userId"),
+                userName = row.str("userName"),
+                avatar = row.str("avatar"),
+                bio = ""
+            )
+        }
+        return PageData(total = table.total, list = list)
+    }
 }
+
+/** 关注/粉丝列表项 */
+data class FollowUserItem(
+    val userId: Long = 0,
+    val userName: String = "",
+    val avatar: String = "",
+    val bio: String = ""
+)

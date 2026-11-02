@@ -1,6 +1,7 @@
 package com.github.learningplatform.ui.course
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
@@ -89,8 +90,8 @@ fun HomeScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            // 与登录页一致的奶油渐变（只铺顶部一段；列表页整屏渐变会让长时间阅读很累）
-            .background(pageGradientBrush(strong = false))
+            // 首页：藏青淡蓝系渐变
+            .background(pageGradientBrush(strong = false, theme = "home"))
     ) {
         HomeTopBar(onOpenSearch = onOpenSearch, onOpenMenu = onOpenAllCategories, onOpenNotifications = onOpenNotifications)
 
@@ -99,7 +100,9 @@ fun HomeScreen(
                 items = listOf(null to "全部") + uiState.categories,
                 selectedId = uiState.selectedCategoryId,
                 onSelect = viewModel::selectCategory,
-                modifier = Modifier.padding(bottom = 4.dp)
+                modifier = Modifier.padding(bottom = 4.dp),
+                // 用随主题切换的 TabHomeInk：浅色藏青、深色亮蓝，避免深色下深紫黑文字看不见
+                selectedColor = com.github.learningplatform.ui.theme.TabHomeInk
             )
         }
 
@@ -134,7 +137,8 @@ private fun HomeTopBar(onOpenSearch: () -> Unit, onOpenMenu: () -> Unit, onOpenN
                 .weight(1f)
                 .height(40.dp)
                 .clip(RoundedCornerShape(50))
-                .background(surfaceWashBrush())
+                // 浅色下 surface 即白色，深色下自动变深蓝灰，不写死 Color.White
+                .background(MaterialTheme.colorScheme.surface)
                 .clickable(onClick = onOpenSearch)
                 .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -169,7 +173,7 @@ private fun CourseFeed(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(pageGradientBrush(strong = false)),
+            .background(pageGradientBrush(strong = false, theme = "home")),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
         item { Spacer(Modifier.height(8.dp)) }
@@ -357,7 +361,9 @@ private fun CourseCard(
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(Color.White)
+            // 浅色下 surface 即白色，深色下自动变深蓝灰
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
             .clickable { onOpenCourse(course.courseId) }
     ) {
         Box {

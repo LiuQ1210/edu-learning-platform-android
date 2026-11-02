@@ -53,7 +53,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.learningplatform.data.remote.dto.NoteDto
 import com.github.learningplatform.ui.common.BackTopBar
 import com.github.learningplatform.ui.common.CommonTextField
-import com.github.learningplatform.ui.common.EmptyState
 import com.github.learningplatform.ui.common.ErrorState
 import com.github.learningplatform.ui.common.LoadingState
 import com.github.learningplatform.ui.common.MetaText
@@ -136,7 +135,7 @@ fun NotesScreen(
                 uiState.isLoading && uiState.notes.isEmpty() -> LoadingState()
                 uiState.error != null && uiState.notes.isEmpty() ->
                     ErrorState(message = uiState.error.orEmpty(), onRetry = viewModel::refresh)
-                uiState.notes.isEmpty() -> EmptyState(message = "还没有笔记，点右下角新建")
+                uiState.notes.isEmpty() -> Box(Modifier.fillMaxSize())
                 else -> LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
                     modifier = Modifier.fillMaxSize(),
@@ -159,7 +158,6 @@ fun NotesScreen(
 }
 
 private val noteSourceTabs = listOf(
-    null to "全部",
     1 to "文章笔记",
     2 to "视频笔记"
 )

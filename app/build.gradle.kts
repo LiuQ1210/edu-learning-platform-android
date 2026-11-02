@@ -50,7 +50,7 @@ android {
         buildConfigField("boolean", "UI_PREVIEW", uiPreview.toString())
 
         // 内容域（分类树/课程/文章/个人中心内容）独立预览开关：
-        val contentPreview = (project.findProperty("contentPreview") as String?)?.toBoolean() ?: true
+        val contentPreview = (project.findProperty("contentPreview") as String?)?.toBoolean() ?: false
         buildConfigField("boolean", "CONTENT_PREVIEW", contentPreview.toString())
     }
 

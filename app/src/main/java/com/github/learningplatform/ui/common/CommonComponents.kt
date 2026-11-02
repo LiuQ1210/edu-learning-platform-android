@@ -209,6 +209,8 @@ fun AppCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        // 描边：深色下勾勒卡片轮廓，浅色下 outlineVariant 极淡(#EEE)几乎不可见，不影响浅色
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         content()
@@ -294,7 +296,8 @@ fun CategoryTabs(
     items: List<Pair<Long?, String>>,
     selectedId: Long?,
     onSelect: (Long?) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    selectedColor: Color = Primary
 ) {
     LazyRow(
         modifier = modifier.fillMaxWidth(),
@@ -305,10 +308,11 @@ fun CategoryTabs(
             val selected = id == selectedId
             Surface(
                 shape = RoundedCornerShape(50),
-                color = if (selected) Primary.copy(alpha = 0.08f) else SurfaceWashStart,
+                // 未选中用 surface（浅色下即白色，深色下自动变深蓝灰），不写死 Color.White
+                color = if (selected) selectedColor.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surface,
                 border = androidx.compose.foundation.BorderStroke(
                     width = if (selected) 1.5.dp else 1.dp,
-                    color = if (selected) Primary else Divider
+                    color = if (selected) selectedColor else Divider
                 ),
                 // 再次点击已选中的分类不取消选择：「全部」是稳定的默认态
                 modifier = Modifier.clickable { onSelect(id) }
@@ -316,7 +320,7 @@ fun CategoryTabs(
                 Text(
                     text = name,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (selected) Primary else TextSecondary,
+                    color = if (selected) selectedColor else TextSecondary,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 1,
                     modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)

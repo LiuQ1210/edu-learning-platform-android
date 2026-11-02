@@ -50,7 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.learningplatform.data.remote.dto.ContentItemDto
-import com.github.learningplatform.ui.theme.SoftBlueGradient
+import com.github.learningplatform.ui.theme.softBlueGradient
 import com.github.learningplatform.ui.common.EmptyState
 import com.github.learningplatform.ui.common.ErrorState
 import com.github.learningplatform.ui.common.LoadingState
@@ -63,7 +63,6 @@ import com.github.learningplatform.ui.theme.Divider
 import com.github.learningplatform.ui.theme.pageGradientBrush
 import com.github.learningplatform.ui.theme.Primary
 import com.github.learningplatform.ui.theme.Success
-import com.github.learningplatform.ui.theme.Surface as AppSurface
 import com.github.learningplatform.ui.theme.TextHint
 import com.github.learningplatform.ui.theme.TextPrimary
 import com.github.learningplatform.ui.theme.TextSecondary
@@ -126,7 +125,7 @@ fun SearchScreen(
                     .weight(1f)
                     .height(44.dp)
                     .clip(RoundedCornerShape(50))
-                    .background(SoftBlueGradient)
+                    .background(softBlueGradient())
                     .padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -293,7 +292,8 @@ private fun SearchHistory(history: List<String>, onPick: (String) -> Unit) {
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(16.dp))
-                        .background(AppSurface)
+                        // 浅色下 surface 即白色，深色下自动变深蓝灰
+                        .background(MaterialTheme.colorScheme.surface)
                         .clickable { onPick(word) }
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {

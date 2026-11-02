@@ -94,13 +94,14 @@ class EditProfileViewModel @Inject constructor(
                         bio = state.bio.ifBlank { null }
                     )
                 )
-                // 同步本地缓存，个人主页首屏直接用新昵称
+                // 同步本地缓存昵称/头像，个人主页与社区主页首屏都直接用最新资料
                 userPreferences.saveLoginInfo(
                     token = userPreferences.getToken(),
                     userId = userPreferences.userId.first(),
-                    userName = userPreferences.userName.first(),
+                    userName = state.nickname,
                     phone = userPreferences.phone.first(),
-                    avatar = state.avatar
+                    avatar = state.avatar,
+                    nickname = state.nickname
                 )
                 _uiState.value = _uiState.value.copy(
                     saving = false,
