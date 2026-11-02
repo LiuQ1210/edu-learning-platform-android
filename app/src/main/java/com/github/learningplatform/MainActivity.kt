@@ -12,6 +12,8 @@ import com.github.learningplatform.data.local.UserPreferences
 import com.github.learningplatform.ui.nav.AppNavHost
 import com.github.learningplatform.ui.theme.LearnPlatformTheme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 /**
@@ -41,17 +43,18 @@ class MainActivity : ComponentActivity() {
         }
 
         enableEdgeToEdge()
+
+        // 系统启动屏驻留的 450ms 里同步读一次主题：DataStore 首次读取有异步延迟，
+        // 若用 LIGHT 当 initialValue，深色用户启动时 Compose 会先用浅色画一帧启动页再闪切深色。
+        // 文件只有几百字节，runBlocking 读取在系统屏遮盖下完成，不增加可感知耗时。
+        val initialTheme = runBlocking { userPreferences.themeMode.first() }
+
         setContent {
             // 设置页改主题后 DataStore 会推新值，这里重组即切主题，不需要重启 Activity。
-            // 冷启动时给个默认值 SYSTEM，第一帧后由 collect 覆盖。
+            // 只有浅色/深色两态，默认浅色，不跟随系统。
             val themeMode = userPreferences.themeMode
-                .collectAsStateWithLifecycle(initialValue = ThemeMode.LIGHT).value
-            val darkTheme = when (themeMode) {
-                ThemeMode.DARK -> true
-                ThemeMode.LIGHT -> false
-                ThemeMode.SYSTEM -> false
-            }
-            LearnPlatformTheme(darkTheme = darkTheme) {
+                .collectAsStateWithLifecycle(initialValue = initialTheme).value
+            LearnPlatformTheme(darkTheme = themeMode == ThemeMode.DARK) {
                 AppNavHost()
             }
         }

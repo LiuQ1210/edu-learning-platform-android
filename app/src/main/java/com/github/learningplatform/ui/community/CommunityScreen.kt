@@ -1,6 +1,7 @@
 ﻿package com.github.learningplatform.ui.community
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -174,7 +175,8 @@ private fun CommunityTopBar(onOpenPublish: () -> Unit, onOpenSearch: () -> Unit)
                 .weight(1f)
                 .height(36.dp)
                 .clip(RoundedCornerShape(50))
-                .background(Color.White)
+                // 浅色下 surface 即白色，深色下自动变深蓝灰
+                .background(MaterialTheme.colorScheme.surface)
                 .clickable(onClick = onOpenSearch)
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -247,7 +249,9 @@ private fun ArticleCard(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 0.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color.White)
+            // 浅色下 surface 即白色，深色下自动变深蓝灰
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
             .padding(12.dp)
     ) {

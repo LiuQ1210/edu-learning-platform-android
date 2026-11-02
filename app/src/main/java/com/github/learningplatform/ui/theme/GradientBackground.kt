@@ -117,11 +117,15 @@ fun GlowOrb(
             .size(diameter)
             .clip(CircleShape)
             .background(
+                // 深色下白晕在深底上太刺眼：核心换成品牌蓝、整体透明度压到 1/4，
+                // 变成一团柔和的暗蓝光；浅色完全沿用原来的白→淡蓝过渡。
                 Brush.radialGradient(
-                    0.00f to Color.White.copy(alpha = alpha),
-                    0.35f to Color.White.copy(alpha = alpha * 0.55f),
-                    0.62f to GlowEdge.copy(alpha = alpha * 0.22f),
-                    0.82f to GlowEdge.copy(alpha * 0.07f),
+                    0.00f to (if (LocalAppDarkTheme.current) Primary else Color.White)
+                        .copy(alpha = if (LocalAppDarkTheme.current) alpha * 0.22f else alpha),
+                    0.35f to (if (LocalAppDarkTheme.current) Primary else Color.White)
+                        .copy(alpha = if (LocalAppDarkTheme.current) alpha * 0.12f else alpha * 0.55f),
+                    0.62f to GlowEdge.copy(alpha = alpha * (if (LocalAppDarkTheme.current) 0.06f else 0.22f)),
+                    0.82f to GlowEdge.copy(alpha = alpha * (if (LocalAppDarkTheme.current) 0.03f else 0.07f)),
                     1.00f to Color.Transparent
                 )
             )
@@ -281,6 +285,30 @@ val SoftPinkGradient: Brush
 /** 淡蓝：品牌、课程类 */
 val SoftBlueGradient: Brush
     get() = Brush.linearGradient(listOf(Color(0xFFE3ECFD), Color(0xFFF6F9FF)))
+
+/**
+ * 淡蓝渐变的可组合版本：浅色下返回 [SoftBlueGradient]（外观不变），
+ * 深色下压暗成同色系渐变，供搜索框等内含文字的容器使用，避免浅底浅字。
+ */
+@Composable
+fun softBlueGradient(): Brush {
+    val dark = LocalAppDarkTheme.current
+    return if (dark) {
+        Brush.linearGradient(listOf(Primary.copy(alpha = 0.28f), DarkSurfaceVariant))
+    } else SoftBlueGradient
+}
+
+/**
+ * 淡青渐变的可组合版本：浅色下返回 [SoftTealGradient]（外观不变），
+ * 深色下压暗，供下载/收件类图标块使用。
+ */
+@Composable
+fun softTealGradient(): Brush {
+    val dark = LocalAppDarkTheme.current
+    return if (dark) {
+        Brush.linearGradient(listOf(Primary.copy(alpha = 0.22f), DarkSurfaceVariant))
+    } else SoftTealGradient
+}
 
 /** 主色渐变：主按钮、选中胶囊等需要质感的元素 */
 val BrandGradient: Brush

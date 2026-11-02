@@ -45,7 +45,7 @@ class UserPreferences @Inject constructor(
     /** 登录态判断：有 token 即视为已登录 */
     val isLoggedIn: Flow<Boolean> = token.map { it.isNotBlank() }
 
-    /** 主题模式：light / dark，默认浅色 */
+    /** 主题模式：只有浅色/深色两态，未设置时默认浅色，不跟随系统 */
     val themeMode: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
         when (prefs[Keys.THEME_MODE]) {
             "dark" -> ThemeMode.DARK

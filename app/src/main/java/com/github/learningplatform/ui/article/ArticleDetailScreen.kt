@@ -68,6 +68,7 @@ import com.github.learningplatform.ui.common.TagChip
 import com.github.learningplatform.ui.common.formatCount
 import com.github.learningplatform.ui.nav.NavIcons
 import com.github.learningplatform.ui.theme.Divider
+import com.github.learningplatform.ui.theme.HighlightWash
 import com.github.learningplatform.ui.theme.surfaceWashBrush
 import com.github.learningplatform.ui.theme.pageGradientBrush
 import com.github.learningplatform.ui.theme.Primary
@@ -479,7 +480,7 @@ private fun CommentItem(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 10.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(if (highlighted) Color(0xFFFFF3E0) else Color.Transparent)
+            .background(if (highlighted) HighlightWash else Color.Transparent)
             .padding(horizontal = if (highlighted) 8.dp else 0.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

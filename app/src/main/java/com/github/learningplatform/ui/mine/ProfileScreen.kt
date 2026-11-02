@@ -38,6 +38,7 @@ import com.github.learningplatform.ui.common.Avatar
 import com.github.learningplatform.ui.common.MetaText
 import com.github.learningplatform.ui.nav.NavIcons
 import com.github.learningplatform.ui.theme.Primary
+import com.github.learningplatform.ui.theme.LocalAppDarkTheme
 import com.github.learningplatform.ui.theme.TextHint
 import com.github.learningplatform.ui.theme.WarmYellowGradient
 import com.github.learningplatform.ui.theme.surfaceWashBrush
@@ -178,7 +179,8 @@ fun ProfileScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(Color.White)
+                    // 浅色下 surface 即白色，深色下自动变深蓝灰
+                    .background(MaterialTheme.colorScheme.surface)
                     .padding(vertical = 16.dp, horizontal = 8.dp)
             ) {
                 Row(
@@ -234,7 +236,8 @@ private fun ProfileHeader(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(Color.White)
+            // 浅色下 surface 即白色，深色下自动变深蓝灰
+            .background(MaterialTheme.colorScheme.surface)
             .clickable(onClick = onOpenCommunityProfile)
             .padding(12.dp)
     ) {
@@ -288,7 +291,8 @@ private fun StatItem(
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFFF5F5F5))
+            // 卡片内嵌套小容器：浅色下仍是极浅灰，深色下自动变深，不写死 #F5F5F5
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .clickable(onClick = onClick)
             .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -363,11 +367,14 @@ private fun GridMenuItem(
             .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // 浅色：彩色 10% 透明方块 + 彩色图标；
+        // 深色：彩色半透明方块会变成高饱和深彩色块太花，方块统一成中性 surfaceContainerHigh，图标保留彩色做功能区分。
+        val dark = LocalAppDarkTheme.current
         Box(
             modifier = Modifier
                 .size(48.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(tint.copy(alpha = 0.1f)),
+                .background(if (dark) MaterialTheme.colorScheme.surfaceContainerHigh else tint.copy(alpha = 0.1f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))

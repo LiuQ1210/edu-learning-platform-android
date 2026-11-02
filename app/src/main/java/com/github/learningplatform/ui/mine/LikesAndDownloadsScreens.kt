@@ -39,7 +39,7 @@ import com.github.learningplatform.ui.common.MetaText
 import com.github.learningplatform.ui.nav.NavIcons
 import com.github.learningplatform.ui.theme.Divider
 import com.github.learningplatform.ui.theme.Primary
-import com.github.learningplatform.ui.theme.SoftTealGradient
+import com.github.learningplatform.ui.theme.softTealGradient
 import com.github.learningplatform.ui.theme.TextPrimary
 import com.github.learningplatform.ui.theme.TextSecondary
 import com.github.learningplatform.ui.theme.pageGradientBrush
@@ -204,7 +204,7 @@ private fun DownloadRow(
             modifier = Modifier
                 .size(46.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(SoftTealGradient),
+                .background(softTealGradient()),
             contentAlignment = Alignment.Center
         ) {
             androidx.compose.material3.Icon(

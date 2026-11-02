@@ -201,6 +201,14 @@ val TabProfileWash: Color
     @Composable @ReadOnlyComposable get() =
         if (LocalAppDarkTheme.current) Color(0xFF3D3220) else Color(0xFFFBEFD2)
 
+/**
+ * 定位高亮底色：高亮评论、正在播放的课时行。
+ * 浅色沿用淡橙 #FFF3E0（保持原 UI 不变），深色压成暗暖褐，避免浅底配浅字。
+ */
+val HighlightWash: Color
+    @Composable @ReadOnlyComposable get() =
+        if (LocalAppDarkTheme.current) Color(0xFF3D3220) else Color(0xFFFFF3E0)
+
 // ---------------------------------------------------------------------------
 // 页面专属配色（每个 Tab 页面对应自己的主色调）
 // ---------------------------------------------------------------------------

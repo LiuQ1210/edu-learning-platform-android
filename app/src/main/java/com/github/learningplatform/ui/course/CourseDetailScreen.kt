@@ -67,6 +67,7 @@ import com.github.learningplatform.ui.common.VideoTypeBadge
 import com.github.learningplatform.ui.common.formatCount
 import com.github.learningplatform.ui.nav.NavIcons
 import com.github.learningplatform.ui.theme.Divider
+import com.github.learningplatform.ui.theme.HighlightWash
 import com.github.learningplatform.ui.theme.surfaceWashBrush
 import com.github.learningplatform.ui.theme.pageGradientBrush
 import com.github.learningplatform.ui.theme.Primary
@@ -380,7 +381,7 @@ private fun LessonRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onOpenPlayer(lesson) }
-            .background(if (highlighted) Color(0xFFFFF3E0) else Color.Transparent)
+            .background(if (highlighted) HighlightWash else Color.Transparent)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -622,7 +623,8 @@ private fun RecentLikers(likeCount: Int) {
                         .size(32.dp)
                         .clip(CircleShape)
                         .background(Primary.copy(alpha = 0.2f))
-                        .border(2.dp, Color.White, CircleShape),
+                        // 浅色下白边、深色下与卡片底融合，不写死 Color.White
+                        .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(name, color = Primary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)

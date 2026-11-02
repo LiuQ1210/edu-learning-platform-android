@@ -1,6 +1,7 @@
 package com.github.learningplatform.ui.course
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
@@ -99,7 +100,8 @@ fun HomeScreen(
                 selectedId = uiState.selectedCategoryId,
                 onSelect = viewModel::selectCategory,
                 modifier = Modifier.padding(bottom = 4.dp),
-                selectedColor = com.github.learningplatform.ui.theme.HomePrimary
+                // 用随主题切换的 TabHomeInk：浅色藏青、深色亮蓝，避免深色下深紫黑文字看不见
+                selectedColor = com.github.learningplatform.ui.theme.TabHomeInk
             )
         }
 
@@ -134,7 +136,8 @@ private fun HomeTopBar(onOpenSearch: () -> Unit, onOpenMenu: () -> Unit, onOpenN
                 .weight(1f)
                 .height(40.dp)
                 .clip(RoundedCornerShape(50))
-                .background(Color.White)
+                // 浅色下 surface 即白色，深色下自动变深蓝灰，不写死 Color.White
+                .background(MaterialTheme.colorScheme.surface)
                 .clickable(onClick = onOpenSearch)
                 .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -347,7 +350,9 @@ private fun CourseCard(
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(Color.White)
+            // 浅色下 surface 即白色，深色下自动变深蓝灰
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
             .clickable { onOpenCourse(course.courseId) }
     ) {
         Box {
