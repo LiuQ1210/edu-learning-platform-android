@@ -58,7 +58,6 @@ import com.github.learningplatform.ui.mine.LikesScreen
 import com.github.learningplatform.ui.mine.MyCoursesScreen
 import com.github.learningplatform.ui.mine.ProfileScreen
 import com.github.learningplatform.ui.mine.StudyStatsScreen
-import com.github.learningplatform.ui.mine.StudyPathScreen
 import com.github.learningplatform.ui.mine.NotificationsScreen
 import com.github.learningplatform.ui.mine.FollowingScreen
 import com.github.learningplatform.ui.mine.FansScreen
@@ -420,10 +419,6 @@ fun MainScaffold(
 
             composable(Routes.STUDY_STATS) {
                 StudyStatsScreen(onBack = { navController.popBackStack() })
-            }
-
-            composable(Routes.STUDY_PATH) {
-                StudyPathScreen(onBack = { navController.popBackStack() })
             }
 
             composable(Routes.MY_FAVORITES) {

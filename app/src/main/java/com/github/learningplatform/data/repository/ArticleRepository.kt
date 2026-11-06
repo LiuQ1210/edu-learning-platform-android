@@ -26,8 +26,8 @@ import javax.inject.Singleton
 /**
  * 社区文章仓库。
  *
- * 已与后端对齐：详情 / 我的发布 / 删除（后端 post 系列，字段名是 postId/postTitle）。
- * 后端尚未提供、继续用本地样例：文章列表流、发布、编辑、撤回、标签、举报。
+ * 已与后端对齐：文章列表流 / 详情 / 我的发布 / 发布 / 删除（后端 post 系列，字段名是 postId/postTitle）。
+ * 后端尚未提供：编辑、撤回、标签、举报。
  */
 @Singleton
 class ArticleRepository @Inject constructor(

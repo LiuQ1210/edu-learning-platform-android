@@ -17,7 +17,7 @@ import javax.inject.Inject
 
 data class CommunityProfileUiState(
     val isLoading: Boolean = false,
-    /** 昵称（自己来自 /user/home；他人后端无接口，页面用占位兜底） */
+    /** 昵称（自己来自 /user/home；他人后端无资料接口，页面用中性占位） */
     val nickname: String = "",
     val avatar: String = "",
     val bio: String = "",
@@ -47,7 +47,7 @@ data class CommunityProfileUiState(
  *          `/api/v1/follow/add|cancel?targetUserId=` → 关注/取关
  *
  * 后端**没有**「按 userId 查他人资料/文章/获赞」的接口（post/list 不支持 authorId），
- * 所以他人主页的昵称、简介仍用本地样例占位渲染，文章列表为空。
+ * 所以他人主页的昵称/简介/性别用中性占位（不编造人名），文章列表为空。
  */
 @HiltViewModel
 class CommunityProfileViewModel @Inject constructor(

@@ -3,7 +3,6 @@ package com.github.learningplatform.ui.community
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,11 +11,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -36,7 +33,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -77,9 +73,11 @@ fun CommunityProfileScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // 昵称/简介：自己来自 /user/home（与底部个人主页同源）；他人后端无资料接口，用占位文案
-    val userName = if (isSelf) profileState.nickname.ifBlank { "未设置昵称" } else "小红"
-    val bio = if (isSelf) profileState.bio else "热爱学习，正在补 Android 和算法。"
+    // 昵称/简介：自己来自 /user/home；他人没有资料接口，用中性占位而不是写死某个人名
+    val userName = profileState.nickname.ifBlank {
+        if (isSelf) "未设置昵称" else "用户 $userId"
+    }
+    val bio = profileState.bio
     var pendingDeleteId by remember { mutableStateOf<Long?>(null) }
 
     Column(
@@ -119,7 +117,7 @@ fun CommunityProfileScreen(
                             }
                             Spacer(Modifier.height(2.dp))
                             Text(
-                                if (isSelf) profileState.sexLabel.ifBlank { "不公开" } else "男",
+                                profileState.sexLabel.ifBlank { "不公开" },
                                 fontSize = 12.sp,
                                 color = TextSecondary
                             )
@@ -182,7 +180,7 @@ fun CommunityProfileScreen(
                 }
             }
 
-            // 粉丝头像墙（类似课程点赞）
+            // 粉丝数：后端只返回计数，没有「粉丝头像列表」接口
             item {
                 Row(
                     modifier = Modifier
@@ -190,29 +188,15 @@ fun CommunityProfileScreen(
                         .clip(RoundedCornerShape(16.dp))
                         .background(MaterialTheme.colorScheme.surface)
                         .padding(14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(modifier = Modifier.weight(1f)) {
-                        listOf("张", "李", "王", "赵").forEachIndexed { i, initial ->
-                            Box(
-                                modifier = Modifier
-                                    .padding(end = 4.dp)
-                                    .size(28.dp)
-                                    .clip(CircleShape)
-                                    .background(listOf(
-                                        Color(0xFFFF8A80), Color(0xFF80D8FF),
-                                        Color(0xFFB9F6CA), Color(0xFFFFD180)
-                                    )[i]),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(initial, fontSize = 12.sp, color = Color.White)
-                            }
-                        }
-                    }
+                    Text("粉丝", fontSize = 13.sp, color = TextSecondary)
                     Text(
-                        "等 ${profileState.fansCount} 人关注",
+                        "${profileState.fansCount} 人",
                         fontSize = 13.sp,
-                        color = TextSecondary
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary
                     )
                 }
             }

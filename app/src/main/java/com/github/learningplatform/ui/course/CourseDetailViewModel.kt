@@ -4,9 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.learningplatform.core.constants.Constants
 import com.github.learningplatform.data.remote.dto.CourseDetailDto
-import com.github.learningplatform.data.remote.dto.RatingDto
 import com.github.learningplatform.data.repository.CourseRepository
 import com.github.learningplatform.data.repository.InteractionRepository
+import com.github.learningplatform.data.repository.RatingRepository
 import com.github.learningplatform.data.repository.UserRepository
 import com.github.learningplatform.ui.readableMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -24,7 +24,7 @@ data class CourseDetailUiState(
     val error: String? = null,
     val detail: CourseDetailDto? = null,
     val tab: Int = 0,
-    val ratings: List<RatingDto> = emptyList(),
+    /** 当前用户已提交的评分（0 = 未评分），来自 /api/v1/rating/info */
     val myScore: Double = 0.0,
     /** 当前用户是否已点赞该课程（interaction/status 或点击后由 toggle 返回） */
     val isLiked: Boolean = false,
@@ -47,7 +47,8 @@ data class CourseDetailUiState(
 class CourseDetailViewModel @Inject constructor(
     private val courseRepository: CourseRepository,
     private val userRepository: UserRepository,
-    private val interactionRepository: InteractionRepository
+    private val interactionRepository: InteractionRepository,
+    private val ratingRepository: RatingRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CourseDetailUiState())
@@ -61,7 +62,8 @@ class CourseDetailViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
                 val detail = courseRepository.getCourseDetail(id)
-                val ratings = runCatching { courseRepository.getRatings(id).list }.getOrDefault(emptyList())
+                // 评分汇总与「我的评分」来自后端 rating/info；失败不影响课程详情展示
+                val rating = runCatching { ratingRepository.getRatingInfo(id) }.getOrNull()
                 // 进页面时同步点赞/收藏态：interaction/status?type=1 点赞、type=2 收藏
                 val likedIds = runCatching {
                     interactionRepository.getActiveIds(Constants.TARGET_COURSE, 1, listOf(id))
@@ -71,8 +73,8 @@ class CourseDetailViewModel @Inject constructor(
                 }.getOrDefault(emptyList())
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    detail = detail,
-                    ratings = ratings,
+                    detail = detail.withRating(rating?.averageScore, rating?.ratingCount),
+                    myScore = rating?.myScore ?: 0.0,
                     isLiked = likedIds.contains(id),
                     isFavorited = favIds.contains(id)
                 )
@@ -101,12 +103,11 @@ class CourseDetailViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isRefreshing = true, message = null)
             try {
                 val detail = courseRepository.getCourseDetail(courseId, forceRefresh = true)
-                val ratings = runCatching { courseRepository.getRatings(courseId).list }
-                    .getOrDefault(_uiState.value.ratings)
+                val rating = runCatching { ratingRepository.getRatingInfo(courseId) }.getOrNull()
                 _uiState.value = _uiState.value.copy(
                     isRefreshing = false,
-                    detail = detail,
-                    ratings = ratings,
+                    detail = detail.withRating(rating?.averageScore, rating?.ratingCount),
+                    myScore = rating?.myScore ?: _uiState.value.myScore,
                     isFavorited = _uiState.value.isFavorited
                 )
             } catch (e: CancellationException) {
@@ -190,19 +191,23 @@ class CourseDetailViewModel @Inject constructor(
         }
     }
 
-    /** 评分范围 0.5-5.0，步长 0.5；后端幂等覆盖 */
+    /** 评分范围 1-5 星；后端按 userId+courseId 覆盖更新，已有评分走 update */
     fun rate(score: Double) {
+        val star = score.toInt().coerceIn(1, 5)
         viewModelScope.launch {
             try {
-                val result = courseRepository.rateCourse(courseId, score)
-                val refreshed = runCatching { courseRepository.getRatings(courseId).list }
-                    .getOrDefault(_uiState.value.ratings)
+                val result = if (_uiState.value.myScore > 0) {
+                    ratingRepository.updateRating(courseId, star)
+                } else {
+                    ratingRepository.addRating(courseId, star)
+                }
+                val detail = _uiState.value.detail
                 _uiState.value = _uiState.value.copy(
-                    myScore = score,
-                    ratings = refreshed,
-                    detail = _uiState.value.detail?.copy(
-                        averageScore = result.averageScore,
-                        ratingCount = result.ratingCount
+                    myScore = star.toDouble(),
+                    detail = detail?.copy(
+                        // 后端没回字段时保留原值，别把详情页的平均分清成 0
+                        averageScore = if (result.averageScore > 0) result.averageScore else detail.averageScore,
+                        ratingCount = if (result.ratingCount > 0) result.ratingCount else detail.ratingCount
                     ),
                     message = "评分成功"
                 )
@@ -213,4 +218,17 @@ class CourseDetailViewModel @Inject constructor(
             }
         }
     }
+}
+
+/**
+ * 用评分接口的汇总值覆盖课程详情里的同名字段。
+ *
+ * 列表/详情接口本身也返回 avgScore / ratingCount，但用户刚评完分时
+ * 评分接口的返回值更新；字段缺省（0）时保留详情原值。
+ */
+private fun CourseDetailDto.withRating(averageScore: Double?, ratingCount: Int?): CourseDetailDto {
+    val avg = averageScore?.takeIf { it > 0 } ?: this.averageScore
+    val count = ratingCount?.takeIf { it > 0 } ?: this.ratingCount
+    if (avg == this.averageScore && count == this.ratingCount) return this
+    return copy(averageScore = avg, ratingCount = count)
 }

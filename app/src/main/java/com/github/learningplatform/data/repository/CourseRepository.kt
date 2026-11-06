@@ -8,7 +8,6 @@ import com.github.learningplatform.core.network.long
 import com.github.learningplatform.core.network.okBody
 import com.github.learningplatform.core.network.payload
 import com.github.learningplatform.core.network.str
-import com.github.learningplatform.data.demo.DemoData
 import com.github.learningplatform.data.local.CacheKeys
 import com.github.learningplatform.data.local.CacheStore
 import com.github.learningplatform.data.local.CacheTtl
@@ -221,16 +220,6 @@ class CourseRepository @Inject constructor(
     /** 播放进度心跳（后端暂未提供） */
     suspend fun syncProgress(request: com.github.learningplatform.data.remote.dto.ProgressSyncRequest) {
         // 暂不实现
-    }
-
-    /** 评分（后端暂未提供，返回假数据） */
-    suspend fun rateCourse(courseId: Long, score: Double): com.github.learningplatform.data.remote.dto.RatingResultDto {
-        return DemoData.rateResult(score)
-    }
-
-    /** 课程评分列表（后端暂未提供，返回假数据） */
-    suspend fun getRatings(courseId: Long, pageNum: Int = 1, pageSize: Int = 20): PageData<com.github.learningplatform.data.remote.dto.RatingDto> {
-        return DemoData.ratings(courseId)
     }
 
     private companion object {

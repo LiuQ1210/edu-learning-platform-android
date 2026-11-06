@@ -1,7 +1,6 @@
 package com.github.learningplatform.ui.course
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -51,13 +49,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.learningplatform.data.remote.dto.CourseChapterDto
 import com.github.learningplatform.data.remote.dto.CourseLessonDto
-import com.github.learningplatform.data.remote.dto.RatingDto
-import com.github.learningplatform.ui.common.Avatar
 import com.github.learningplatform.ui.common.EmptyState
 import com.github.learningplatform.ui.common.ErrorState
 import com.github.learningplatform.ui.common.LoadingState
@@ -72,7 +67,6 @@ import com.github.learningplatform.ui.theme.HighlightWash
 import com.github.learningplatform.ui.theme.surfaceWashBrush
 import com.github.learningplatform.ui.theme.pageGradientBrush
 import com.github.learningplatform.ui.theme.Primary
-import com.github.learningplatform.ui.theme.Surface
 import com.github.learningplatform.ui.theme.TextHint
 import com.github.learningplatform.ui.theme.TextPrimary
 import com.github.learningplatform.ui.theme.TextSecondary
@@ -98,7 +92,6 @@ fun CourseDetailScreen(
     val highlightLessonId = remember { LessonHighlightBus.highlightLessonId.also { LessonHighlightBus.highlightLessonId = null } }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
-    var localRatings by remember { mutableStateOf(listOf<RatingDto>()) }
 
     LaunchedEffect(courseId) { viewModel.load(courseId) }
 
@@ -226,7 +219,7 @@ fun CourseDetailScreen(
                     }
 
                     // 最近点赞：用真实 likeCount（原来误用了后端并不返回的 studentCount）
-                    item { RecentLikers(likeCount = detail.likeCount) }
+                    item { LikeSummary(likeCount = detail.likeCount) }
 
                     item { CourseTabs(selected = uiState.tab, onSelect = viewModel::selectTab) }
 
@@ -234,7 +227,7 @@ fun CourseDetailScreen(
                         0 -> catalogSection(detail.chapters, highlightLessonId, onOpenPlayer = { lesson ->
                             onOpenPlayer(courseId, lesson.lessonId)
                         })
-                        else -> ratingSection(uiState.ratings, uiState.myScore, viewModel::rate, localRatings) { newR -> localRatings = listOf(newR) + localRatings }
+                        else -> ratingSection(uiState.myScore, viewModel::rate)
                     }
                     }
                 }
@@ -436,11 +429,8 @@ private fun LessonRow(
 }
 
 private fun androidx.compose.foundation.lazy.LazyListScope.ratingSection(
-    ratings: List<RatingDto>,
     myScore: Double,
-    onRate: (Double) -> Unit,
-    localRatings: List<RatingDto> = emptyList(),
-    onPostRating: (RatingDto) -> Unit = {}
+    onRate: (Double) -> Unit
 ) {
     item {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -452,9 +442,9 @@ private fun androidx.compose.foundation.lazy.LazyListScope.ratingSection(
             )
             Spacer(Modifier.height(8.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // 【任务⑤：key 稳定】静态常量列表也补上稳定 key（评分值本身即唯一键）
-                items((1..10).map { it * 0.5 }, key = { it }) { score ->
-                    val selected = myScore > 0 && kotlin.math.abs(myScore - score) < 0.01
+                // 后端 rating/add|update 的 score 是整数（1-5 星），不再提供 0.5 星档位
+                items((1..5).toList(), key = { it }) { score ->
+                    val selected = myScore > 0 && myScore.toInt() == score
                     Surface(
                         shape = RoundedCornerShape(50),
                         color = if (selected) Primary else MaterialTheme.colorScheme.surface,
@@ -462,10 +452,10 @@ private fun androidx.compose.foundation.lazy.LazyListScope.ratingSection(
                             1.dp,
                             if (selected) Primary else Divider
                         ),
-                        modifier = Modifier.clickable { onRate(score) }
+                        modifier = Modifier.clickable { onRate(score.toDouble()) }
                     ) {
                         Text(
-                            text = String.format(Locale.CHINA, "%.1f", score),
+                            text = "$score 星",
                             style = MaterialTheme.typography.bodySmall,
                             color = if (selected) Color.White else TextSecondary,
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
@@ -473,94 +463,16 @@ private fun androidx.compose.foundation.lazy.LazyListScope.ratingSection(
                     }
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            // 评价输入框
-            var input by remember { mutableStateOf("") }
-            androidx.compose.material3.OutlinedTextField(
-                value = input,
-                onValueChange = { input = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("说说这门课的感受...", color = TextHint) },
-                minLines = 3,
-                shape = RoundedCornerShape(12.dp)
-            )
             Spacer(Modifier.height(8.dp))
-            androidx.compose.material3.Button(
-                onClick = {
-                    if (input.isNotBlank() && myScore > 0) {
-                        onPostRating(
-                            RatingDto(
-                                userId = 0,
-                                userName = "我",
-                                userAvatar = "",
-                                score = myScore,
-                                comment = input.trim(),
-                                createTime = "刚刚"
-                            )
-                        )
-                        input = ""
-                    }
+            Text(
+                text = if (myScore > 0) {
+                    "已评分 ${myScore.toInt()} 星，点击其他星级可修改"
+                } else {
+                    "点击星级提交评分（1-5 星）"
                 },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp)
-            ) {
-                Text("发布评价")
-            }
-        }
-    }
-
-    val allRatings = localRatings + ratings
-    item { SectionHeader(title = "全部评价 (${allRatings.size})") }
-    if (allRatings.isEmpty()) {
-        item { EmptyState(message = "暂无评价", modifier = Modifier.height(200.dp)) }
-    } else {
-        items(allRatings, key = { "rating-${it.userId}-${it.score}-${it.createTime}-${it.comment}" }) { rating ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 10.dp)
-            ) {
-                Avatar(url = rating.userAvatar, name = rating.userName, size = 36.dp)
-                Spacer(Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = rating.userName.ifBlank { "匿名用户" },
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = TextPrimary,
-                            modifier = Modifier.weight(1f)
-                        )
-                        // 星星
-                        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                            (1..5).forEach { s ->
-                                Text(
-                                    text = "★",
-                                    color = if (rating.score >= s) Color(0xFFFFC107) else TextHint,
-                                    fontSize = 12.sp
-                                )
-                            }
-                        }
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = String.format(Locale.CHINA, "%.1f", rating.score),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Primary
-                        )
-                    }
-                    if (rating.comment.isNotBlank()) {
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = rating.comment,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = TextPrimary
-                        )
-                    }
-                    Spacer(Modifier.height(2.dp))
-                    MetaText(rating.createTime)
-                }
-            }
-            HorizontalDivider(color = Divider, modifier = Modifier.padding(start = 62.dp))
+                style = MaterialTheme.typography.bodySmall,
+                color = TextHint
+            )
         }
     }
 }
@@ -624,42 +536,32 @@ fun formatDuration(seconds: Int): String {
 }
 
 
+/**
+ * 点赞汇总。
+ *
+ * 后端只返回 likeCount，没有「最近点赞用户」列表；之前的五个头像
+ * （张/李/王/赵/陈）是本地写死的假数据，现已移除，只展示真实计数。
+ */
 @Composable
-private fun RecentLikers(likeCount: Int) {
-    Column(
+private fun LikeSummary(likeCount: Int) {
+    if (likeCount <= 0) return
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = "最近点赞",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = TextPrimary
+        Icon(
+            NavIcons.Favorite,
+            contentDescription = null,
+            tint = Primary,
+            modifier = Modifier.size(16.dp)
         )
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            listOf("张", "李", "王", "赵", "陈").forEach { name ->
-                Box(
-                    modifier = Modifier
-                        .padding(end = 4.dp)
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(Primary.copy(alpha = 0.2f))
-                        // 浅色下白边、深色下与卡片底融合，不写死 Color.White
-                        .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(name, color = Primary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                }
-            }
-            Spacer(Modifier.width(16.dp))
-            Spacer(Modifier.width(4.dp))
-            Text(
-                text = "等 ${formatCount(likeCount)} 人赞过",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary
-            )
-        }
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = "已有 ${formatCount(likeCount)} 人点赞",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary
+        )
     }
 }

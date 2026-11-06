@@ -45,13 +45,6 @@ android {
         val baseUrl = if (rawBaseUrl.endsWith("/")) rawBaseUrl else "$rawBaseUrl/"
         buildConfigField("String", "BASE_URL", "\"$baseUrl\"")
 
-        // UI 预览开关：true 时登录/注册等认证接口直接返回本地假登录，不发任何网络请求。
-        val uiPreview = (project.findProperty("uiPreview") as String?)?.toBoolean() ?: false
-        buildConfigField("boolean", "UI_PREVIEW", uiPreview.toString())
-
-        // 内容域（分类树/课程/文章/个人中心内容）独立预览开关：
-        val contentPreview = (project.findProperty("contentPreview") as String?)?.toBoolean() ?: false
-        buildConfigField("boolean", "CONTENT_PREVIEW", contentPreview.toString())
     }
 
     /*
@@ -97,10 +90,6 @@ android {
             // Hilt / Room / Compose 的规则由各自 AAR 的 consumer rules 自动合并，不用手写。
             isMinifyEnabled = true
             isShrinkResources = true
-
-            // 生产构建关掉 UI 预览短路，走真实网络路径。
-            // DemoData 与 58 处 preview 分支会被 R8 一并裁掉（DemoData.enabled 是常量 false）。
-            buildConfigField("boolean", "UI_PREVIEW", "false")
         }
     }
 

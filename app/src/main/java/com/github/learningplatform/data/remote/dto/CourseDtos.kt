@@ -133,23 +133,9 @@ data class ProgressSyncRequest(
     val deviceType: Int = 3
 )
 
-/** 6.5 课程评分（0.5-5.0，步长0.5） */
-@Serializable
-data class RatingRequest(val score: Double)
-
+/** 6.5 课程评分提交结果（0.5-5.0 分由后端四舍五入为整数星级） */
 @Serializable
 data class RatingResultDto(
     val averageScore: Double = 0.0,
     val ratingCount: Int = 0
-)
-
-/** 6.6 评分列表项 */
-@Serializable
-data class RatingDto(
-    val userId: Long = 0,
-    val userName: String = "",
-    val userAvatar: String = "",
-    val score: Double = 0.0,
-    val comment: String = "",
-    val createTime: String = ""
 )
