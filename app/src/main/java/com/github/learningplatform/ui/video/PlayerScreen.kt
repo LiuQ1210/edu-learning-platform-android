@@ -8,8 +8,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
@@ -272,48 +274,6 @@ fun PlayerScreen(
                     }
                 }
 
-                // 顶部返回条
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onBack) {
-                        Icon(NavIcons.ArrowBack, contentDescription = "返回", tint = Color.White)
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = uiState.title.ifBlank { "课程播放" },
-                            color = Color.White,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1
-                        )
-                        if (!uiState.playInfo?.watermarkText.isNullOrBlank()) {
-                            Text(
-                                text = uiState.playInfo?.watermarkText.orEmpty(),
-                                color = Color.White.copy(alpha = 0.6f),
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        }
-                    }
-
-                    // 写笔记：视频笔记会带上当前播放位置
-                    IconButton(onClick = {
-                        // 直接取 ExoPlayer 的真实位置，不要用 ViewModel 里缓存的
-                        // lastKnownSeconds —— 那个只在 15-30 秒一次的心跳里更新，会偏
-                        noteTimestamp = (player.currentPosition / 1000).toInt().coerceAtLeast(0)
-                        viewModel.showNoteDialog()
-                    }) {
-                        Icon(
-                            NavIcons.Note,
-                            contentDescription = "写笔记",
-                            tint = Color.White
-                        )
-                    }
-                }
-
                 // 暂停时显示广告位（预留）
                 if (!isPlaying) {
                     AdSlot(slotId = "video_pause_banner", modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 50.dp))
@@ -324,7 +284,10 @@ fun PlayerScreen(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
+                        // 背景铺满到屏幕底部，控件本身让开手势导航条区域，
+                        // 否则播放键/进度条的下半截会落在系统触摸区内，按不动
                         .background(Color.Black.copy(alpha = 0.45f))
+                        .navigationBarsPadding()
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -441,6 +404,64 @@ fun PlayerScreen(
                 }
 
 
+            }
+        }
+
+        /*
+         * 顶部返回条。
+         *
+         * 两个关键点：
+         *
+         * 1) 必须放在 when 外面。放在「播放正常」分支里时，加载中/加载失败
+         *    （ErrorState）这条路径上没有任何返回入口，只能靠系统返回键。
+         *
+         * 2) 必须加 statusBarsPadding。本页是 edge-to-edge 全屏页（MainActivity
+         *    调了 enableEdgeToEdge），窗口从屏幕 0,0 开始画，但系统状态栏窗口
+         *    仍然占着顶部那一条（刘海/挖孔机约 24~50dp）并吃掉该区域的触摸事件。
+         *    不给这一行让出 inset，返回键就被压在状态栏底下：看得见、点不动。
+         */
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(NavIcons.ArrowBack, contentDescription = "返回", tint = Color.White)
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = uiState.title.ifBlank { "课程播放" },
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1
+                )
+                if (!uiState.playInfo?.watermarkText.isNullOrBlank()) {
+                    Text(
+                        text = uiState.playInfo?.watermarkText.orEmpty(),
+                        color = Color.White.copy(alpha = 0.6f),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
+
+            // 写笔记：视频笔记会带上当前播放位置。
+            // 播放地址还没下发时不显示，避免对着空播放器写一条位置为 0 的笔记。
+            if (uiState.playInfo?.playUrl != null) {
+                IconButton(onClick = {
+                    // 直接取 ExoPlayer 的真实位置，不要用 ViewModel 里缓存的
+                    // lastKnownSeconds —— 那个只在 15-30 秒一次的心跳里更新，会偏
+                    noteTimestamp = (player.currentPosition / 1000).toInt().coerceAtLeast(0)
+                    viewModel.showNoteDialog()
+                }) {
+                    Icon(
+                        NavIcons.Note,
+                        contentDescription = "写笔记",
+                        tint = Color.White
+                    )
+                }
             }
         }
     }

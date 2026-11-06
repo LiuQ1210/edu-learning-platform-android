@@ -46,6 +46,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -166,6 +167,28 @@ fun CourseDetailScreen(
                                     .fillMaxWidth()
                                     .aspectRatio(16f / 9f),
                                 radius = 0.dp
+                            )
+                            /*
+                             * 封面顶部由深到透明的渐变。
+                             *
+                             * 返回键是纯白图标直接压在封面上：封面一旦是白底或浅色
+                             * （比如 MySQL 那门课的白底书封），白色箭头就和背景糊在一起，
+                             * 用户看不到返回入口。封面图是后端下发的，颜色不可控，
+                             * 所以靠一层固定遮罩给白色图标兜住对比度，而不是给图标换颜色
+                             * （深色封面上又会反过来看不见）。
+                             */
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(88.dp)
+                                    .background(
+                                        Brush.verticalGradient(
+                                            listOf(
+                                                Color.Black.copy(alpha = 0.5f),
+                                                Color.Transparent
+                                            )
+                                        )
+                                    )
                             )
                             IconButton(
                                 onClick = onBack,
