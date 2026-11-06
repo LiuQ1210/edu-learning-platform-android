@@ -2,10 +2,16 @@ package com.github.learningplatform.data.repository
 
 import com.github.learningplatform.core.network.double
 import com.github.learningplatform.core.network.int
+import com.github.learningplatform.core.network.long
 import com.github.learningplatform.core.network.okBody
 import com.github.learningplatform.core.network.payload
+import com.github.learningplatform.core.network.str
 import com.github.learningplatform.data.remote.RatingApi
+import com.github.learningplatform.data.remote.dto.RatingDto
 import com.github.learningplatform.data.remote.dto.RatingResultDto
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,18 +28,18 @@ class RatingRepository @Inject constructor(
     private val ratingApi: RatingApi
 ) {
 
-    /** 新增评分 */
-    suspend fun addRating(courseId: Long, score: Int): RatingResultDto {
-        val data = ratingApi.addRating(courseId, score).okBody().payload()
+    /** 新增评分（content 可选） */
+    suspend fun addRating(courseId: Long, score: Int, content: String? = null): RatingResultDto {
+        val data = ratingApi.addRating(courseId, score, content).okBody().payload()
         return RatingResultDto(
             averageScore = data.double("avgScore"),
             ratingCount = data.int("ratingCount")
         )
     }
 
-    /** 修改评分 */
-    suspend fun updateRating(courseId: Long, score: Int): RatingResultDto {
-        val data = ratingApi.updateRating(courseId, score).okBody().payload()
+    /** 修改评分（content 可选，空串=清空文字） */
+    suspend fun updateRating(courseId: Long, score: Int, content: String? = null): RatingResultDto {
+        val data = ratingApi.updateRating(courseId, score, content).okBody().payload()
         return RatingResultDto(
             averageScore = data.double("avgScore"),
             ratingCount = data.int("ratingCount")
@@ -53,5 +59,22 @@ class RatingRepository @Inject constructor(
             averageScore = data.double("avgScore"),
             ratingCount = data.int("ratingCount")
         )
+    }
+
+    /** 评分列表（后端返回 TableDataInfo：{total, rows:[...]}） */
+    suspend fun getRatingList(courseId: Long): List<RatingDto> {
+        val root = ratingApi.getRatingList(courseId).okBody()
+        val rows = root["rows"]?.jsonArray ?: return emptyList()
+        return rows.map { el ->
+            val o = el.jsonObject
+            RatingDto(
+                userId = o.long("userId"),
+                userName = o.str("userName"),
+                userAvatar = o.str("avatar").ifBlank { o.str("userAvatar") },
+                score = o.double("score"),
+                comment = o.str("content"),
+                createTime = o.str("createTime")
+            )
+        }
     }
 }

@@ -106,7 +106,11 @@ fun VideoScreen(
                 onRetry = viewModel::refresh
             )
             uiState.videos.isEmpty() -> EmptyState(message = "暂无短视频")
-            else -> {
+            else -> androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+                isRefreshing = uiState.isLoading && uiState.videos.isNotEmpty(),
+                onRefresh = viewModel::refresh,
+                modifier = Modifier.fillMaxSize()
+            ) {
                 val pagerState = rememberPagerState(pageCount = { uiState.videos.size })
 
                 // 从收藏/历史列表带 id 进来：列表加载完后自动跳到目标视频
@@ -165,8 +169,10 @@ fun VideoScreen(
             comments = uiState.comments,
             error = uiState.commentsError,
             hasMore = uiState.commentsHasMore,
+            myUserId = uiState.myUserId,
             onLoadMore = viewModel::loadMoreComments,
             onPostComment = viewModel::postComment,
+            onDeleteComment = viewModel::deleteComment,
             onDismiss = viewModel::closeComments
         )
     }
@@ -494,8 +500,10 @@ private fun CommentsSheet(
     comments: List<CommentDto>,
     error: String?,
     hasMore: Boolean,
+    myUserId: Long,
     onLoadMore: () -> Unit,
     onPostComment: (String, Long) -> Unit,
+    onDeleteComment: (Long) -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -538,10 +546,14 @@ private fun CommentsSheet(
                     items(comments, key = { it.commentId }) { comment ->
                         CommentRow(
                             comment = comment,
+                            isMine = comment.userId == myUserId,
+                            myUserId = myUserId,
                             onReply = {
                                 replyToCommentId = comment.commentId
                                 replyToUser = comment.userName
-                            }
+                            },
+                            onDelete = { onDeleteComment(comment.commentId) },
+                            onDeleteReply = onDeleteComment
                         )
                     }
                     if (hasMore) {
@@ -610,7 +622,7 @@ private fun CommentsSheet(
 }
 
 @Composable
-private fun CommentRow(comment: CommentDto, onReply: () -> Unit = {}) {
+private fun CommentRow(comment: CommentDto, isMine: Boolean = false, myUserId: Long = 0L, onReply: () -> Unit = {}, onDelete: () -> Unit = {}, onDeleteReply: (Long) -> Unit = {}) {
     var liked by remember { mutableStateOf(comment.isLiked) }
     var likeCnt by remember { mutableStateOf(comment.likeCount) }
     Row(modifier = Modifier
@@ -649,32 +661,33 @@ private fun CommentRow(comment: CommentDto, onReply: () -> Unit = {}) {
                 ) {
                     comment.hotReplies.forEachIndexed { index, reply ->
                         if (index > 0) Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = reply.userName + (reply.replyToName?.let { " 回复 $it" } ?: "") + "：" + reply.content,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
-                        )
+                        Column {
+                            Text(
+                                text = reply.userName + (reply.replyToName?.let { " 回复 $it" } ?: "") + "：" + reply.content,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                            if (reply.userId == myUserId) {
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = "删除",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFFFF4D6A),
+                                    modifier = Modifier.clickable { onDeleteReply(reply.commentId) }
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
-        // 评论点赞 + 回复
+        // 评论回复 + 删除（自己的评论才显示删除）
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                NavIcons.Favorite,
-                contentDescription = "赞",
-                tint = if (liked) Color(0xFFFF4D6A) else TextHint,
-                modifier = Modifier
-                    .size(18.dp)
-                    .clickable {
-                        liked = !liked
-                        likeCnt = if (liked) likeCnt + 1 else likeCnt - 1
-                    }
-            )
-            Spacer(Modifier.height(2.dp))
-            Text("$likeCnt", style = MaterialTheme.typography.labelSmall, color = TextHint)
-            Spacer(Modifier.height(8.dp))
             Icon(NavIcons.Comment, contentDescription = "回复", tint = TextHint, modifier = Modifier.size(16.dp).clickable { onReply() })
+            if (isMine) {
+                Spacer(Modifier.height(8.dp))
+                Text("删除", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.clickable { onDelete() })
+            }
         }
     }
 }

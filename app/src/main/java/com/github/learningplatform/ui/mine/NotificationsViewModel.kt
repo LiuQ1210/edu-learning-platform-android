@@ -20,7 +20,12 @@ data class NotificationUiItem(
     val body: String = "",
     val time: String = "",
     val read: Boolean = false,
-    val category: String = "like"
+    val category: String = "like",
+    val targetType: String = "",
+    val targetId: Long = 0L,
+    val fromUserId: Long = 0L,
+    val fromUserName: String = "",
+    val fromUserAvatar: String = ""
 )
 
 data class NotificationsUiState(
@@ -71,6 +76,21 @@ class NotificationsViewModel @Inject constructor(
         }
     }
 
+    fun markRead(notificationId: Long) {
+        viewModelScope.launch {
+            try {
+                val count = notificationRepository.markRead(notificationId)
+                _uiState.value = _uiState.value.copy(unreadCount = count)
+                // 本地标记已读
+                _uiState.value = _uiState.value.copy(
+                    items = _uiState.value.items.map {
+                        if (it.id == notificationId) it.copy(read = true) else it
+                    }
+                )
+            } catch (_: Throwable) {}
+        }
+    }
+
     private fun load(reset: Boolean) {
         val snapshot = _uiState.value
         val nextPage = if (reset) 1 else snapshot.pageNum + 1
@@ -84,11 +104,11 @@ class NotificationsViewModel @Inject constructor(
                 generation = generation
             )
             try {
-                // 后端通知类型：1点赞 2评论 3关注 4收藏
-                val typeMap = mapOf(0 to "1", 1 to "2", 2 to "3", 3 to "4")
+                // 后端通知类型：1点赞 2收藏 3评论 4关注 5回复
+                val typeMap = mapOf(0 to "1", 1 to "3", 2 to "4", 3 to "2")
                 val type = typeMap[snapshot.selectedTab]
-                // 暂时先拉全部，后面再按类型筛选
                 val list = notificationRepository.getNotificationList(
+                    type = type,
                     isRead = null,
                     pageNum = nextPage,
                     pageSize = 20
@@ -97,19 +117,36 @@ class NotificationsViewModel @Inject constructor(
                     try {
                         @Suppress("UNCHECKED_CAST")
                         val row = map as? Map<String, Any?> ?: return@mapNotNull null
+                        val fromName = row["fromUserName"] as? String ?: ""
+                        val rawContent = row["content"] as? String ?: ""
+                        val content = if (rawContent == "null") "" else rawContent
+                        val notifType = row["type"] as? String ?: "1"
+                        val title = when (notifType) {
+                            "1" -> "${fromName} 赞了你的内容"
+                            "2" -> "${fromName} 收藏了你的内容"
+                            "3" -> "${fromName} 评论了你"
+                            "4" -> "${fromName} 关注了你"
+                            "5" -> "${fromName} 回复了你"
+                            else -> fromName
+                        }
                         NotificationUiItem(
                             id = (row["notificationId"] as? Number)?.toLong() ?: 0L,
-                            title = row["title"] as? String ?: "",
-                            body = row["content"] as? String ?: "",
+                            title = title,
+                            body = content,
                             time = row["createTime"] as? String ?: "",
                             read = (row["isRead"] as? String) == "1",
-                            category = when (row["type"] as? String) {
+                            category = when (notifType) {
                                 "1" -> "like"
-                                "2" -> "comment"
-                                "3" -> "follow"
-                                "4" -> "favorite"
+                                "2" -> "favorite"
+                                "3", "5" -> "comment"
+                                "4" -> "follow"
                                 else -> "like"
-                            }
+                            },
+                            targetType = row["targetType"] as? String ?: "",
+                            targetId = (row["targetId"] as? Number)?.toLong() ?: 0L,
+                            fromUserId = (row["fromUserId"] as? Number)?.toLong() ?: 0L,
+                            fromUserName = fromName,
+                            fromUserAvatar = row["fromUserAvatar"] as? String ?: ""
                         )
                     } catch (_: Throwable) {
                         null

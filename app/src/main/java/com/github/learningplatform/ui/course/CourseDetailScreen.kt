@@ -227,7 +227,7 @@ fun CourseDetailScreen(
                         0 -> catalogSection(detail.chapters, highlightLessonId, onOpenPlayer = { lesson ->
                             onOpenPlayer(courseId, lesson.lessonId)
                         })
-                        else -> ratingSection(uiState.myScore, viewModel::rate)
+                        else -> ratingSection(uiState.myScore, uiState.ratings, viewModel::rate)
                     }
                     }
                 }
@@ -430,7 +430,8 @@ private fun LessonRow(
 
 private fun androidx.compose.foundation.lazy.LazyListScope.ratingSection(
     myScore: Double,
-    onRate: (Double) -> Unit
+    ratings: List<com.github.learningplatform.data.remote.dto.RatingDto>,
+    onRate: (Double, String) -> Unit
 ) {
     item {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -441,10 +442,15 @@ private fun androidx.compose.foundation.lazy.LazyListScope.ratingSection(
                 color = TextPrimary
             )
             Spacer(Modifier.height(8.dp))
+            // 评论文字输入（可选）
+            var comment by remember { mutableStateOf("") }
+            // 点星星只选中，点发布才提交
+            var draftScore by remember { mutableStateOf(0) }
+            val effectiveScore = if (draftScore > 0) draftScore else myScore.toInt()
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 // 后端 rating/add|update 的 score 是整数（1-5 星），不再提供 0.5 星档位
                 items((1..5).toList(), key = { it }) { score ->
-                    val selected = myScore > 0 && myScore.toInt() == score
+                    val selected = effectiveScore == score
                     Surface(
                         shape = RoundedCornerShape(50),
                         color = if (selected) Primary else MaterialTheme.colorScheme.surface,
@@ -452,7 +458,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.ratingSection(
                             1.dp,
                             if (selected) Primary else Divider
                         ),
-                        modifier = Modifier.clickable { onRate(score.toDouble()) }
+                        modifier = Modifier.clickable { draftScore = score }
                     ) {
                         Text(
                             text = "$score 星",
@@ -464,16 +470,111 @@ private fun androidx.compose.foundation.lazy.LazyListScope.ratingSection(
                 }
             }
             Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.OutlinedTextField(
+                    value = comment,
+                    onValueChange = { if (it.length <= 500) comment = it },
+                    placeholder = { Text("写点评价（可选）") },
+                    modifier = Modifier.weight(1f),
+                    maxLines = 3
+                )
+                Spacer(Modifier.width(8.dp))
+                Button(
+                    onClick = { onRate(effectiveScore.toDouble(), comment) },
+                    enabled = effectiveScore > 0,
+                    shape = RoundedCornerShape(8.dp)
+                ) { Text("发布") }
+            }
+            Spacer(Modifier.height(8.dp))
             Text(
                 text = if (myScore > 0) {
                     "已评分 ${myScore.toInt()} 星，点击其他星级可修改"
                 } else {
-                    "点击星级提交评分（1-5 星）"
+                    "点击星级提交评分（1-5 星，评价可选）"
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = TextHint
             )
         }
+    }
+    // 评分列表
+    if (ratings.isNotEmpty()) {
+        item {
+            Text(
+                text = "全部评价（${ratings.size}）",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = TextPrimary,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp)
+            )
+        }
+        items(ratings, key = { it.userId }) { r ->
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(r.userName.ifBlank { "匿名" }, style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
+                    Spacer(Modifier.width(8.dp))
+                    Text("${r.score.toInt()} 星", style = MaterialTheme.typography.bodySmall, color = Primary)
+                }
+                if (r.comment.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(r.comment, style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
+                }
+                if (r.createTime.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(r.createTime, style = MaterialTheme.typography.bodySmall, color = TextHint)
+                }
+            }
+            androidx.compose.material3.HorizontalDivider(color = Divider.copy(alpha = 0.3f))
+        }
+    }
+}
+
+private fun androidx.compose.foundation.lazy.LazyListScope.commentSection(
+    comments: List<com.github.learningplatform.data.remote.dto.CommentDto>,
+    myUserId: Long,
+    onAdd: (String) -> Unit,
+    onDelete: (Long) -> Unit
+) {
+    item {
+        var text by remember { mutableStateOf("") }
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "评论（${comments.size}）",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = TextPrimary
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.OutlinedTextField(
+                    value = text,
+                    onValueChange = { if (it.length <= 500) text = it },
+                    placeholder = { Text("说点什么...") },
+                    modifier = Modifier.weight(1f),
+                    maxLines = 2
+                )
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = { onAdd(text); text = "" }, enabled = text.isNotBlank()) {
+                    Text("发送")
+                }
+            }
+        }
+    }
+    items(comments, key = { it.commentId }) { c ->
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(c.userName.ifBlank { "匿名" }, style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
+                Spacer(Modifier.weight(1f))
+                if (c.userId == myUserId) {
+                    androidx.compose.material3.TextButton(onClick = { onDelete(c.commentId) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                        Text("删除", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+            Text(c.content, style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
+            Text(c.createTime, style = MaterialTheme.typography.bodySmall, color = TextHint)
+        }
+        androidx.compose.material3.HorizontalDivider(color = Divider.copy(alpha = 0.3f))
     }
 }
 

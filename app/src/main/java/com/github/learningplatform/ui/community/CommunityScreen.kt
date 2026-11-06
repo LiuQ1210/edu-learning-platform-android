@@ -99,7 +99,12 @@ fun CommunityScreen(
                 uiState.error != null && uiState.articles.isEmpty() ->
                     ErrorState(message = uiState.error.orEmpty(), onRetry = viewModel::refresh)
                 uiState.articles.isEmpty() -> EmptyState(message = "还没有文章，来写第一篇吧")
-                else -> LazyColumn(
+                else -> androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+                    isRefreshing = uiState.isLoading && uiState.articles.isNotEmpty(),
+                    onRefresh = viewModel::refresh,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(pageGradientBrush(strong = false, theme = "community")),
@@ -146,6 +151,7 @@ fun CommunityScreen(
                             }
                         }
                     }
+                }
                 }
             }
         }
@@ -302,16 +308,6 @@ private fun ArticleCard(
                 MetaText("${formatCount(article.commentCount)} 评论")
             }
         }
-
-        if (article.coverUrl.isNotBlank()) {
-            Spacer(Modifier.width(12.dp))
-            NetImage(
-                url = article.coverUrl,
-                modifier = Modifier
-                    .width(100.dp)
-                    .height(72.dp),
-                radius = 10.dp
-            )
-        }
+        // 社区文章列表不显示封面图（正文里的图不带到列表卡片）
     }
 }

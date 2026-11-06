@@ -14,23 +14,33 @@ import retrofit2.http.Query
  */
 interface RatingApi {
 
-    /** 新增评分 */
+    /** 新增评分（content 可选，≤500字，不传=只打星） */
     @POST("api/v1/rating/add")
     suspend fun addRating(
         @Query("courseId") courseId: Long,
-        @Query("score") score: Int
+        @Query("score") score: Int,
+        @Query("content") content: String? = null
     ): Response<JsonObject>
 
-    /** 修改评分 */
+    /** 修改评分（content 可选，传空串=清空文字） */
     @POST("api/v1/rating/update")
     suspend fun updateRating(
         @Query("courseId") courseId: Long,
-        @Query("score") score: Int
+        @Query("score") score: Int,
+        @Query("content") content: String? = null
     ): Response<JsonObject>
 
     /** 查询评分：我的评分 + 课程平均分 + 评分人数 */
     @GET("api/v1/rating/info")
     suspend fun getRatingInfo(
         @Query("courseId") courseId: Long
+    ): Response<JsonObject>
+
+    /** 评分列表（分页） */
+    @GET("api/v1/rating/list")
+    suspend fun getRatingList(
+        @Query("courseId") courseId: Long,
+        @Query("pageNum") pageNum: Int = 1,
+        @Query("pageSize") pageSize: Int = 20
     ): Response<JsonObject>
 }

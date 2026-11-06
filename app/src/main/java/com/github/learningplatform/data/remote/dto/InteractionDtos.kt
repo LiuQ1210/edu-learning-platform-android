@@ -26,6 +26,7 @@ data class CommentDto(
 @Serializable
 data class HotReplyDto(
     val commentId: Long = 0,
+    val userId: Long = 0,
     val userName: String = "",
     val replyToName: String? = null,
     val content: String = ""

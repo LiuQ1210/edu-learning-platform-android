@@ -15,13 +15,14 @@ class NotificationRepository @Inject constructor(
     private val notificationApi: NotificationApi
 ) {
 
-    /** 我的通知列表 */
+    /** 我的通知列表（type: 1点赞 2评论 3关注 4收藏） */
     suspend fun getNotificationList(
+        type: String? = null,
         isRead: String? = null,
         pageNum: Int = 1,
         pageSize: Int = 20
     ): List<Map<String, Any>> =
-        notificationApi.getNotificationList(isRead, pageNum, pageSize)
+        notificationApi.getNotificationList(type, isRead, pageNum, pageSize)
             .okTable()
             .rows
             .map { it.toAnyMap() }

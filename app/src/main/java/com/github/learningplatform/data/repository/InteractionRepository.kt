@@ -162,8 +162,8 @@ private fun JsonObject.toComment(): CommentDto {
     val replies = children.mapNotNull { it as? JsonObject }.map { child ->
         HotReplyDto(
             commentId = child.long("commentId"),
+            userId = child.long("userId"),
             userName = child.str("userName"),
-            // 后端字段叫 replyUserName：被回复人的昵称
             replyToName = child.str("replyUserName").ifBlank { null },
             content = child.str("content")
         )

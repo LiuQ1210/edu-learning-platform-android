@@ -14,9 +14,10 @@ import retrofit2.http.Query
  */
 interface NotificationApi {
 
-    /** 我的通知列表（分页） */
+    /** 我的通知列表（分页，type: 1点赞 2评论 3关注 4收藏） */
     @GET("api/v1/notification/list")
     suspend fun getNotificationList(
+        @Query("type") type: String? = null,
         @Query("isRead") isRead: String? = null,
         @Query("pageNum") pageNum: Int = 1,
         @Query("pageSize") pageSize: Int = 20

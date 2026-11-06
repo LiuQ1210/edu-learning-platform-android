@@ -548,9 +548,8 @@ fun MainScaffold(
                         com.github.learningplatform.ui.article.CommentHighlightBus.highlightCommentId = commentId
                         navController.navigate(Routes.articleDetail(articleId))
                     },
-                    onOpenVideo = { commentId ->
-                            com.github.learningplatform.ui.video.VideoCommentHighlightBus.highlightCommentId = commentId
-                            navController.navigate(Routes.VIDEO)
+                    onOpenVideo = { videoId ->
+                            navController.navigate(Routes.video(focusId = videoId))
                         },
                     onOpenUser = { userId -> navController.navigate(Routes.blogHome(userId)) },
                     onOpenTodos = { navController.navigate(Routes.TODOS) }

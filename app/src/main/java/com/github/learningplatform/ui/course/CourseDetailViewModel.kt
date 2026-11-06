@@ -26,8 +26,12 @@ data class CourseDetailUiState(
     val tab: Int = 0,
     /** 当前用户已提交的评分（0 = 未评分），来自 /api/v1/rating/info */
     val myScore: Double = 0.0,
-    /** 评分列表（cjx 分支） */
+    /** 评分列表（接后端 /rating/list） */
     val ratings: List<com.github.learningplatform.data.remote.dto.RatingDto> = emptyList(),
+    /** 评论列表 */
+    val comments: List<com.github.learningplatform.data.remote.dto.CommentDto> = emptyList(),
+    /** 当前登录用户ID（用于判断评论是否可删） */
+    val myUserId: Long = 0L,
     /** 当前用户是否已点赞该课程（interaction/status 或点击后由 toggle 返回） */
     val isLiked: Boolean = false,
     val isFavorited: Boolean = false,
@@ -50,7 +54,9 @@ class CourseDetailViewModel @Inject constructor(
     private val courseRepository: CourseRepository,
     private val userRepository: UserRepository,
     private val interactionRepository: InteractionRepository,
-    private val ratingRepository: RatingRepository
+    private val ratingRepository: RatingRepository,
+    private val commentRepository: com.github.learningplatform.data.repository.CommentRepository,
+    private val userPreferences: com.github.learningplatform.data.local.UserPreferences
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CourseDetailUiState())
@@ -62,12 +68,13 @@ class CourseDetailViewModel @Inject constructor(
         courseId = id
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            val myUid = runCatching { userPreferences.currentUserId().toLong() }.getOrDefault(0L)
             try {
                 val detail = courseRepository.getCourseDetail(id)
                 // 评分汇总与「我的评分」来自后端 rating/info；失败不影响课程详情展示
                 val rating = runCatching { ratingRepository.getRatingInfo(id) }.getOrNull()
-                // 评分列表（cjx 分支，当前为假数据）
-                val ratings = runCatching { courseRepository.getRatings(id).list }.getOrDefault(emptyList())
+                // 评分列表（接后端 /rating/list）
+                val ratings = runCatching { ratingRepository.getRatingList(id) }.getOrDefault(emptyList())
                 // 上报观看历史（课程）
                 userRepository.reportView(Constants.TARGET_COURSE, id)
                 // 进页面时同步点赞/收藏态：interaction/status?type=1 点赞、type=2 收藏
@@ -83,8 +90,11 @@ class CourseDetailViewModel @Inject constructor(
                     ratings = ratings,
                     myScore = rating?.myScore ?: 0.0,
                     isLiked = likedIds.contains(id),
-                    isFavorited = favIds.contains(id)
+                    isFavorited = favIds.contains(id),
+                    myUserId = myUid
                 )
+                // 评论列表
+                loadComments()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -198,19 +208,23 @@ class CourseDetailViewModel @Inject constructor(
         }
     }
 
-    /** 评分范围 1-5 星；后端按 userId+courseId 覆盖更新，已有评分走 update */
-    fun rate(score: Double) {
+    /** 评分范围 1-5 星；后端按 userId+courseId 覆盖更新，已有评分走 update。content 可选。 */
+    fun rate(score: Double, content: String = "") {
         val star = score.toInt().coerceIn(1, 5)
         viewModelScope.launch {
             try {
+                val c = content.trim().ifBlank { null }
                 val result = if (_uiState.value.myScore > 0) {
-                    ratingRepository.updateRating(courseId, star)
+                    ratingRepository.updateRating(courseId, star, c)
                 } else {
-                    ratingRepository.addRating(courseId, star)
+                    ratingRepository.addRating(courseId, star, c)
                 }
                 val detail = _uiState.value.detail
+                // 评完刷新评分列表
+                val newRatings = runCatching { ratingRepository.getRatingList(courseId) }.getOrDefault(_uiState.value.ratings)
                 _uiState.value = _uiState.value.copy(
                     myScore = star.toDouble(),
+                    ratings = newRatings,
                     detail = detail?.copy(
                         // 后端没回字段时保留原值，别把详情页的平均分清成 0
                         averageScore = if (result.averageScore > 0) result.averageScore else detail.averageScore,
@@ -220,6 +234,39 @@ class CourseDetailViewModel @Inject constructor(
                 )
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: Throwable) {
+                _uiState.value = _uiState.value.copy(message = e.readableMessage())
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------- 评论
+
+    fun loadComments() {
+        viewModelScope.launch {
+            val list = runCatching { commentRepository.list("2", courseId) }.getOrDefault(emptyList())
+            _uiState.value = _uiState.value.copy(comments = list)
+        }
+    }
+
+    fun addComment(content: String) {
+        val c = content.trim()
+        if (c.isEmpty()) return
+        viewModelScope.launch {
+            try {
+                commentRepository.add("2", courseId, c)
+                loadComments()
+            } catch (e: Throwable) {
+                _uiState.value = _uiState.value.copy(message = e.readableMessage())
+            }
+        }
+    }
+
+    fun deleteComment(commentId: Long) {
+        viewModelScope.launch {
+            try {
+                commentRepository.remove(commentId)
+                loadComments()
             } catch (e: Throwable) {
                 _uiState.value = _uiState.value.copy(message = e.readableMessage())
             }

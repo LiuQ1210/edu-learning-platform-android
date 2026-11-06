@@ -80,6 +80,10 @@ object NetworkModule {
     @Provides @Singleton
     fun provideRatingApi(client: RetrofitClient): RatingApi = client.create()
 
+    /** 通用评论 */
+    @Provides @Singleton
+    fun provideCommentApi(client: RetrofitClient): com.github.learningplatform.data.remote.CommentApi = client.create()
+
     /** 关注 */
     @Provides @Singleton
     fun provideFollowApi(client: RetrofitClient): FollowApi = client.create()

@@ -37,6 +37,7 @@ data class VideoUiState(
     val commentsLoading: Boolean = false,
     val commentsError: String? = null,
     val comments: List<CommentDto> = emptyList(),
+    val myUserId: Long = 0L,
     val commentsCursor: String? = null,
     val commentsHasMore: Boolean = false,
     val message: String? = null
@@ -66,7 +67,8 @@ class VideoViewModel @Inject constructor(
     private val courseRepository: CourseRepository,
     private val interactionRepository: InteractionRepository,
     private val userRepository: com.github.learningplatform.data.repository.UserRepository,
-    private val videoApi: com.github.learningplatform.data.remote.VideoApi
+    private val videoApi: com.github.learningplatform.data.remote.VideoApi,
+    private val userPreferences: com.github.learningplatform.data.local.UserPreferences
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(VideoUiState())
@@ -341,6 +343,10 @@ class VideoViewModel @Inject constructor(
 
     fun openComments(courseId: Long) {
         _uiState.value = _uiState.value.copy(commentsTarget = courseId, comments = emptyList())
+        viewModelScope.launch {
+            val myUid = runCatching { userPreferences.currentUserId().toLong() }.getOrDefault(0L)
+            _uiState.value = _uiState.value.copy(myUserId = myUid)
+        }
         loadComments(courseId, reset = true)
     }
 
@@ -429,6 +435,19 @@ class VideoViewModel @Inject constructor(
                     commentsLoading = false,
                     commentsError = e.readableMessage()
                 )
+            }
+        }
+    }
+
+    fun deleteComment(commentId: Long) {
+        viewModelScope.launch {
+            try {
+                interactionRepository.deleteComment(commentId)
+                _uiState.value = _uiState.value.copy(
+                    comments = _uiState.value.comments.filterNot { it.commentId == commentId }
+                )
+            } catch (e: Throwable) {
+                _uiState.value = _uiState.value.copy(message = e.readableMessage())
             }
         }
     }

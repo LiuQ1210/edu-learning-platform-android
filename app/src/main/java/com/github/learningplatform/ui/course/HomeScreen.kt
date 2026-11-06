@@ -110,12 +110,17 @@ fun HomeScreen(
             uiState.isLoading && uiState.hotCourses.isEmpty() -> LoadingState()
             uiState.error != null && uiState.hotCourses.isEmpty() ->
                 ErrorState(message = uiState.error.orEmpty(), onRetry = viewModel::refresh)
-            else -> CourseFeed(
-                uiState = uiState,
-                onOpenAllCategories = onOpenAllCategories,
-                onOpenCourse = onOpenCourse,
-                onLoadMore = viewModel::loadMore
-            )
+            else -> androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+                isRefreshing = uiState.isLoading && uiState.hotCourses.isNotEmpty(),
+                onRefresh = viewModel::refresh
+            ) {
+                CourseFeed(
+                    uiState = uiState,
+                    onOpenAllCategories = onOpenAllCategories,
+                    onOpenCourse = onOpenCourse,
+                    onLoadMore = viewModel::loadMore
+                )
+            }
         }
     }
 }

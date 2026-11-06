@@ -33,6 +33,7 @@ data class ArticleDetailUiState(
     val isLiked: Boolean = false,
     val isFavorited: Boolean = false,
     val comments: List<CommentDto> = emptyList(),
+    val myUserId: Long = 0L,
     val commentsLoading: Boolean = false,
     val commentsCursor: String? = null,
     val commentsHasMore: Boolean = false,
@@ -55,7 +56,8 @@ class ArticleDetailViewModel @Inject constructor(
     private val articleRepository: ArticleRepository,
     private val interactionRepository: InteractionRepository,
     private val noteRepository: NoteRepository,
-    private val userRepository: com.github.learningplatform.data.repository.UserRepository
+    private val userRepository: com.github.learningplatform.data.repository.UserRepository,
+    private val userPreferences: com.github.learningplatform.data.local.UserPreferences
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ArticleDetailUiState())
@@ -88,7 +90,8 @@ class ArticleDetailViewModel @Inject constructor(
                     detail = detail,
                     isMine = isMine,
                     isLiked = id in likeIds,
-                    isFavorited = id in favIds
+                    isFavorited = id in favIds,
+                    myUserId = runCatching { userPreferences.currentUserId().toLong() }.getOrDefault(0L)
                 )
                 // 上报观看历史（文章）
                 userRepository.reportView(Constants.TARGET_ARTICLE, id)

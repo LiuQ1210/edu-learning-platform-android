@@ -28,6 +28,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.compose.ui.graphics.Color
+import com.github.learningplatform.ui.common.Avatar
 import com.github.learningplatform.ui.common.BackTopBar
 import com.github.learningplatform.ui.common.EmptyState
 import com.github.learningplatform.ui.common.ErrorState
@@ -92,7 +94,20 @@ fun NotificationsScreen(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(uiState.items) { item ->
-                        NotificationRow(item = item)
+                        NotificationRow(
+                            item = item,
+                            onClick = {
+                                viewModel.markRead(item.id)
+                                when (item.category) {
+                                    "follow" -> if (item.fromUserId != 0L) onOpenUser(item.fromUserId)
+                                    else -> when (item.targetType) {
+                                        "1" -> if (item.targetId != 0L) onOpenArticle(item.targetId, null)
+                                        "2" -> if (item.targetId != 0L) onOpenCourse(item.targetId, null)
+                                        "3" -> onOpenVideo(item.targetId)
+                                    }
+                                }
+                            }
+                        )
                     }
                     if (uiState.hasMore) {
                         item { viewModel.loadMore() }
@@ -104,40 +119,26 @@ fun NotificationsScreen(
 }
 
 @Composable
-private fun NotificationRow(item: NotificationUiItem) {
+private fun NotificationRow(item: NotificationUiItem, onClick: () -> Unit = {}) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 类型图标背景
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(
-                    when (item.category) {
-                        "like" -> Primary.copy(alpha = 0.1f)
-                        "comment" -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
-                        "follow" -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f)
-                        "favorite" -> MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
-                        else -> Primary.copy(alpha = 0.1f)
-                    }
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = when (item.category) {
-                    "like" -> "赞"
-                    "comment" -> "评"
-                    "follow" -> "关"
-                    "favorite" -> "藏"
-                    else -> "通"
-                },
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Medium
-            )
+        // 触发者头像
+        Box {
+            Avatar(url = item.fromUserAvatar, name = item.fromUserName.ifBlank { "用户" }, size = 40.dp)
+            if (!item.read) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFFF4D6A))
+                        .align(Alignment.TopEnd)
+                )
+            }
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column {

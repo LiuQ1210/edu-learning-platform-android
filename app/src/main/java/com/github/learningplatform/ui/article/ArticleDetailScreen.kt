@@ -253,8 +253,10 @@ fun ArticleDetailScreen(
                         CommentItem(
                             comment = comment,
                             highlighted = comment.commentId == highlightCommentId,
-                            onToggleLike = { viewModel.toggleCommentLike(comment.commentId) },
+                            isMine = comment.userId == uiState.myUserId,
+                            myUserId = uiState.myUserId,
                             onDelete = { viewModel.deleteComment(comment.commentId) },
+                            onDeleteReply = { viewModel.deleteComment(it) },
                             onReply = {
                                 replyToCommentId = comment.commentId
                                 replyToName = comment.userName
@@ -471,8 +473,10 @@ private fun RichContent(html: String, modifier: Modifier = Modifier) {
 private fun CommentItem(
     comment: CommentDto,
     highlighted: Boolean = false,
-    onToggleLike: () -> Unit,
+    isMine: Boolean = false,
+    myUserId: Long = 0L,
     onDelete: () -> Unit,
+    onDeleteReply: (Long) -> Unit,
     onReply: () -> Unit = {}
 ) {
     Column(
@@ -495,16 +499,29 @@ private fun CommentItem(
                 )
                 MetaText(comment.createTime)
             }
+            if (comment.likeCount > 0) {
+                Text(
+                    text = "${formatCount(comment.likeCount)} 赞",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextHint
+                )
+            }
+            Spacer(Modifier.width(8.dp))
             Text(
-                text = "${formatCount(comment.likeCount)} 赞",
+                text = "回复",
                 style = MaterialTheme.typography.labelSmall,
-                color = if (comment.isLiked) Primary else TextHint,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(if (comment.isLiked) Primary.copy(alpha = 0.1f) else SurfaceColor)
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                    .clickable(onClick = onToggleLike)
+                color = Primary,
+                modifier = Modifier.clickable(onClick = onReply)
             )
+            if (isMine) {
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "删除",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.clickable(onClick = onDelete)
+                )
+            }
         }
 
         Spacer(Modifier.height(6.dp))
@@ -523,18 +540,29 @@ private fun CommentItem(
                     .padding(10.dp)
             ) {
                 comment.hotReplies.forEach { reply ->
-                    Row(modifier = Modifier.padding(vertical = 3.dp)) {
-                        Text(
-                            text = reply.userName + if (reply.replyToName != null) " 回复 ${reply.replyToName}：" else "：",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Primary,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Text(
-                            text = reply.content,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
-                        )
+                    Column(modifier = Modifier.padding(vertical = 3.dp)) {
+                        Row {
+                            Text(
+                                text = reply.userName + if (reply.replyToName != null) " 回复 ${reply.replyToName}：" else "：",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Primary,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = reply.content,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+                        if (reply.userId == myUserId) {
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = "删除",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.clickable { onDeleteReply(reply.commentId) }
+                            )
+                        }
                     }
                 }
             }
