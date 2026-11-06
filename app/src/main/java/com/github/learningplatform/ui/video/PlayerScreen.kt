@@ -8,8 +8,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
@@ -45,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.github.learningplatform.core.constants.Constants
@@ -148,6 +151,8 @@ fun PlayerScreen(
                     "播放状态=%s 时长=%dms 位置=%dms",
                     name, player.duration, player.currentPosition
                 )
+                // 重试成功、真正读出首帧后清掉上一次的失败提示
+                if (state == Player.STATE_READY) playbackError = null
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
@@ -156,6 +161,11 @@ fun PlayerScreen(
                     "播放失败 errorCode=%d name=%s",
                     error.errorCode, error.errorCodeName
                 )
+                // 【必须做】不能只打日志：加载失败的界面和「正在缓冲」完全一样 ——
+                // 黑屏 + 位置停在 00:00，用户只会以为卡死了（曾经因为写死的播放地址
+                // 返回 404，整门课都是这个表现）。这里把原因交给下面的覆盖层，
+                // 至少能看到「播放中断 + 重试」。
+                playbackError = error.toUserMessage()
             }
         }
         player.addListener(listener)
@@ -272,48 +282,6 @@ fun PlayerScreen(
                     }
                 }
 
-                // 顶部返回条
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onBack) {
-                        Icon(NavIcons.ArrowBack, contentDescription = "返回", tint = Color.White)
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = uiState.title.ifBlank { "课程播放" },
-                            color = Color.White,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1
-                        )
-                        if (!uiState.playInfo?.watermarkText.isNullOrBlank()) {
-                            Text(
-                                text = uiState.playInfo?.watermarkText.orEmpty(),
-                                color = Color.White.copy(alpha = 0.6f),
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        }
-                    }
-
-                    // 写笔记：视频笔记会带上当前播放位置
-                    IconButton(onClick = {
-                        // 直接取 ExoPlayer 的真实位置，不要用 ViewModel 里缓存的
-                        // lastKnownSeconds —— 那个只在 15-30 秒一次的心跳里更新，会偏
-                        noteTimestamp = (player.currentPosition / 1000).toInt().coerceAtLeast(0)
-                        viewModel.showNoteDialog()
-                    }) {
-                        Icon(
-                            NavIcons.Note,
-                            contentDescription = "写笔记",
-                            tint = Color.White
-                        )
-                    }
-                }
-
                 // 暂停时显示广告位（预留）
                 if (!isPlaying) {
                     AdSlot(slotId = "video_pause_banner", modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 50.dp))
@@ -324,7 +292,10 @@ fun PlayerScreen(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
+                        // 背景铺满到屏幕底部，控件本身让开手势导航条区域，
+                        // 否则播放键/进度条的下半截会落在系统触摸区内，按不动
                         .background(Color.Black.copy(alpha = 0.45f))
+                        .navigationBarsPadding()
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -443,6 +414,64 @@ fun PlayerScreen(
 
             }
         }
+
+        /*
+         * 顶部返回条。
+         *
+         * 两个关键点：
+         *
+         * 1) 必须放在 when 外面。放在「播放正常」分支里时，加载中/加载失败
+         *    （ErrorState）这条路径上没有任何返回入口，只能靠系统返回键。
+         *
+         * 2) 必须加 statusBarsPadding。本页是 edge-to-edge 全屏页（MainActivity
+         *    调了 enableEdgeToEdge），窗口从屏幕 0,0 开始画，但系统状态栏窗口
+         *    仍然占着顶部那一条（刘海/挖孔机约 24~50dp）并吃掉该区域的触摸事件。
+         *    不给这一行让出 inset，返回键就被压在状态栏底下：看得见、点不动。
+         */
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(NavIcons.ArrowBack, contentDescription = "返回", tint = Color.White)
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = uiState.title.ifBlank { "课程播放" },
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1
+                )
+                if (!uiState.playInfo?.watermarkText.isNullOrBlank()) {
+                    Text(
+                        text = uiState.playInfo?.watermarkText.orEmpty(),
+                        color = Color.White.copy(alpha = 0.6f),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
+
+            // 写笔记：视频笔记会带上当前播放位置。
+            // 播放地址还没下发时不显示，避免对着空播放器写一条位置为 0 的笔记。
+            if (uiState.playInfo?.playUrl != null) {
+                IconButton(onClick = {
+                    // 直接取 ExoPlayer 的真实位置，不要用 ViewModel 里缓存的
+                    // lastKnownSeconds —— 那个只在 15-30 秒一次的心跳里更新，会偏
+                    noteTimestamp = (player.currentPosition / 1000).toInt().coerceAtLeast(0)
+                    viewModel.showNoteDialog()
+                }) {
+                    Icon(
+                        NavIcons.Note,
+                        contentDescription = "写笔记",
+                        tint = Color.White
+                    )
+                }
+            }
+        }
     }
 
     if (uiState.isLoading) {
@@ -482,4 +511,23 @@ private fun formatTime(seconds: Int): String {
     val s = seconds % 60
     return if (h > 0) String.format(Locale.CHINA, "%d:%02d:%02d", h, m, s)
     else String.format(Locale.CHINA, "%02d:%02d", m, s)
+}
+
+/**
+ * 把 ExoPlayer 的错误码翻译成用户看得懂的一句话。
+ *
+ * 错误码（2004 / ERROR_CODE_IO_BAD_HTTP_STATUS）只对开发有用；而 404、连不上网、
+ * 解码失败三者的处置完全不同（换地址 / 查网络 / 换设备），提示必须能区分开。
+ */
+private fun PlaybackException.toUserMessage(): String = when (errorCode) {
+    PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> {
+        val httpCode = (cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode
+        if (httpCode != null) "视频地址无法访问（HTTP $httpCode）" else "视频地址无法访问"
+    }
+    PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> "视频文件不存在"
+    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED -> "网络连接失败，请检查网络"
+    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> "网络超时，请稍后重试"
+    PlaybackException.ERROR_CODE_DECODING_FAILED,
+    PlaybackException.ERROR_CODE_DECODER_INIT_FAILED -> "视频解码失败，该格式暂不支持"
+    else -> "播放失败（${errorCodeName}）"
 }

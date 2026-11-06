@@ -272,7 +272,8 @@ private fun VideoPage(
                     color = Color.White.copy(alpha = 0.8f)
                 )
                 Text(
-                    text = formatCount(course.viewCount) + " 次播放",
+                    // viewCount 为 null 表示后端没返回该字段，此时显示「—」而不是假的 0
+                    text = course.viewCount?.let { formatCount(it) + " 次播放" } ?: "— 次播放",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.8f)
                 )

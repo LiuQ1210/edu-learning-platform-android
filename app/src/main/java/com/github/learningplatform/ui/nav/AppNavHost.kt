@@ -38,7 +38,7 @@ import com.github.learningplatform.ui.theme.TabCommunityWash
 import com.github.learningplatform.ui.theme.TabProfileInk
 import com.github.learningplatform.ui.theme.TabProfileWash
 import com.github.learningplatform.ui.article.ArticleEditScreen
-import com.github.learningplatform.ui.article.MyArticlesScreen
+import com.github.learningplatform.ui.article.ArticleDetailScreen
 import com.github.learningplatform.ui.article.TagArticlesScreen
 import com.github.learningplatform.ui.auth.LoginScreen
 import com.github.learningplatform.ui.auth.RegisterScreen
@@ -58,7 +58,6 @@ import com.github.learningplatform.ui.mine.LikesScreen
 import com.github.learningplatform.ui.mine.MyCoursesScreen
 import com.github.learningplatform.ui.mine.ProfileScreen
 import com.github.learningplatform.ui.mine.StudyStatsScreen
-import com.github.learningplatform.ui.mine.StudyPathScreen
 import com.github.learningplatform.ui.mine.NotificationsScreen
 import com.github.learningplatform.ui.mine.FollowingScreen
 import com.github.learningplatform.ui.mine.FansScreen
@@ -290,7 +289,6 @@ fun MainScaffold(
                     onOpenCommunityProfile = { navController.navigate(Routes.blogHome(0L, self = true)) },
                     onOpenMyCourses = { navController.navigate(Routes.MY_COURSES) },
                     onOpenStudyStats = { navController.navigate(Routes.STUDY_STATS) },
-                    onOpenMyArticles = { navController.navigate(Routes.MY_ARTICLES) },
                     onOpenHistory = { navController.navigate(Routes.WATCH_HISTORY) },
                     onOpenFavorites = { navController.navigate(Routes.MY_FAVORITES) },
                     onOpenLikes = { navController.navigate(Routes.MY_LIKES) },
@@ -382,15 +380,6 @@ fun MainScaffold(
                 )
             }
 
-            composable(Routes.MY_ARTICLES) {
-                MyArticlesScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenArticle = { navController.navigate(Routes.articleDetail(it)) },
-                    onEdit = { navController.navigate(Routes.articleEdit(it)) },
-                    onPublish = { navController.navigate(Routes.ARTICLE_PUBLISH) }
-                )
-            }
-
             composable(
                 route = Routes.TAG_ARTICLES,
                 arguments = listOf(navArgument("tagId") { type = NavType.LongType })
@@ -430,10 +419,6 @@ fun MainScaffold(
 
             composable(Routes.STUDY_STATS) {
                 StudyStatsScreen(onBack = { navController.popBackStack() })
-            }
-
-            composable(Routes.STUDY_PATH) {
-                StudyPathScreen(onBack = { navController.popBackStack() })
             }
 
             composable(Routes.MY_FAVORITES) {

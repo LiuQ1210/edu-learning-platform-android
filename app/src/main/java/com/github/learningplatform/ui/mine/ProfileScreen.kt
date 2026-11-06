@@ -63,7 +63,6 @@ fun ProfileScreen(
     onOpenCommunityProfile: () -> Unit,
     onOpenMyCourses: () -> Unit,
     onOpenStudyStats: () -> Unit,
-    onOpenMyArticles: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenFavorites: () -> Unit,
     onOpenLikes: () -> Unit,

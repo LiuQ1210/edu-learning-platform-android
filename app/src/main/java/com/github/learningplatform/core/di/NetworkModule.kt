@@ -4,6 +4,7 @@ import com.github.learningplatform.core.network.RetrofitClient
 import com.github.learningplatform.data.remote.AppApi
 import com.github.learningplatform.data.remote.ArticleApi
 import com.github.learningplatform.data.remote.AuthApi
+import com.github.learningplatform.data.remote.BannerApi
 import com.github.learningplatform.data.remote.CategoryApi
 import com.github.learningplatform.data.remote.CheckinApi
 import com.github.learningplatform.data.remote.CourseApi
@@ -45,6 +46,7 @@ object NetworkModule {
     @Provides @Singleton
     fun provideCourseApi(client: RetrofitClient): CourseApi = client.create()
 
+    /** 短视频列表 */
     @Provides @Singleton
     fun provideVideoApi(client: RetrofitClient): VideoApi = client.create()
 
@@ -89,4 +91,8 @@ object NetworkModule {
     /** 积分 */
     @Provides @Singleton
     fun providePointsApi(client: RetrofitClient): PointsApi = client.create()
+
+    /** 首页轮播图 */
+    @Provides @Singleton
+    fun provideBannerApi(client: RetrofitClient): BannerApi = client.create()
 }

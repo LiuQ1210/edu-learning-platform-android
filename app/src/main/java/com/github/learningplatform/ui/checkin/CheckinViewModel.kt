@@ -42,10 +42,9 @@ class CheckinViewModel @Inject constructor(
             try {
                 val status = checkinRepository.getStatus()
                 val account = checkinRepository.getAccount()
-                // 档位以后端为准；失败时用兜底列表，避免整页空白
+                // 档位以后端为准；拉不到就显示空档位，不再回退到本地写死的旧档位
                 val rewards = runCatching { checkinRepository.getExchangeTiers() }
                     .getOrDefault(emptyList())
-                    .ifEmpty { com.github.learningplatform.data.remote.dto.ExchangeResultDto.OPTIONS }
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     status = status,

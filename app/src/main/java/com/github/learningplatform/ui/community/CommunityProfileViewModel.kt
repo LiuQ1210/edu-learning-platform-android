@@ -2,6 +2,8 @@ package com.github.learningplatform.ui.community
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.learningplatform.data.remote.dto.ArticleDto
+import com.github.learningplatform.data.repository.ArticleRepository
 import com.github.learningplatform.data.repository.FollowRepository
 import com.github.learningplatform.data.repository.UserRepository
 import com.github.learningplatform.ui.readableMessage
@@ -15,7 +17,7 @@ import javax.inject.Inject
 
 data class CommunityProfileUiState(
     val isLoading: Boolean = false,
-    /** 昵称（自己来自 /user/home；他人后端无接口，页面用占位兜底） */
+    /** 昵称（自己来自 /user/home；他人后端无资料接口，页面用中性占位） */
     val nickname: String = "",
     val avatar: String = "",
     val bio: String = "",
@@ -28,6 +30,8 @@ data class CommunityProfileUiState(
     val likeReceivedCount: Int = 0,
     val isFollowed: Boolean = false,
     val submitting: Boolean = false,
+    /** 我的文章：来自 /api/v1/post/myList（他人主页后端无按作者查询接口，恒为空） */
+    val articles: List<ArticleDto> = emptyList(),
     val message: String? = null,
     val error: String? = null
 )
@@ -37,17 +41,19 @@ data class CommunityProfileUiState(
  *
  * 后端能提供的：
  *  - 自己：`/api/v1/user/home` → 昵称/头像/简介/性别 + followCount / fansCount / likeReceivedCount
+ *          `/api/v1/post/myList` → 我发布的文章
  *  - 他人：`/api/v1/follow/count?userId=` → followCount / fansCount
  *          `/api/v1/follow/status?userIds=` → 是否已关注
  *          `/api/v1/follow/add|cancel?targetUserId=` → 关注/取关
  *
- * 后端**没有**「按 userId 查他人资料/文章/获赞」的接口，他人昵称、头像、简介、文章列表
- * 仍由页面用本地样例占位渲染。
+ * 后端**没有**「按 userId 查他人资料/文章/获赞」的接口（post/list 不支持 authorId），
+ * 所以他人主页的昵称/简介/性别用中性占位（不编造人名），文章列表为空。
  */
 @HiltViewModel
 class CommunityProfileViewModel @Inject constructor(
     private val followRepository: FollowRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val articleRepository: ArticleRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CommunityProfileUiState())
@@ -65,8 +71,12 @@ class CommunityProfileViewModel @Inject constructor(
             try {
                 if (isSelf) {
                     val home = userRepository.getUserHome()
-                    // 自己：资料（昵称/头像/简介/性别）与关注/粉丝/获赞都来自 /user/home，
+                    // 我的文章：后端 /api/v1/post/myList 只返回当前登录用户的发布；
+                    // 资料（昵称/头像/简介/性别）与关注/粉丝/获赞都来自 /user/home，
                     // 与底部「个人主页」读同一个接口，保证两页数据互通一致。
+                    val articles = runCatching {
+                        articleRepository.getMyArticles(pageNum = 1, pageSize = 20).list
+                    }.getOrDefault(emptyList())
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         nickname = home.userName,
@@ -76,7 +86,8 @@ class CommunityProfileViewModel @Inject constructor(
                         followCount = home.followCount,
                         fansCount = home.fansCount,
                         likeReceivedCount = home.likeReceivedCount,
-                        isFollowed = false
+                        isFollowed = false,
+                        articles = articles
                     )
                 } else {
                     val counts = followRepository.getFollowCount(userId)
@@ -128,6 +139,23 @@ class CommunityProfileViewModel @Inject constructor(
                     submitting = false,
                     error = e.readableMessage()
                 )
+            }
+        }
+    }
+
+    /** 删除我的文章（后端 /api/v1/post/remove），成功后本地移除 */
+    fun deleteArticle(articleId: Long) {
+        viewModelScope.launch {
+            try {
+                articleRepository.deleteArticle(articleId)
+                _uiState.value = _uiState.value.copy(
+                    articles = _uiState.value.articles.filterNot { it.articleId == articleId },
+                    message = "已删除"
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                _uiState.value = _uiState.value.copy(message = e.readableMessage())
             }
         }
     }

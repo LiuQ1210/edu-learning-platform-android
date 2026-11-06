@@ -52,16 +52,7 @@ data class ExchangeResultDto(
     val message: String = "",
     val pointsLeft: Int = 0,
     val adFreeUntil: Long = 0L
-) {
-    companion object {
-        /** 仅作为后端 `/points/exchange/tiers` 拉取失败时的兜底展示 */
-        val OPTIONS = listOf(
-            AdFreeRewardDto("1", "免广告 30 分钟", 10, 30),
-            AdFreeRewardDto("2", "免广告 2 小时", 30, 120),
-            AdFreeRewardDto("3", "免广告 24 小时", 100, 1440)
-        )
-    }
-}
+)
 
 // ---------------------------------------------------------------------------
 // 签到 / 积分（对齐后端 ApiV1CheckinController + ApiV1PointsController）

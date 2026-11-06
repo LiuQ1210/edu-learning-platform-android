@@ -3,7 +3,6 @@ package com.github.learningplatform.ui.article
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,14 +29,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -45,7 +40,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.learningplatform.ui.common.BackTopBar
-import com.github.learningplatform.ui.common.NetImage
 import com.github.learningplatform.ui.nav.NavIcons
 import com.github.learningplatform.ui.theme.Primary
 import com.github.learningplatform.ui.theme.surfaceWashBrush
@@ -54,14 +48,12 @@ import com.github.learningplatform.ui.theme.Surface as SurfaceColor
 import com.github.learningplatform.ui.theme.TextHint
 import com.github.learningplatform.ui.theme.TextPrimary
 import com.github.learningplatform.ui.theme.TextSecondary
-import java.io.File
 
 /**
  * 文章编辑 / 发布（接口文档 7.3 新建、7.4 编辑）。
  *
- * 封面：走 v3.1 增补 15.1 的 `POST /files/upload`（scene=article_cover），
- * 相册选图 → 本地压缩 → 上传 → 把返回的 url 交给 7.3/7.4 的 coverUrl。
- * 也保留手填直链的入口，方便用已上传过的图片。
+ * 不设置封面：列表/详情页的封面由后端下发（列表接口本来就允许空），
+ * 发布时不传 coverUrl，交给服务端决定默认表现。
  *
  * 已知限制：content 字段是 HTML。这里用纯文本编辑 + 段落换行转换为 <p>，
  * 满足「能发出文章」的最小闭环；接入富文本编辑器时只需替换 [BodyEditor]。
@@ -75,20 +67,6 @@ fun ArticleEditScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    val context = LocalContext.current
-
-    // 封面上传：系统相册选图（不需要存储权限，content Uri 转成 cache 文件后上传）
-    val coverPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        val file = uriToCacheFile(context, uri, "cover")
-        if (file == null) {
-            android.widget.Toast.makeText(context, "无法读取所选图片", android.widget.Toast.LENGTH_SHORT).show()
-        } else {
-            viewModel.uploadCover(file)
-        }
-    }
 
     LaunchedEffect(articleId) { viewModel.init(articleId) }
 
@@ -214,53 +192,6 @@ fun ArticleEditScreen(
             }
 
             Spacer(Modifier.height(16.dp))
-            FieldLabel("封面（选填）")
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                NetImage(
-                    url = uiState.coverUrl,
-                    modifier = Modifier
-                        .width(96.dp)
-                        .height(64.dp),
-                    radius = 10.dp
-                )
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    OutlinedButton(
-                        onClick = { coverPicker.launch("image/*") },
-                        enabled = !uiState.uploadingCover && !uiState.submitting,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(if (uiState.uploadingCover) "上传中..." else "从相册选择")
-                    }
-                    Spacer(Modifier.height(6.dp))
-                    BasicTextField(
-                        value = uiState.coverUrl,
-                        onValueChange = viewModel::onCoverChange,
-                        singleLine = true,
-                        textStyle = MaterialTheme.typography.bodySmall.copy(color = TextPrimary),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(surfaceWashBrush())
-                            .padding(10.dp),
-                        decorationBox = { inner ->
-                            if (uiState.coverUrl.isEmpty()) {
-                                Text("或粘贴图片直链", color = TextHint, style = MaterialTheme.typography.bodySmall)
-                            }
-                            inner()
-                        }
-                    )
-                }
-            }
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = "上传走 POST /api/v1/files/upload（scene=article_cover），" +
-                    "本地已自动压到长边 1600px / 质量 85",
-                style = MaterialTheme.typography.labelSmall,
-                color = TextHint
-            )
-
-            Spacer(Modifier.height(16.dp))
             FieldLabel("标签（最多选 5 个）")
             if (uiState.tags.isEmpty()) {
                 Text("暂无标签", color = TextHint, style = MaterialTheme.typography.bodySmall)
@@ -347,21 +278,3 @@ private fun BodyEditor(value: String, onValueChange: (String) -> Unit) {
         }
     )
 }
-
-/**
- * content:// -> cacheDir 下的临时文件。
- *
- * 相册返回的是 content Uri，OkHttp 读不了，必须先落盘。
- * 与拍照签到用的是同一套逻辑，但两个界面各自独立，避免跨包依赖。
- */
-private fun uriToCacheFile(
-    context: android.content.Context,
-    uri: android.net.Uri,
-    prefix: String
-): File? = runCatching {
-    val target = File(context.cacheDir, "${prefix}_${System.currentTimeMillis()}.jpg")
-    context.contentResolver.openInputStream(uri)?.use { input ->
-        target.outputStream().use { output -> input.copyTo(output) }
-    } ?: return null
-    target.takeIf { it.length() > 0L }
-}.getOrNull()

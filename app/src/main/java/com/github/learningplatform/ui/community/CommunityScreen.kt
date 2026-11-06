@@ -1,4 +1,4 @@
-﻿package com.github.learningplatform.ui.community
+package com.github.learningplatform.ui.community
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.learningplatform.data.remote.dto.ArticleDto
@@ -256,14 +257,30 @@ private fun ArticleCard(
             .padding(12.dp)
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = article.title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = TextPrimary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // 精华标记：后端 isFeatured=1 的文章，「精华」tab 就是靠 featured=true 筛出来的
+                if (article.isFeatured) {
+                    Text(
+                        text = "精华",
+                        fontSize = 10.sp,
+                        color = Color.White,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Primary)
+                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                }
+                Text(
+                    text = article.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+            }
             if (article.summary.isNotBlank()) {
                 Spacer(Modifier.height(4.dp))
                 Text(
