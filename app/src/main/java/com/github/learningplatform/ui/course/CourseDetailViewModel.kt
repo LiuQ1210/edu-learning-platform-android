@@ -60,13 +60,19 @@ class CourseDetailViewModel @Inject constructor(
             try {
                 val detail = courseRepository.getCourseDetail(id)
                 val ratings = runCatching { courseRepository.getRatings(id).list }.getOrDefault(emptyList())
+                // 上报观看历史（课程）
+                userRepository.reportView(Constants.TARGET_COURSE, id)
+                // 详情接口不返回 isFavorited，批量查一次当前课程的收藏状态
+                val favIds = runCatching {
+                    interactionRepository.getActiveIds(Constants.TARGET_COURSE, 2, listOf(id))
+                }.getOrDefault(emptyList()).toSet()
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     detail = detail,
                     ratings = ratings,
                     // 详情接口返回 isLiked/isFavorited 之外的收藏态由 8.9 维护，
-                    // v3 的 6.2 未返回 isFavorited，这里先按未收藏展示。
-                    isFavorited = false
+                    // v3 的 6.2 未返回 isFavorited，这里用 activeIds 查回。
+                    isFavorited = id in favIds
                 )
             } catch (e: CancellationException) {
                 throw e

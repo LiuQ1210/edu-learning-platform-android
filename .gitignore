@@ -19,3 +19,15 @@ app/build/
 
 # Mac系统垃圾
 .DS_Store
+
+# 本地调试截图与日志（不提交）
+/build*.png
+/problems.png
+/buildpanel.png
+hs_err_pid*.log
+replay_pid*.log
+
+# 本地脚本与签名密钥（绝不提交）
+/tools/
+*.jks
+*.keystore

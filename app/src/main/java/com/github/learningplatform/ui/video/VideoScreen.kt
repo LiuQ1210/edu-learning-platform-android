@@ -109,6 +109,16 @@ fun VideoScreen(
             else -> {
                 val pagerState = rememberPagerState(pageCount = { uiState.videos.size })
 
+                // 从收藏/历史列表带 id 进来：列表加载完后自动跳到目标视频
+                LaunchedEffect(viewModel) {
+                    viewModel.focusIndex.collect { idx ->
+                        idx?.let {
+                            if (it < uiState.videos.size) pagerState.scrollToPage(it)
+                            viewModel.consumeFocus()
+                        }
+                    }
+                }
+
                 // 滑到哪一页就只让那一页持有播放器，避免同时解码多个视频
                 LaunchedEffect(pagerState.currentPage) {
                     viewModel.onPageChanged(pagerState.currentPage)

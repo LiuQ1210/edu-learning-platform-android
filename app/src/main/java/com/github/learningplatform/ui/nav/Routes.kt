@@ -84,6 +84,7 @@ object Routes {
 
     fun courseDetail(courseId: Long) = "course_detail/$courseId"
     fun articleDetail(articleId: Long) = "article_detail/$articleId"
+    fun video(focusId: Long? = null) = "$VIDEO?focusId=${focusId ?: 0L}"
     fun articleEdit(articleId: Long) = "article_edit/$articleId"
     fun noteDetail(noteId: Long) = "note_detail/$noteId"
     fun tagArticles(tagId: Long) = "tag_articles/$tagId"
