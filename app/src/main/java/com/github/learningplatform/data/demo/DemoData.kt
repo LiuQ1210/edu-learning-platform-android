@@ -8,6 +8,8 @@ import com.github.learningplatform.data.remote.dto.DownloadRecordDto
 import com.github.learningplatform.data.remote.dto.HotWordDto
 import com.github.learningplatform.data.remote.dto.MyCourseDto
 import com.github.learningplatform.data.remote.dto.PageData
+import com.github.learningplatform.data.remote.dto.RatingDto
+import com.github.learningplatform.data.remote.dto.RatingResultDto
 import com.github.learningplatform.data.remote.dto.TodoDto
 
 /**
@@ -182,4 +184,17 @@ object DemoData {
         AdSlotDto("community_home_banner", "社区主页轮播广告", "TAKU_SLOT_COMM_BANNER_001", 1),
         AdSlotDto("video_home_banner", "视频主页轮播广告", "TAKU_SLOT_VIDEO_BANNER_001", 1)
     )
+
+    // ---------------------------------------------------------------- 课程评分（后端未提供，假数据）
+
+    fun ratings(courseId: Long): PageData<RatingDto> = PageData(
+        total = 3,
+        list = listOf(
+            RatingDto(1001, "张三", "", 5.0, "讲得很清楚"),
+            RatingDto(1002, "李四", "", 4.5, "例子实用"),
+            RatingDto(1003, "王五", "", 4.0, "适合入门")
+        )
+    )
+
+    fun rateResult(score: Double) = RatingResultDto(averageScore = score, ratingCount = 129)
 }

@@ -57,10 +57,12 @@ object ApiTargetType {
      * 笔记行返回 `post` / `video`。兼容数字字符串（老数据）与空值。
      */
     fun toInt(raw: String?): Int = when (raw?.trim()?.lowercase()) {
-        POST -> 1
-        COURSE -> 2
-        SHORT_VIDEO -> 3
-        NOTE_VIDEO -> 2
+        // 注意：这里已经 lowercase，分支值必须全小写；SHORT_VIDEO 常量是驼峰 "shortVideo"，
+        // 直接写常量会因大小写不匹配落进 else，导致短视频 targetType 被错判成文章(1)。
+        "post" -> 1
+        "course" -> 2
+        "shortvideo" -> 3
+        "video" -> 2
         else -> raw?.trim()?.toIntOrNull() ?: 1
     }
 

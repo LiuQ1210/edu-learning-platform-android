@@ -12,6 +12,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -195,7 +196,9 @@ fun MainScaffold(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
     val currentRoute = currentDestination?.route
-    val showBar = currentRoute in Routes.barRoutes
+    // video 带 focusId 参数后实际 route 是 "video?focusId=123"，精确匹配 "video" 会失败，
+    // 导致底栏不显示、像全屏页一样退不出去；改成前缀匹配。
+    val showBar = Routes.barRoutes.any { currentRoute?.startsWith(it) == true }
 
     Scaffold(
         bottomBar = {
@@ -213,7 +216,8 @@ fun MainScaffold(
                     windowInsets = androidx.compose.foundation.layout.WindowInsets(0)
                 ) {
                     BottomNavItem.entries.forEach { item ->
-                        val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
+                        // 同样按前缀匹配：video?focusId=123 也要高亮「视频」tab
+                        val selected = currentDestination?.hierarchy?.any { it.route?.startsWith(item.route) == true } == true
                         // 每个 Tab 一个色对：选中用该 Tab 的墨色 + 同色系淡垫，深浅模式自动切换
                         val (ink, wash) = when (item) {
                             BottomNavItem.HOME -> TabHomeInk to TabHomeWash
@@ -264,7 +268,19 @@ fun MainScaffold(
                 )
             }
 
-            composable(Routes.VIDEO) {
+            composable(
+                route = "${Routes.VIDEO}?focusId={focusId}",
+                arguments = listOf(navArgument("focusId") {
+                    type = NavType.StringType
+                    defaultValue = "0"
+                    nullable = true
+                })
+            ) { backStack ->
+                val focusId = backStack.arguments?.getString("focusId")?.toLongOrNull() ?: 0L
+                val videoViewModel: com.github.learningplatform.ui.video.VideoViewModel = hiltViewModel()
+                LaunchedEffect(focusId) {
+                    if (focusId > 0L) videoViewModel.setFocus(focusId)
+                }
                 VideoScreen(
                     onOpenCourse = { navController.navigate(Routes.courseDetail(it)) },
                     onOpenPlayer = onOpenPlayer
@@ -425,8 +441,17 @@ fun MainScaffold(
                 FavoritesScreen(
                     onBack = { navController.popBackStack() },
                     onOpenTarget = { type, id ->
-                        if (type == 1) navController.navigate(Routes.articleDetail(id))
-                        else navController.navigate(Routes.courseDetail(id))
+                        when (type) {
+                            1 -> navController.navigate(Routes.articleDetail(id))
+                            // 从收藏列表带 id 进短视频：压栈 video 时弹掉收藏列表这层，
+                            // 否则 video?focusId 会被 tab 切换的 saveState 当成 video tab state，
+                            // 导致点底栏「我的」切不回个人主页。返回键从 video 回到 profile。
+                            3 -> navController.navigate(Routes.video(id)) {
+                                launchSingleTop = true
+                                popUpTo(Routes.HOME) { inclusive = false }
+                            }
+                            else -> navController.navigate(Routes.courseDetail(id))
+                        }
                     }
                 )
             }
@@ -435,8 +460,14 @@ fun MainScaffold(
                 LikesScreen(
                     onBack = { navController.popBackStack() },
                     onOpenTarget = { type, id ->
-                        if (type == 1) navController.navigate(Routes.articleDetail(id))
-                        else navController.navigate(Routes.courseDetail(id))
+                        when (type) {
+                            1 -> navController.navigate(Routes.articleDetail(id))
+                            3 -> navController.navigate(Routes.video(id)) {
+                                launchSingleTop = true
+                                popUpTo(Routes.HOME) { inclusive = false }
+                            }
+                            else -> navController.navigate(Routes.courseDetail(id))
+                        }
                     }
                 )
             }
@@ -457,8 +488,14 @@ fun MainScaffold(
                 WatchHistoryScreen(
                     onBack = { navController.popBackStack() },
                     onOpenTarget = { type, id ->
-                        if (type == 1) navController.navigate(Routes.articleDetail(id))
-                        else navController.navigate(Routes.courseDetail(id))
+                        when (type) {
+                            1 -> navController.navigate(Routes.articleDetail(id))
+                            3 -> navController.navigate(Routes.video(id)) {
+                                launchSingleTop = true
+                                popUpTo(Routes.HOME) { inclusive = false }
+                            }
+                            else -> navController.navigate(Routes.courseDetail(id))
+                        }
                     }
                 )
             }

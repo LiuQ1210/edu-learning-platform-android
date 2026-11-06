@@ -65,6 +65,7 @@ data class InteractionMeta(
 class VideoViewModel @Inject constructor(
     private val courseRepository: CourseRepository,
     private val interactionRepository: InteractionRepository,
+    private val userRepository: com.github.learningplatform.data.repository.UserRepository,
     private val videoApi: com.github.learningplatform.data.remote.VideoApi
 ) : ViewModel() {
 
@@ -75,9 +76,26 @@ class VideoViewModel @Inject constructor(
     private val _interaction = MutableStateFlow<Map<Long, InteractionMeta>>(emptyMap())
     val interaction: StateFlow<Map<Long, InteractionMeta>> = _interaction.asStateFlow()
 
+    /** 从收藏/历史列表点进来时要定位到的视频 id；0 表示普通进入 */
+    private var pendingFocusId: Long = 0L
+
+    /** 列表加载完成后，若 pendingFocusId 已在列表里，发这个 index 让 Pager 跳过去 */
+    private val _focusIndex = MutableStateFlow<Int?>(null)
+    val focusIndex: StateFlow<Int?> = _focusIndex.asStateFlow()
+
+    fun consumeFocus() { _focusIndex.value = null }
+
     private var currentPage = -1
 
     init { load() }
+
+    /** 从外部带 id 进入（收藏/历史点短视频）：记住 id，重置列表后定位 */
+    fun setFocus(id: Long) {
+        if (id <= 0L || id == pendingFocusId) return
+        pendingFocusId = id
+        _uiState.value = VideoUiState()
+        load()
+    }
 
     fun refresh() {
         _uiState.value = VideoUiState()
@@ -102,6 +120,12 @@ class VideoViewModel @Inject constructor(
         val state = _uiState.value
         listOfNotNull(state.videos.getOrNull(page), state.videos.getOrNull(page + 1))
             .forEach { ensurePlayUrl(it.courseId) }
+        // 滑到某页即上报一次观看历史（后端首次 +1 播放数，之后覆盖时间）
+        state.videos.getOrNull(page)?.let {
+            viewModelScope.launch {
+                userRepository.reportView(Constants.TARGET_SHORT_VIDEO, it.courseId)
+            }
+        }
     }
 
     private fun ensurePlayUrl(courseId: Long) {
@@ -164,6 +188,21 @@ class VideoViewModel @Inject constructor(
                         )
                     }
                     _interaction.value = if (reset) newMeta else _interaction.value + newMeta
+                    // 后端短视频列表接口不返回 isFavorited/isLiked，批量查一次当前页视频的
+                    // 已赞/已藏状态，否则重启 app 后收藏/点赞按钮都不亮。
+                    // targetType 必须用 TARGET_SHORT_VIDEO=3，不能写 2（那是课程），否则查的是课程状态。
+                    try {
+                        val ids = videoList.map { it.courseId }
+                        val favIds = interactionRepository.getActiveIds(Constants.TARGET_SHORT_VIDEO, 2, ids).toSet()
+                        val likeIds = interactionRepository.getActiveIds(Constants.TARGET_SHORT_VIDEO, 1, ids).toSet()
+                        val updates = ids.associateWith { id ->
+                            (_interaction.value[id] ?: InteractionMeta()).copy(
+                                isFavorited = id in favIds,
+                                isLiked = id in likeIds
+                            )
+                        }
+                        _interaction.value = _interaction.value + updates
+                    } catch (_: Throwable) { }
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         isLoadingMore = false,
@@ -173,6 +212,19 @@ class VideoViewModel @Inject constructor(
                         pageNum = nextPage,
                         hasMore = accumulated.size < page.total
                     )
+                    // 从收藏/历史列表带 id 进来：在已加载列表里找目标视频，找到就跳过去；
+                    // 没找到且还有下一页，继续翻页直到找到。
+                    if (pendingFocusId != 0L) {
+                        val idx = accumulated.indexOfFirst { it.courseId == pendingFocusId }
+                        if (idx >= 0) {
+                            _focusIndex.value = idx
+                            pendingFocusId = 0L
+                        } else if (accumulated.size < page.total) {
+                            fetch(reset = false)
+                        } else {
+                            pendingFocusId = 0L
+                        }
+                    }
                 } else {
                     throw Exception("接口返回失败")
                 }

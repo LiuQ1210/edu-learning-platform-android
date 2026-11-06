@@ -182,6 +182,30 @@ class UserRepository @Inject constructor(
         types.forEach { userApi.clearViewHistory(it).okBody() }
     }
 
+    /**
+     * 上报观看历史。进短视频/课程播放时调一次；之后可周期性带 position 续报进度。
+     * 客户端 targetType 数字 -> 后端字符串。失败不阻塞播放。
+     */
+    suspend fun reportView(targetType: Int, targetId: Long, position: Int? = null, duration: Int? = null) {
+        val type = ApiTargetType.of(targetType) ?: return
+        try {
+            userApi.reportView(type, targetId, null, position, duration).okBody()
+        } catch (_: Exception) { }
+    }
+
+    /** 查断点续播位置，返回 position（秒），没有记录返回 0 */
+    suspend fun getViewProgress(targetType: Int, targetId: Long): Int {
+        val type = ApiTargetType.of(targetType) ?: return 0
+        return try {
+            userApi.getViewProgress(type, targetId).okBody().payload().int("position")
+        } catch (_: Exception) { 0 }
+    }
+
+    /** 删除单条观看历史 */
+    suspend fun removeViewHistory(historyId: Long) {
+        try { userApi.removeViewHistory(historyId).okBody() } catch (_: Exception) { }
+    }
+
     /** 下载记录：后端未提供，使用本地样例 */
     suspend fun getDownloadRecords(
         pageNum: Int = 1,

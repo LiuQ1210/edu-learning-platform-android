@@ -72,6 +72,34 @@ interface UserApi {
         @Query("pageSize") pageSize: Int = 20
     ): Response<RawTableData>
 
+    /**
+     * 上报观看（表单）。后端 targetType 是字符串 shortVideo/course/post。
+     * position/duration 可空（文章不传）。
+     */
+    @FormUrlEncoded
+    @POST("api/v1/history/report")
+    suspend fun reportView(
+        @Field("targetType") targetType: String,
+        @Field("targetId") targetId: Long,
+        @Field("videoId") videoId: Long? = null,
+        @Field("position") position: Int? = null,
+        @Field("duration") duration: Int? = null
+    ): Response<JsonObject>
+
+    /** 查断点续播位置 */
+    @GET("api/v1/history/progress")
+    suspend fun getViewProgress(
+        @Query("targetType") targetType: String,
+        @Query("targetId") targetId: Long
+    ): Response<JsonObject>
+
+    /** 删除单条历史 */
+    @FormUrlEncoded
+    @POST("api/v1/history/remove")
+    suspend fun removeViewHistory(
+        @Field("historyId") historyId: Long
+    ): Response<JsonObject>
+
     /** 清空观看历史 */
     @POST("api/v1/history/clear")
     suspend fun clearViewHistory(

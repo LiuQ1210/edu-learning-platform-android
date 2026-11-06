@@ -26,6 +26,8 @@ data class CourseDetailUiState(
     val tab: Int = 0,
     /** 当前用户已提交的评分（0 = 未评分），来自 /api/v1/rating/info */
     val myScore: Double = 0.0,
+    /** 评分列表（cjx 分支） */
+    val ratings: List<com.github.learningplatform.data.remote.dto.RatingDto> = emptyList(),
     /** 当前用户是否已点赞该课程（interaction/status 或点击后由 toggle 返回） */
     val isLiked: Boolean = false,
     val isFavorited: Boolean = false,
@@ -64,6 +66,10 @@ class CourseDetailViewModel @Inject constructor(
                 val detail = courseRepository.getCourseDetail(id)
                 // 评分汇总与「我的评分」来自后端 rating/info；失败不影响课程详情展示
                 val rating = runCatching { ratingRepository.getRatingInfo(id) }.getOrNull()
+                // 评分列表（cjx 分支，当前为假数据）
+                val ratings = runCatching { courseRepository.getRatings(id).list }.getOrDefault(emptyList())
+                // 上报观看历史（课程）
+                userRepository.reportView(Constants.TARGET_COURSE, id)
                 // 进页面时同步点赞/收藏态：interaction/status?type=1 点赞、type=2 收藏
                 val likedIds = runCatching {
                     interactionRepository.getActiveIds(Constants.TARGET_COURSE, 1, listOf(id))
@@ -74,6 +80,7 @@ class CourseDetailViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     detail = detail.withRating(rating?.averageScore, rating?.ratingCount),
+                    ratings = ratings,
                     myScore = rating?.myScore ?: 0.0,
                     isLiked = likedIds.contains(id),
                     isFavorited = favIds.contains(id)

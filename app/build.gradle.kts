@@ -207,3 +207,27 @@ kotlin {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
+
+/**
+ * Android 16（API 36+）有本地网络访问限制，app 不能直连 10.0.2.2，
+ * baseUrl 用的是 127.0.0.1:80，必须靠 `adb reverse tcp:80 tcp:80` 把设备回环
+ * 转发到宿主机 80。reverse 在模拟器/电脑重启后会丢，这里让 installDebug 装完自动重建，
+ * 以后只管 `./gradlew installDebug`，不用手动敲 reverse。
+ */
+tasks.register("adbReverse80") {
+    group = "run"
+    description = "After installDebug, re-run: adb reverse tcp:80 tcp:80"
+    doLast {
+        val adb = "D:\\Android\\Sdk\\platform-tools\\adb.exe"
+        try {
+            val p = Runtime.getRuntime().exec(arrayOf(adb, "reverse", "tcp:80", "tcp:80"))
+            p.waitFor()
+            println(">> adb reverse tcp:80 tcp:80 OK")
+        } catch (e: Exception) {
+            println(">> adb reverse 失败（设备未连？）: ${e.message}")
+        }
+    }
+}
+tasks.whenTaskAdded {
+    if (name == "installDebug") finalizedBy("adbReverse80")
+}

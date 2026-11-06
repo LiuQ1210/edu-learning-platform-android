@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,11 +59,24 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
+    var showAgreement by remember { mutableStateOf(false) }
+    var showPrivacy by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
+    var showClearCache by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.loggedOut) {
         if (uiState.loggedOut) onLoggedOut()
+    }
+    // 清除缓存后弹个轻提示
+    LaunchedEffect(uiState.cleared) {
+        if (uiState.cleared) {
+            // 复用 snackbar 太重，这里直接 Toast 一下即可
+            android.widget.Toast.makeText(context, "缓存已清除", android.widget.Toast.LENGTH_SHORT).show()
+            viewModel.consumeCleared()
+        }
     }
 
     Scaffold(
@@ -100,13 +114,13 @@ fun SettingsScreen(
                     .clip(RoundedCornerShape(16.dp))
                     .background(surfaceWashBrush())
             ) {
-                SettingRow(NavIcons.Inbox, "清除缓存", onClick = { })
+                SettingRow(NavIcons.Inbox, "清除缓存", trailing = uiState.cacheSizeLabel, onClick = { showClearCache = true })
                 Divider()
-                SettingRow(NavIcons.Note, "用户协议", onClick = { })
+                SettingRow(NavIcons.Note, "用户协议", onClick = { showAgreement = true })
                 Divider()
-                SettingRow(NavIcons.Bookmark, "隐私政策", onClick = { })
+                SettingRow(NavIcons.Bookmark, "隐私政策", onClick = { showPrivacy = true })
                 Divider()
-                SettingRow(NavIcons.Community, "关于我们", trailing = "v" + BuildConfig.VERSION_NAME, onClick = { })
+                SettingRow(NavIcons.Community, "关于我们", trailing = "v" + BuildConfig.VERSION_NAME, onClick = { showAbout = true })
             }
 
             Spacer(Modifier.height(24.dp))
@@ -186,8 +200,60 @@ fun SettingsScreen(
             }
         )
     }
+
+    if (showAgreement) {
+        InfoDialog(
+            title = "用户协议",
+            text = "欢迎使用本学习平台。使用本应用即表示您同意：\n\n1. 您应妥善保管账号，因账号泄露造成的损失由您自行承担；\n2. 平台内容仅供个人学习使用，未经许可不得商用或二次分发；\n3. 我们有权根据运营需要调整课程内容与功能，重要变更会提前通知。",
+            onDismiss = { showAgreement = false }
+        )
+    }
+
+    if (showPrivacy) {
+        InfoDialog(
+            title = "隐私政策",
+            text = "我们重视您的隐私：\n\n1. 仅收集学习行为（观看历史、进度、点赞收藏）用于改进推荐与记录学习进度；\n2. 不会向第三方共享您的个人身份信息；\n3. 您可在「设置-清除缓存」中清除本地缓存数据。",
+            onDismiss = { showPrivacy = false }
+        )
+    }
+
+    if (showAbout) {
+        InfoDialog(
+            title = "关于我们",
+            text = "学习平台 v" + BuildConfig.VERSION_NAME + "\n\n面向学习者的综合学习社区，提供课程、文章与短视频学习内容。",
+            onDismiss = { showAbout = false }
+        )
+    }
+
+    if (showClearCache) {
+        AlertDialog(
+            onDismissRequest = { showClearCache = false },
+            title = { Text("清除缓存") },
+            text = { Text("将清除本地图片与临时缓存（不影响学习记录），当前 " + uiState.cacheSizeLabel + "，确定清除吗？") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showClearCache = false
+                    viewModel.clearCache()
+                }) { Text("清除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearCache = false }) { Text("取消") }
+            }
+        )
+    }
 }
 
+@Composable
+private fun InfoDialog(title: String, text: String, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(text, style = MaterialTheme.typography.bodyMedium) },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("知道了") }
+        }
+    )
+}
 @Composable
 private fun ThemeOption(label: String, selected: Boolean, onClick: () -> Unit) {
     Row(

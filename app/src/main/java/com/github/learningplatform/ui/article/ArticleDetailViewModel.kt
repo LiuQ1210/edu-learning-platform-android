@@ -54,7 +54,8 @@ data class ArticleDetailUiState(
 class ArticleDetailViewModel @Inject constructor(
     private val articleRepository: ArticleRepository,
     private val interactionRepository: InteractionRepository,
-    private val noteRepository: NoteRepository
+    private val noteRepository: NoteRepository,
+    private val userRepository: com.github.learningplatform.data.repository.UserRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ArticleDetailUiState())
@@ -74,13 +75,23 @@ class ArticleDetailViewModel @Inject constructor(
                         .list.any { it.articleId == id }
                 }.getOrDefault(false)
 
+                // 详情接口可能不返回 isLiked/isFavorited，用 activeIds 兜底查一次
+                val likeIds = runCatching {
+                    interactionRepository.getActiveIds(Constants.TARGET_ARTICLE, 1, listOf(id))
+                }.getOrDefault(emptyList()).toSet()
+                val favIds = runCatching {
+                    interactionRepository.getActiveIds(Constants.TARGET_ARTICLE, 2, listOf(id))
+                }.getOrDefault(emptyList()).toSet()
+
                 _uiState.value = ArticleDetailUiState(
                     isLoading = false,
                     detail = detail,
                     isMine = isMine,
-                    isLiked = detail.isLiked,
-                    isFavorited = detail.isFavorited
+                    isLiked = id in likeIds,
+                    isFavorited = id in favIds
                 )
+                // 上报观看历史（文章）
+                userRepository.reportView(Constants.TARGET_ARTICLE, id)
                 loadComments(reset = true)
             } catch (e: CancellationException) {
                 throw e

@@ -1,5 +1,6 @@
 package com.github.learningplatform.ui.mine
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.learningplatform.data.local.ThemeMode
@@ -7,22 +8,29 @@ import com.github.learningplatform.data.local.UserPreferences
 import com.github.learningplatform.data.repository.AuthRepository
 import com.github.learningplatform.ui.readableMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 import javax.inject.Inject
 
 data class SettingsUiState(
     val loggedOut: Boolean = false,
-    val themeMode: ThemeMode = ThemeMode.SYSTEM
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val cacheSizeLabel: String = "计算中...",
+    val cleared: Boolean = false
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val userPreferences: UserPreferences
+    private val userPreferences: UserPreferences,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -35,6 +43,7 @@ class SettingsViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(themeMode = mode)
             }
         }
+        computeCacheSize()
     }
 
     fun setThemeMode(mode: ThemeMode) {
@@ -54,6 +63,43 @@ class SettingsViewModel @Inject constructor(
             }
             _uiState.value = SettingsUiState(loggedOut = true)
         }
+    }
+
+    /** 递归算 cache 目录总大小，格式化成 KB/MB 字符串 */
+    private fun computeCacheSize() {
+        viewModelScope.launch {
+            val size = withContext(Dispatchers.IO) { dirSize(context.cacheDir) }
+            _uiState.value = _uiState.value.copy(cacheSizeLabel = formatSize(size))
+        }
+    }
+
+    fun clearCache() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                context.cacheDir.listFiles()?.forEach { it.deleteRecursively() }
+            }
+            _uiState.value = _uiState.value.copy(cacheSizeLabel = "0 B", cleared = true)
+        }
+    }
+
+    fun consumeCleared() { _uiState.value = _uiState.value.copy(cleared = false) }
+
+    private fun dirSize(dir: File): Long {
+        if (!dir.exists()) return 0L
+        var total = 0L
+        dir.listFiles()?.forEach { child ->
+            total += if (child.isDirectory) dirSize(child) else child.length()
+        }
+        return total
+    }
+
+    private fun formatSize(bytes: Long): String {
+        if (bytes <= 0) return "0 B"
+        val kb = bytes / 1024.0
+        if (kb < 1024) return "%.1f KB".format(kb)
+        val mb = kb / 1024.0
+        if (mb < 1024) return "%.1f MB".format(mb)
+        return "%.2f GB".format(mb / 1024.0)
     }
 }
 

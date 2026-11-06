@@ -139,3 +139,14 @@ data class RatingResultDto(
     val averageScore: Double = 0.0,
     val ratingCount: Int = 0
 )
+
+/** 6.5 课程评分列表项 */
+@Serializable
+data class RatingDto(
+    val userId: Long = 0,
+    val userName: String = "",
+    val userAvatar: String = "",
+    val score: Double = 0.0,
+    val comment: String = "",
+    val createTime: String = ""
+)

@@ -201,9 +201,10 @@ fun ProfileScreen(
                 Row(
                     modifier = Modifier.fillMaxWidth()
                 ) {
+                    // 退出登录统一收到设置页，这里只留设置入口；Spacer weight=2f 让设置占 1/3 格，
+                    // 和上一行「我的收藏」严格对齐（上一行 3 等分各占 1/3）。
                     GridMenuItem(NavIcons.Settings, "设置", onOpenSettings, tint = Color(0xFF607D8B), modifier = Modifier.weight(1f))
-                    GridMenuItem(NavIcons.Logout, "退出登录", viewModel::logout, tint = Color(0xFFF44336), modifier = Modifier.weight(1f))
-                    Spacer(Modifier.weight(1f))
+                    Spacer(Modifier.weight(2f))
                 }
             }
         }

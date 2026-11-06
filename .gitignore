@@ -27,3 +27,13 @@ app/build/
 # 临时调试产物（截图、模拟器日志等）
 /.tmp/
 *.log
+
+# 本地调试截图（不提交）
+/build*.png
+/problems.png
+/buildpanel.png
+
+# 本地脚本与签名密钥（绝不提交）
+/tools/
+*.jks
+*.keystore
