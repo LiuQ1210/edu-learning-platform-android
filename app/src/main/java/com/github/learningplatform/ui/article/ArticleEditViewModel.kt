@@ -4,10 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.learningplatform.data.remote.dto.CreateArticleRequest
 import com.github.learningplatform.data.remote.dto.PostStatus
-import com.github.learningplatform.data.remote.dto.UploadScene
 import com.github.learningplatform.data.repository.ArticleRepository
 import com.github.learningplatform.data.repository.CategoryRepository
-import com.github.learningplatform.data.repository.FileRepository
 import com.github.learningplatform.ui.course.CATEGORY_TYPE_ARTICLE
 import com.github.learningplatform.ui.readableMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -17,7 +15,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import java.io.File
 
 private const val MAX_TAGS = 5
 
@@ -26,14 +23,11 @@ data class ArticleEditUiState(
     val title: String = "",
     val summary: String = "",
     val content: String = "",
-    val coverUrl: String = "",
     val categoryId: Long? = null,
     val categories: List<Pair<Long, String>> = emptyList(),
     val tags: List<com.github.learningplatform.data.remote.dto.ArticleTagDto> = emptyList(),
     val selectedTagIds: Set<Long> = emptySet(),
     val submitting: Boolean = false,
-    /** 封面上传中（接口 v3.1 增补 15.1，scene=article_cover） */
-    val uploadingCover: Boolean = false,
     val finished: Boolean = false,
     val message: String? = null
 ) {
@@ -45,12 +39,12 @@ data class ArticleEditUiState(
  * 文章编辑。
  *
  * 正文以纯文本编辑，提交前把空行分段转成 <p> 标签，与后端 HTML 正文格式对齐。
+ * 不涉及封面：发布时 coverUrl 传 null，列表/详情页的封面完全由后端下发。
  */
 @HiltViewModel
 class ArticleEditViewModel @Inject constructor(
     private val articleRepository: ArticleRepository,
-    private val categoryRepository: CategoryRepository,
-    private val fileRepository: FileRepository
+    private val categoryRepository: CategoryRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ArticleEditUiState())
@@ -105,7 +99,6 @@ class ArticleEditViewModel @Inject constructor(
                 title = detail.title,
                 summary = detail.summary,
                 content = htmlToPlain(detail.content),
-                coverUrl = detail.coverUrl,
                 categoryId = detail.categoryId.takeIf { it > 0L },
                 selectedTagIds = detail.tags.map { it.tagId }.toSet()
             )
@@ -126,39 +119,6 @@ class ArticleEditViewModel @Inject constructor(
 
     fun onContentChange(value: String) {
         _uiState.value = _uiState.value.copy(content = value)
-    }
-
-    fun onCoverChange(value: String) {
-        _uiState.value = _uiState.value.copy(coverUrl = value)
-    }
-
-    /**
-     * 上传封面（接口 v3.1 增补 15.1，scene=article_cover）。
-     *
-     * 上传成功后把服务端返回的 url 写进 coverUrl，提交文章时一起带上。
-     * 之所以不在提交时顺带上传：7.3/7.4 的 coverUrl 是字符串字段，
-     * 上传失败要让用户能重试，不应该把整篇文章的提交一起卡住。
-     */
-    fun uploadCover(file: File) {
-        if (_uiState.value.uploadingCover) return
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(uploadingCover = true, message = null)
-            try {
-                val result = fileRepository.upload(file, UploadScene.ARTICLE_COVER)
-                _uiState.value = _uiState.value.copy(
-                    uploadingCover = false,
-                    coverUrl = result.url,
-                    message = "封面上传成功"
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                _uiState.value = _uiState.value.copy(
-                    uploadingCover = false,
-                    message = e.readableMessage()
-                )
-            }
-        }
     }
 
     fun selectCategory(id: Long) {
@@ -219,7 +179,6 @@ class ArticleEditViewModel @Inject constructor(
                         title = state.title,
                         summary = state.summary.ifBlank { null },
                         content = html,
-                        coverUrl = state.coverUrl.ifBlank { null },
                         categoryId = state.categoryId ?: 0L,
                         tagIds = state.selectedTagIds.toList(),
                         publish = publish
