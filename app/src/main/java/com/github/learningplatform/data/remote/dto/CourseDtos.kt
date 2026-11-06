@@ -94,6 +94,14 @@ data class CourseLessonDto(
     val lessonId: Long,
     val title: String = "",
     val duration: Int = 0,
+    /**
+     * 播放地址（后端 `learning_course_video.video_url`）。
+     *
+     * 文档 6.3 的播放凭证接口后端没有实现，课程视频的真实地址就随 6.2 详情下发，
+     * 可能是 OSS 直链，也可能是 `/profile/upload/xxx.mp4` 这种相对路径，
+     * 统一在 Repository 里用 [com.github.learningplatform.core.network.ImageUrl] 补全。
+     */
+    val videoUrl: String = "",
     val isFree: Int = 0,
     /** 转码状态：1成功 */
     val transcodeStatus: Int = 1,

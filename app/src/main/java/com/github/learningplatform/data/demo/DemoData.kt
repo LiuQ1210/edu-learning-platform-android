@@ -19,7 +19,6 @@ import com.github.learningplatform.data.remote.dto.HotWordDto
 import com.github.learningplatform.data.remote.dto.MyCourseDto
 import com.github.learningplatform.data.remote.dto.NoteDto
 import com.github.learningplatform.data.remote.dto.PageData
-import com.github.learningplatform.data.remote.dto.PlayInfoDto
 import com.github.learningplatform.data.remote.dto.RatingDto
 import com.github.learningplatform.data.remote.dto.RatingResultDto
 import com.github.learningplatform.data.remote.dto.ReplyDto
@@ -157,17 +156,38 @@ object DemoData {
         val isShort = base.videoType == 1
         val chapters = if (isShort) emptyList() else listOf(
             CourseChapterDto(3001, "第一章：环境搭建", listOf(
-                CourseLessonDto(4001, "1.1 开发环境准备", 536, 1, 1, 0, 1),
-                CourseLessonDto(4002, "1.2 第一个程序", 720, 0, 1, 120, 0),
-                CourseLessonDto(4003, "1.3 常见问题排查", 420, 0, 1, 0, 0)
+                CourseLessonDto(
+                    lessonId = 4001, title = "1.1 开发环境准备", duration = 536,
+                    isFree = 1, transcodeStatus = 1, progressSeconds = 0, isFinished = 1
+                ),
+                CourseLessonDto(
+                    lessonId = 4002, title = "1.2 第一个程序", duration = 720,
+                    isFree = 0, transcodeStatus = 1, progressSeconds = 120, isFinished = 0
+                ),
+                CourseLessonDto(
+                    lessonId = 4003, title = "1.3 常见问题排查", duration = 420,
+                    isFree = 0, transcodeStatus = 1, progressSeconds = 0, isFinished = 0
+                )
             )),
             CourseChapterDto(3002, "第二章：核心概念", listOf(
-                CourseLessonDto(4004, "2.1 数据结构概览", 900, 0, 1, 0, 0),
-                CourseLessonDto(4005, "2.2 算法复杂度", 1080, 0, 1, 0, 0)
+                CourseLessonDto(
+                    lessonId = 4004, title = "2.1 数据结构概览", duration = 900,
+                    isFree = 0, transcodeStatus = 1, progressSeconds = 0, isFinished = 0
+                ),
+                CourseLessonDto(
+                    lessonId = 4005, title = "2.2 算法复杂度", duration = 1080,
+                    isFree = 0, transcodeStatus = 1, progressSeconds = 0, isFinished = 0
+                )
             )),
             CourseChapterDto(3003, "第三章：项目实战", listOf(
-                CourseLessonDto(4006, "3.1 需求拆解", 660, 0, 1, 0, 0),
-                CourseLessonDto(4007, "3.2 编码实现", 1500, 0, 1, 0, 0)
+                CourseLessonDto(
+                    lessonId = 4006, title = "3.1 需求拆解", duration = 660,
+                    isFree = 0, transcodeStatus = 1, progressSeconds = 0, isFinished = 0
+                ),
+                CourseLessonDto(
+                    lessonId = 4007, title = "3.2 编码实现", duration = 1500,
+                    isFree = 0, transcodeStatus = 1, progressSeconds = 0, isFinished = 0
+                )
             ))
         )
         return CourseDetailDto(
@@ -199,22 +219,6 @@ object DemoData {
             RatingDto(1002, "李四", "", 4.5, "2026-09-09 18:20:00"),
             RatingDto(1003, "王五", "", 4.0, "2026-09-08 09:05:00")
         )
-    )
-
-    fun playInfo(courseId: Long, lessonId: Long?) = PlayInfoDto(
-        courseId = courseId,
-        lessonId = lessonId ?: 0L,
-        // 公开测试流。
-        //
-        // 用 W3C 的示例视频，**不要用 Google 的 gtv-videos-bucket**：
-        // 后者是 commondatastorage.googleapis.com，国内网络访问不通。
-        // 实测症状是「画面不动、位置一直 00:00」——ExoPlayer 停在 BUFFERING、
-        // duration 始终是 TIME_UNSET，但**代码链路完全正常**，很容易误判成播放器有问题。
-        // W3C 这个源支持 Range 请求，进度条可以拖动。
-        playUrl = "https://www.runoob.com/try/demo/movie.mp4",
-        expireTime = System.currentTimeMillis() / 1000 + 3600,
-        watermarkText = "DemoUser1001",
-        duration = 52
     )
 
     fun rateResult(score: Double) = RatingResultDto(averageScore = score, ratingCount = 129)

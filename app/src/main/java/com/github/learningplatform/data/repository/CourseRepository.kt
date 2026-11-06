@@ -1,6 +1,7 @@
 package com.github.learningplatform.data.repository
 
 import com.github.learningplatform.core.network.ApiException
+import com.github.learningplatform.core.network.ImageUrl
 import com.github.learningplatform.core.network.double
 import com.github.learningplatform.core.network.int
 import com.github.learningplatform.core.network.long
@@ -18,6 +19,7 @@ import com.github.learningplatform.data.remote.dto.CourseDetailDto
 import com.github.learningplatform.data.remote.dto.CourseDto
 import com.github.learningplatform.data.remote.dto.CourseLessonDto
 import com.github.learningplatform.data.remote.dto.PageData
+import com.github.learningplatform.data.remote.dto.PlayInfoDto
 import com.github.learningplatform.data.remote.dto.TableDataInfo
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -113,7 +115,7 @@ class CourseRepository @Inject constructor(
     suspend fun getCourseDetail(
         courseId: Long,
         forceRefresh: Boolean = false
-    ): com.github.learningplatform.data.remote.dto.CourseDetailDto {
+    ): CourseDetailDto {
         val data = courseApi.getCourseDetail(courseId).okBody().payload()
         val course = data["course"] as? JsonObject
             ?: throw ApiException(-1, "课程不存在或已下架")
@@ -122,7 +124,10 @@ class CourseRepository @Inject constructor(
             lessonId = long("videoId"),
             title = str("videoTitle"),
             // 后端 learning_course_video 没有 duration 字段，暂时取 0，UI 显示「--:--」
-            duration = int("duration")
+            duration = int("duration"),
+            // 播放地址随详情一起下发（后端没实现 6.3 play-info）。
+            // 存的是 OSS 直链时原样返回，是 /profile/upload/... 时按 BASE_URL 补全。
+            videoUrl = ImageUrl.resolve(str("videoUrl"))
         )
 
         val chapters = (data["chapters"] as? JsonArray)
@@ -144,7 +149,7 @@ class CourseRepository @Inject constructor(
             ?.map { it.toLesson() }
             .orEmpty()
 
-        return com.github.learningplatform.data.remote.dto.CourseDetailDto(
+        return CourseDetailDto(
             courseId = course.long("courseId"),
             title = course.str("courseName"),
             coverUrl = course.str("coverUrl"),
@@ -164,9 +169,53 @@ class CourseRepository @Inject constructor(
         )
     }
 
-    /** 播放凭证（后端暂未提供，返回假数据） */
-    suspend fun getPlayInfo(courseId: Long, lessonId: Long? = null): com.github.learningplatform.data.remote.dto.PlayInfoDto {
-        return DemoData.playInfo(courseId, lessonId)
+    /**
+     * 课程播放地址（文档 6.3 的播放凭证）。
+     *
+     * 后端**没有**实现 `GET /api/v1/courses/{courseId}/play-info`，但课程视频的真实
+     * 地址一直随 6.2 详情下发（`chapters[].videos[].videoUrl`，来自
+     * `learning_course_video.video_url`）。所以这里不调独立接口，直接把详情里的
+     * [CourseLessonDto.videoUrl] 组装成 [PlayInfoDto]，和短视频模块「地址就在列表
+     * 数据里」的做法保持一致。
+     *
+     * 之前这里返回写死的样例数据（一条公开测试流），源站下线后**整门课都播不了**：
+     * 与用户选哪门课、哪一节无关，播放器一律报 404。不要再回退到任何假地址。
+     *
+     * 视频是 OSS 直链（实测 206 + Range，可拖动进度条）；签名 URL / 动态水印等 VOD
+     * 能力等后端补上 6.3 后，只需替换本方法的实现，UI 与 DTO 都不用动。
+     */
+    suspend fun getPlayInfo(courseId: Long, lessonId: Long? = null): PlayInfoDto =
+        playInfoOf(getCourseDetail(courseId), lessonId)
+
+    /**
+     * 从**已经取到的**课程详情里挑出目标课时的播放地址。
+     *
+     * 播放页本来就要拉详情拿标题，用这个重载可以避免为了一个地址再请求一遍。
+     *
+     * @param lessonId 长视频传小节 ID；短视频课程（无章节）传 null，取第一条有地址的课时
+     * @throws ApiException 课时不存在、或后端没给该课时传视频 —— 宁可报错也不播别的
+     */
+    fun playInfoOf(detail: CourseDetailDto, lessonId: Long?): PlayInfoDto {
+        val lessons = detail.chapters.flatMap { it.lessons } + detail.lessons
+        val target = if (lessonId != null) {
+            lessons.firstOrNull { it.lessonId == lessonId }
+                ?: throw ApiException(-1, "课时不存在或已删除")
+        } else {
+            lessons.firstOrNull { it.videoUrl.isNotBlank() }
+                ?: throw ApiException(-1, "该课程暂未上传视频")
+        }
+        if (target.videoUrl.isBlank()) {
+            throw ApiException(-1, "「${target.title.ifBlank { "该课时" }}」还没有上传视频")
+        }
+        return PlayInfoDto(
+            courseId = detail.courseId,
+            lessonId = target.lessonId,
+            playUrl = target.videoUrl,
+            // 直链没有有效期，也不做动态水印；字段保留，等 6.3 接 VOD 后填真实值
+            expireTime = 0,
+            watermarkText = "",
+            duration = target.duration
+        )
     }
 
     /** 播放进度心跳（后端暂未提供） */

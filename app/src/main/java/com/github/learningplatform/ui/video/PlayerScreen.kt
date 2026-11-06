@@ -47,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.github.learningplatform.core.constants.Constants
@@ -150,6 +151,8 @@ fun PlayerScreen(
                     "播放状态=%s 时长=%dms 位置=%dms",
                     name, player.duration, player.currentPosition
                 )
+                // 重试成功、真正读出首帧后清掉上一次的失败提示
+                if (state == Player.STATE_READY) playbackError = null
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
@@ -158,6 +161,11 @@ fun PlayerScreen(
                     "播放失败 errorCode=%d name=%s",
                     error.errorCode, error.errorCodeName
                 )
+                // 【必须做】不能只打日志：加载失败的界面和「正在缓冲」完全一样 ——
+                // 黑屏 + 位置停在 00:00，用户只会以为卡死了（曾经因为写死的播放地址
+                // 返回 404，整门课都是这个表现）。这里把原因交给下面的覆盖层，
+                // 至少能看到「播放中断 + 重试」。
+                playbackError = error.toUserMessage()
             }
         }
         player.addListener(listener)
@@ -503,4 +511,23 @@ private fun formatTime(seconds: Int): String {
     val s = seconds % 60
     return if (h > 0) String.format(Locale.CHINA, "%d:%02d:%02d", h, m, s)
     else String.format(Locale.CHINA, "%02d:%02d", m, s)
+}
+
+/**
+ * 把 ExoPlayer 的错误码翻译成用户看得懂的一句话。
+ *
+ * 错误码（2004 / ERROR_CODE_IO_BAD_HTTP_STATUS）只对开发有用；而 404、连不上网、
+ * 解码失败三者的处置完全不同（换地址 / 查网络 / 换设备），提示必须能区分开。
+ */
+private fun PlaybackException.toUserMessage(): String = when (errorCode) {
+    PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> {
+        val httpCode = (cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode
+        if (httpCode != null) "视频地址无法访问（HTTP $httpCode）" else "视频地址无法访问"
+    }
+    PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> "视频文件不存在"
+    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED -> "网络连接失败，请检查网络"
+    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> "网络超时，请稍后重试"
+    PlaybackException.ERROR_CODE_DECODING_FAILED,
+    PlaybackException.ERROR_CODE_DECODER_INIT_FAILED -> "视频解码失败，该格式暂不支持"
+    else -> "播放失败（${errorCodeName}）"
 }

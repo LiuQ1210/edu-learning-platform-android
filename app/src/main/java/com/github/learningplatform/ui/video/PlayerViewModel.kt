@@ -69,17 +69,18 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
+                // 详情只拉一次：标题和播放地址都来自同一份响应（对齐短视频页的做法 ——
+                // 播放地址就放在列表/详情数据里，不额外调接口）。原来先取详情拿标题、
+                // 再调 getPlayInfo 拿地址，既多一次请求，地址又来自本地假数据。
                 val detail: CourseDetailDto = courseRepository.getCourseDetail(id)
-                val lessonTitle = lesson?.let { target ->
-                    detail.chapters.asSequence()
-                        .flatMap { it.lessons.asSequence() }
-                        .firstOrNull { it.lessonId == target }
-                        ?.title
+                val currentLesson = lesson?.let { targetLesson ->
+                    (detail.chapters.flatMap { it.lessons } + detail.lessons)
+                        .firstOrNull { it.lessonId == targetLesson }
                 }
-                val info = courseRepository.getPlayInfo(id, lesson)
+                val info = courseRepository.playInfoOf(detail, lesson)
                 _uiState.value = PlayerUiState(
                     isLoading = false,
-                    title = lessonTitle ?: detail.title,
+                    title = currentLesson?.title ?: detail.title,
                     playInfo = info
                 )
             } catch (e: CancellationException) {

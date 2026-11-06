@@ -215,6 +215,7 @@ Get-Process -Name 'qemu-system-x86_64','emulator' -ErrorAction SilentlyContinue 
 
 等 `adb shell getprop sys.boot_completed` 返回 `1` 再装包。
 
-> 视频页在模拟器上是黑屏：ExoPlayer 日志显示 Init/Release 正常、无解码错误，
-> 是模拟器访问不了外网视频 CDN（`ping commondatastorage.googleapis.com` 100% 丢包）。
-> 换能联网的真机，或把 `DemoData.playInfo` 的 `playUrl` 指向局域网流即可验证。
+> 播放地址一律由后端下发，客户端不再内置测试流：课程走 `GET /api/v1/course/{id}`
+> 里的 `chapters[].videos[].videoUrl`，短视频走 `/api/v1/video/list` 的 `videoUrl`。
+> 播放不了时先在设备里确认真实地址可达（`adb shell am start -a android.intent.action.VIEW -d <url>`），
+> 再确认 `adb reverse tcp:80 tcp:80` 仍然生效 —— 后端换地址或源文件下线都会表现为「黑屏 + 00:00」。
