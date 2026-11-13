@@ -23,45 +23,37 @@ adb install -r -t app\build\outputs\apk\debug\app-debug.apk
 adb shell am start -n com.github.learningplatform/.MainActivity
 ```
 
-**登录**：当前构建开了「UI 预览模式」，**用户名和密码随便填**（如 `demo` / `demo123456`）即可进入，
-不需要后端。四个 Tab、列表、详情、评论、签到、笔记、待办全部有样例数据。
+**登录**：应用已接真实后端（默认 `http://127.0.0.1:80/`，模拟器需先做 `adb reverse tcp:80 tcp:80`），
+请使用后端已注册的账号登录。后端未启动时，登录页会直接提示网络错误。
 
 ---
 
-## 二、UI 预览模式
+## 二、本地样例数据的范围
 
-后端还没就绪时，界面必须能被打开、被点、被评审。所以加了一个**编译期开关**：
+客户端已移除全局「UI 预览模式」开关和 `data\demo\Preview.kt`：已接后端的模块
+（登录注册、分类、课程列表/详情、文章列表/详情、评论、个人资料、收藏/点赞/观看历史、
+笔记、课程评分、签到积分）全部走真实接口，不再有本地短路分支。
 
-- 开关打开（默认）：所有 Repository 直接返回本地样例数据，**一个网络请求都不发**
-- 开关关闭：走真实接口，`BuildConfig.BASE_URL` 指向 `https://api.learnplatform.com/api/v1/`
+仍使用本地占位数据（后端还没有对应接口）的只有：
 
-样例数据在 `app\src\main\java\com\github\learningplatform\data\demo\DemoData.kt`，
-字段与分页结构和接口文档一致，所以滚动加载、空状态、错误提示、详情跳转都是真跑的。
+- 他人博客主页（`/user/blog-home`）
+- 我的课程 / 加入退出课程 / 下载记录
+- 待办（`/api/v1/todos`）
+- 文章标签、搜索热词、广告位、APP 配置
+- 学习数据统计页（纯占位）
 
-短路逻辑在 `data\demo\Preview.kt`，Repository 里每个方法开头一行：
+占位数据集中在 `app\src\main\java\com\github\learningplatform\data\demo\DemoData.kt`。
+某个功能接上后端后，请直接删掉 `DemoData` 里对应的条目，不要再保留双份数据。
 
-```kotlin
-suspend fun getCourses(...): PageData<CourseDto> {
-    preview { return DemoData.coursePage(pageNum, pageSize, videoType) }
-    return safeApiCall { courseApi.getCourses(...) }
-}
-```
+### 后端地址
 
-### 关掉预览模式（接真实后端）
+默认是 `http://127.0.0.1:80/`。换地址时不用改代码：
 
 ```powershell
-.\gradlew.bat :app:assembleDebug -PuiPreview=false
+.\gradlew.bat :app:assembleDebug -PbaseUrl=http://192.168.1.10:80/
 ```
 
-或改 `app\build.gradle.kts` 里的默认值：
-
-```kotlin
-val uiPreview = (project.findProperty("uiPreview") as String?)?.toBoolean() ?: true
-//                                                                        ↑ 改成 false
-```
-
-同时把 `BASE_URL` 换成真实后端地址。**release 构建不会带样例数据**：
-`DemoData.enabled` 是编译期常量，R8 会把整块数据和分支裁掉。
+`baseUrl` 必须以 `/` 结尾（脚本会自动补齐）。
 
 ---
 
