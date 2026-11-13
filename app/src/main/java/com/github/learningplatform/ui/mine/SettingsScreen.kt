@@ -55,6 +55,7 @@ import com.github.learningplatform.ui.theme.TextSecondary
 fun SettingsScreen(
     onBack: () -> Unit,
     onOpenChangePassword: () -> Unit,
+    onOpenShippingAddress: () -> Unit,
     onLoggedOut: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
@@ -97,6 +98,8 @@ fun SettingsScreen(
                     .background(surfaceWashBrush())
             ) {
                 SettingRow(NavIcons.Lock, "修改密码", onClick = onOpenChangePassword)
+                Divider()
+                SettingRow(NavIcons.Place, "收货信息", onClick = onOpenShippingAddress)
                 Divider()
                 SettingRow(
                     icon = NavIcons.Bookmark,

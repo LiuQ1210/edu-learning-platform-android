@@ -386,7 +386,10 @@ private fun VideoAction(
 // 用 androidx.annotation.OptIn（而不是 Kotlin 的 @file:OptIn）才能真正让 lint 认可
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
-private fun ShortVideoPlayer(playUrl: String, modifier: Modifier = Modifier) {
+private fun ShortVideoPlayer(
+    playUrl: String,
+    modifier: Modifier = Modifier
+) {
     val context = LocalContext.current
     val player = remember(playUrl) {
         ExoPlayer.Builder(context).build().apply {

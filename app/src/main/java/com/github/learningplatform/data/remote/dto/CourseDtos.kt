@@ -120,19 +120,6 @@ data class PlayInfoDto(
     val duration: Int = 0
 )
 
-/** 6.4 播放进度心跳 */
-@Serializable
-data class ProgressSyncRequest(
-    val courseId: Long,
-    /** 长视频必传 */
-    val lessonId: Long? = null,
-    val progressSeconds: Int,
-    val watchDuration: Int,
-    val isFinished: Int,
-    /** 1-Web 2-iOS 3-Android */
-    val deviceType: Int = 3
-)
-
 /** 6.5 课程评分提交结果（0.5-5.0 分由后端四舍五入为整数星级） */
 @Serializable
 data class RatingResultDto(

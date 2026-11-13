@@ -39,12 +39,13 @@ import com.github.learningplatform.ui.theme.TabCommunityWash
 import com.github.learningplatform.ui.theme.TabProfileInk
 import com.github.learningplatform.ui.theme.TabProfileWash
 import com.github.learningplatform.ui.article.ArticleEditScreen
-import com.github.learningplatform.ui.article.ArticleDetailScreen
 import com.github.learningplatform.ui.article.TagArticlesScreen
 import com.github.learningplatform.ui.auth.LoginScreen
 import com.github.learningplatform.ui.auth.RegisterScreen
 import com.github.learningplatform.ui.checkin.CheckinRecordScreen
 import com.github.learningplatform.ui.checkin.CheckinTaskScreen
+import com.github.learningplatform.ui.checkin.TaskCenterNavBus
+import com.github.learningplatform.ui.checkin.TaskCenterTarget
 import com.github.learningplatform.ui.community.CommunityScreen
 import com.github.learningplatform.ui.course.CategoryAllScreen
 import com.github.learningplatform.ui.course.CourseDetailScreen
@@ -64,7 +65,13 @@ import com.github.learningplatform.ui.mine.FollowingScreen
 import com.github.learningplatform.ui.mine.FansScreen
 import com.github.learningplatform.ui.community.CommunityProfileScreen
 import com.github.learningplatform.ui.mine.SettingsScreen
+import com.github.learningplatform.ui.mine.ShippingAddressScreen
 import com.github.learningplatform.ui.mine.WatchHistoryScreen
+import com.github.learningplatform.ui.mall.ExchangeRecordsScreen
+import com.github.learningplatform.ui.mall.PointsMallScreen
+import com.github.learningplatform.ui.mall.PrizeExchangeScreen
+import com.github.learningplatform.ui.mall.PrizeExchangeSuccessScreen
+import com.github.learningplatform.ui.mall.demoMallPrizes
 import com.github.learningplatform.ui.note.NoteDetailScreen
 import com.github.learningplatform.ui.note.NotesScreen
 import com.github.learningplatform.ui.todo.TodosScreen
@@ -128,6 +135,8 @@ private fun RootNavHost(navController: NavHostController, startDestination: Stri
                 onOpenPlayer = { courseId, lessonId ->
                     navController.navigate(Routes.player(courseId, lessonId))
                 },
+                // 收货信息属于账号资料，设置页在 main 图内，需由根图打开
+                onOpenShippingAddress = { navController.navigate(Routes.SHIPPING_ADDRESS) },
                 // 退出登录必须回到根图的登录页，并清掉整条主框架回退栈
                 onLoggedOut = {
                     navController.navigate(Routes.LOGIN) {
@@ -142,8 +151,97 @@ private fun RootNavHost(navController: NavHostController, startDestination: Stri
             CheckinTaskScreen(
                 onBack = { navController.popBackStack() },
                 onOpenRecords = { navController.navigate(Routes.CHECKIN_RECORD) },
-                onOpenRules = { navController.navigate("checkin_rules") }
+                onOpenRules = { navController.navigate("checkin_rules") },
+                onOpenMall = { balance, todayPoints ->
+                    navController.navigate(Routes.pointsMall(balance, todayPoints))
+                }
             )
+        }
+
+        // 积分商城：把任务中心的余额 / 今日任务积分带过去
+        composable(
+            route = Routes.POINTS_MALL,
+            arguments = listOf(
+                navArgument("balance") {
+                    type = NavType.IntType
+                    defaultValue = 0
+                },
+                navArgument("todayPoints") {
+                    type = NavType.IntType
+                    defaultValue = 0
+                }
+            )
+        ) { entry ->
+            val balance = entry.arguments?.getInt("balance") ?: 0
+            PointsMallScreen(
+                balance = balance,
+                todayPoints = entry.arguments?.getInt("todayPoints") ?: 0,
+                onExchangePrize = { prize ->
+                    navController.navigate(Routes.prizeExchange(prize.id, balance))
+                },
+                onOpenRecords = { navController.navigate(Routes.EXCHANGE_RECORDS) },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        // 奖品兑换：填写收货信息，确认后兑换（当前仅前端流程）
+        composable(
+            route = Routes.PRIZE_EXCHANGE,
+            arguments = listOf(
+                navArgument("prizeId") { type = NavType.StringType },
+                navArgument("balance") {
+                    type = NavType.IntType
+                    defaultValue = -1
+                }
+            )
+        ) { entry ->
+            val prizeId = entry.arguments?.getString("prizeId").orEmpty()
+            PrizeExchangeScreen(
+                prize = demoMallPrizes.firstOrNull { it.id == prizeId },
+                balance = entry.arguments?.getInt("balance") ?: -1,
+                onEditAddress = { navController.navigate(Routes.SHIPPING_ADDRESS) },
+                onSuccess = { remaining ->
+                    // 成功页替换确认页：返回不会再回到已完成的兑换
+                    navController.navigate(Routes.prizeExchangeSuccess(prizeId, remaining)) {
+                        popUpTo(Routes.PRIZE_EXCHANGE) { inclusive = true }
+                    }
+                },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        // 兑换成功：结果展示页，返回即回到商城
+        composable(
+            route = Routes.PRIZE_EXCHANGE_SUCCESS,
+            arguments = listOf(
+                navArgument("prizeId") { type = NavType.StringType },
+                navArgument("remaining") {
+                    type = NavType.IntType
+                    defaultValue = -1
+                }
+            )
+        ) { entry ->
+            PrizeExchangeSuccessScreen(
+                prize = demoMallPrizes.firstOrNull {
+                    it.id == entry.arguments?.getString("prizeId").orEmpty()
+                },
+                remaining = entry.arguments?.getInt("remaining") ?: -1,
+                onViewRecords = { navController.navigate(Routes.EXCHANGE_RECORDS) },
+                onBackToMall = { navController.popBackStack() }
+            )
+        }
+
+        // 兑换记录：本机记录列表，商城顶部与兑换成功页都可进入
+        composable(Routes.EXCHANGE_RECORDS) {
+            ExchangeRecordsScreen(
+                onGoMall = { navController.popBackStack() },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        // 收货信息：从设置页或兑换确认页进入，保存后返回原页面
+        composable(Routes.SHIPPING_ADDRESS) {
+            ShippingAddressScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Routes.CHECKIN_RECORD) {
@@ -186,6 +284,8 @@ private fun RootNavHost(navController: NavHostController, startDestination: Stri
 fun MainScaffold(
     onOpenCheckin: () -> Unit,
     onOpenPlayer: (Long, Long?) -> Unit,
+    /** 设置页的「收货信息」：页面注册在根图，需由这里向上透传 */
+    onOpenShippingAddress: () -> Unit,
     /**
      * 退出登录：必须由根 NavHost 处理。
      * 内层 navController 的图里没有登录页，用它 navigate(LOGIN) 会直接抛异常。
@@ -199,6 +299,24 @@ fun MainScaffold(
     // video 带 focusId 参数后实际 route 是 "video?focusId=123"，精确匹配 "video" 会失败，
     // 导致底栏不显示、像全屏页一样退不出去；改成前缀匹配。
     val showBar = Routes.barRoutes.any { currentRoute?.startsWith(it) == true }
+
+    // 任务中心「去学习课程 / 去浏览帖子」：全屏任务页拿不到内层 NavController，
+    // 通过 TaskCenterNavBus 回到主框架后再切到对应 Tab。
+    // 短视频不再计分，所以「观看课程视频」落到首页课程 Tab，而不是短视频 Tab。
+    val pendingTaskTarget by TaskCenterNavBus.pending.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingTaskTarget) {
+        val target = pendingTaskTarget ?: return@LaunchedEffect
+        val route = when (target) {
+            TaskCenterTarget.COURSE -> Routes.HOME
+            TaskCenterTarget.COMMUNITY -> Routes.COMMUNITY
+        }
+        navController.navigate(route) {
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+        TaskCenterNavBus.consume()
+    }
 
     Scaffold(
         bottomBar = {
@@ -525,6 +643,7 @@ fun MainScaffold(
                 SettingsScreen(
                     onBack = { navController.popBackStack() },
                     onOpenChangePassword = { navController.navigate(Routes.CHANGE_PASSWORD) },
+                    onOpenShippingAddress = onOpenShippingAddress,
                     onLoggedOut = onLoggedOut
                 )
             }

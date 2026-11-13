@@ -130,6 +130,15 @@ fun PlayerScreen(
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
                 isPlaying = playing
+                // 暂停/缓冲时把已累计的观看秒数尽快上报。
+                // 但播放结束也会走这里，顺序与 STATE_ENDED 回调不保证；
+                // 若已到末尾必须按「看完」上报，否则最后几秒会以 finished=false 发出去，
+                // 服务端就永远收不到完成标记（seconds 必须 > 0，不能再补一条空上报）。
+                if (!playing) {
+                    val reachedEnd = player.duration > 0 &&
+                        player.currentPosition >= player.duration - 500
+                    if (reachedEnd) viewModel.onPlaybackFinished() else viewModel.onPlaybackPaused()
+                }
             }
 
             /*
@@ -170,14 +179,10 @@ fun PlayerScreen(
         }
         player.addListener(listener)
         onDispose {
-            // 只把位置交给 ViewModel，真正的最后一次上报在 onCleared 里发
-            // （这里直接 syncProgress 会被 viewModelScope 的取消吃掉）
             val reachedEnd = player.duration > 0 &&
                 player.currentPosition >= player.duration - 500
-            viewModel.onPlayerDetached(
-                positionSeconds = (player.currentPosition / 1000).toInt(),
-                isFinished = reachedEnd
-            )
+            // 补报剩余观看秒数；请求挂在 ViewModel 的 appScope 上，不会被清理取消
+            viewModel.onPlayerDetached(isFinished = reachedEnd)
             player.removeListener(listener)
             player.release()
         }
@@ -215,31 +220,21 @@ fun PlayerScreen(
         }
     }
 
+    // 每秒采样播放位置，并在真正播放时累计观看秒数。
+    // 累计器每满 20 秒、暂停、播放结束、退出页面时由 ViewModel 上报增量，
+    // 积分是否到账以服务端返回为准。
     LaunchedEffect(player) {
         while (true) {
             delay(1000)
             positionSec = (player.currentPosition / 1000f).coerceAtLeast(0f)
             durationSec = (player.duration.coerceAtLeast(0L) / 1000f)
+            if (player.isPlaying) {
+                viewModel.onPlayingSecond(durationSec.toInt())
+            }
             if (player.duration > 0 && player.currentPosition >= player.duration - 500) {
-                viewModel.onPlayerDetached(
-                    positionSeconds = (player.currentPosition / 1000).toInt(),
-                    isFinished = true
-                )
-                viewModel.syncProgress(
-                    progressSeconds = (player.currentPosition / 1000).toInt(),
-                    isFinished = 1
-                )
+                viewModel.onPlaybackFinished()
                 break
             }
-        }
-    }
-
-    LaunchedEffect(player, isPlaying) {
-        while (isPlaying) {
-            delay(20_000)
-            viewModel.syncProgress(
-                progressSeconds = (player.currentPosition / 1000).toInt()
-            )
         }
     }
 

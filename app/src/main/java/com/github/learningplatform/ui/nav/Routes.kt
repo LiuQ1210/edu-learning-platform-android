@@ -48,6 +48,7 @@ object Routes {
     const val NOTE_DETAIL = "note_detail/{noteId}"
     const val TODOS = "todos"
     const val SETTINGS = "settings"
+    const val SHIPPING_ADDRESS = "shipping_address"
     const val CHANGE_PASSWORD = "change_password"
     const val FOLLOWING = "following"
     const val FANS = "fans"
@@ -55,9 +56,15 @@ object Routes {
     // ---- 通知 ----
     const val NOTIFICATIONS = "notifications"
 
-    // ---- 签到（全屏）----
+    // ---- 签到 / 任务中心（全屏）----
     const val CHECKIN = "checkin"
     const val CHECKIN_RECORD = "checkin_record"
+
+    // ---- 积分商城（全屏）----
+    const val POINTS_MALL = "points_mall?balance={balance}&todayPoints={todayPoints}"
+    const val PRIZE_EXCHANGE = "prize_exchange/{prizeId}?balance={balance}"
+    const val PRIZE_EXCHANGE_SUCCESS = "prize_exchange_success/{prizeId}?remaining={remaining}"
+    const val EXCHANGE_RECORDS = "exchange_records"
 
     // ---- 播放（全屏）----
     const val PLAYER = "player/{courseId}?lessonId={lessonId}"
@@ -89,4 +96,16 @@ object Routes {
     fun blogHome(userId: Long, self: Boolean = false) = "blog_home/$userId?self=$self"
     fun player(courseId: Long, lessonId: Long? = null) =
         "player/$courseId?lessonId=${lessonId ?: 0L}"
+
+    /** 积分商城：把任务中心已加载的余额 / 今日任务积分带过去，避免商城再请求一次账户 */
+    fun pointsMall(balance: Int, todayPoints: Int) =
+        "points_mall?balance=$balance&todayPoints=$todayPoints"
+
+    /** 奖品兑换：带上奖品 id 和余额，确认页直接复用商城已加载的数据 */
+    fun prizeExchange(prizeId: String, balance: Int) =
+        "prize_exchange/$prizeId?balance=$balance"
+
+    /** 兑换成功：携带奖品 id 与兑换后剩余积分（-1 表示余额未知/已扣光），仅供结果展示 */
+    fun prizeExchangeSuccess(prizeId: String, remaining: Int) =
+        "prize_exchange_success/$prizeId?remaining=$remaining"
 }

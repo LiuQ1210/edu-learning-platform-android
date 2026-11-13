@@ -213,7 +213,7 @@ private fun StatsCard(status: DailySignStatusDto?) {
         ) {
             StatItem("连续签到", "${status?.continuousDays ?: 0} 天")
             StatItem("累计签到", "${status?.totalSigns ?: 0} 天")
-            StatItem("总积分", "${status?.points ?: 0}")
+            StatItem("总积分", "${status?.points ?: 0} 积分")
         }
     }
 }

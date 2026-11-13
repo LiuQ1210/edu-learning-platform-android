@@ -17,6 +17,7 @@ import com.github.learningplatform.data.remote.PointsApi
 import com.github.learningplatform.data.remote.RatingApi
 import com.github.learningplatform.data.remote.ResourceApi
 import com.github.learningplatform.data.remote.SearchApi
+import com.github.learningplatform.data.remote.StudyApi
 import com.github.learningplatform.data.remote.TodoApi
 import com.github.learningplatform.data.remote.UserApi
 import com.github.learningplatform.data.remote.VideoApi
@@ -95,6 +96,10 @@ object NetworkModule {
     /** 积分 */
     @Provides @Singleton
     fun providePointsApi(client: RetrofitClient): PointsApi = client.create()
+
+    /** 学习数据（课程视频观看时长上报） */
+    @Provides @Singleton
+    fun provideStudyApi(client: RetrofitClient): StudyApi = client.create()
 
     /** 首页轮播图 */
     @Provides @Singleton

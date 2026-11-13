@@ -3,12 +3,15 @@ package com.github.learningplatform.ui.video
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.learningplatform.core.constants.Constants
+import com.github.learningplatform.data.local.TaskCenterStore
 import com.github.learningplatform.data.remote.dto.CourseDetailDto
 import com.github.learningplatform.data.remote.dto.CreateNoteRequest
 import com.github.learningplatform.data.remote.dto.PlayInfoDto
-import com.github.learningplatform.data.remote.dto.ProgressSyncRequest
+import com.github.learningplatform.data.repository.ContentWatchRepository
 import com.github.learningplatform.data.repository.CourseRepository
 import com.github.learningplatform.data.repository.NoteRepository
+import com.github.learningplatform.domain.model.ContentTaskType
+import com.github.learningplatform.domain.model.WatchAccumulator
 import com.github.learningplatform.ui.readableMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -19,13 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.withContext
-
-
-/** 客户端类型：1-Web 2-iOS 3-Android（接口 6.4） */
-private const val DEVICE_TYPE_ANDROID = 3
 
 data class PlayerUiState(
     val isLoading: Boolean = false,
@@ -47,7 +44,9 @@ data class PlayerUiState(
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     private val courseRepository: CourseRepository,
-    private val noteRepository: NoteRepository
+    private val noteRepository: NoteRepository,
+    private val contentWatchRepository: ContentWatchRepository,
+    private val taskCenterStore: TaskCenterStore
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PlayerUiState())
@@ -56,12 +55,13 @@ class PlayerViewModel @Inject constructor(
     private var courseId: Long = 0L
     private var lessonId: Long? = null
 
-    /** 最近一次上报时的播放位置，用于计算「本次有效观看时长」的增量 */
-    private var lastReportedSeconds: Int = 0
+    /** 实际播放的小节 ID；路由未带 lessonId 时由详情补齐，上报必须用它 */
+    private var resolvedLessonId: Long? = null
 
-    /** 最近一次已知位置；退出时的最后一次上报由 [onCleared] 发送 */
-    private var lastKnownSeconds: Int = 0
-    private var completed: Boolean = false
+    private var latestDurationSeconds: Int? = null
+
+    /** 真实播放秒数累计；不按播放位置差值计算，避免拖动进度条刷时长 */
+    private val watchAccumulator = WatchAccumulator()
 
     fun load(id: Long, lesson: Long?) {
         courseId = id
@@ -78,6 +78,8 @@ class PlayerViewModel @Inject constructor(
                         .firstOrNull { it.lessonId == targetLesson }
                 }
                 val info = courseRepository.playInfoOf(detail, lesson)
+                resolvedLessonId = info.lessonId.takeIf { it > 0L }
+                latestDurationSeconds = info.duration.takeIf { it > 0 }
                 _uiState.value = PlayerUiState(
                     isLoading = false,
                     title = currentLesson?.title ?: detail.title,
@@ -95,75 +97,74 @@ class PlayerViewModel @Inject constructor(
     }
 
     /**
-     * 由播放页在 onDispose 时调用。
+     * 播放页每秒调用一次：只有真正在播放时才累加。
      *
-     * ViewModel 作用域马上就要被取消，这里只记录数据，真正的请求交给 [onCleared]。
+     * 不按播放位置差值计算——拖动进度条时位置会跳变，差值会把「没看过的部分」
+     * 也算成观看时长。
      */
-    fun onPlayerDetached(positionSeconds: Int, isFinished: Boolean) {
-        lastKnownSeconds = positionSeconds
-        if (isFinished) completed = true
+    fun onPlayingSecond(durationSeconds: Int) {
+        if (courseId == 0L) return
+        if (durationSeconds > 0) latestDurationSeconds = durationSeconds
+        if (watchAccumulator.addSecond()) {
+            flushWatch()
+        }
+    }
+
+    /** 播放到结尾：带上 finished 标记立即上报。 */
+    fun onPlaybackFinished() {
+        watchAccumulator.markFinished()
+        flushWatch(force = true)
+    }
+
+    /** 暂停时把已累计的秒数尽快上报，避免长时间挂起后丢失。 */
+    fun onPlaybackPaused() {
+        flushWatch(force = true)
     }
 
     /**
-     * 心跳上报。
-     *
-     * @param watchDuration 传 -1 表示由本方法按「距上次上报的增量」自动计算。
-     *        直接传当前总位置是错的：文档 6.4 的 watchDuration 是本次有效观看时长。
+     * 由播放页在 onDispose 时调用：记录是否看完，并补报剩余秒数。
      */
-    fun syncProgress(progressSeconds: Int, watchDuration: Int = -1, isFinished: Int = 0) {
-        if (courseId == 0L) return
-        val delta = if (watchDuration >= 0) watchDuration
-        else (progressSeconds - lastReportedSeconds).coerceAtLeast(0)
-        lastReportedSeconds = progressSeconds
-        launchSync(progressSeconds, delta, isFinished)
+    fun onPlayerDetached(isFinished: Boolean) {
+        if (isFinished) watchAccumulator.markFinished()
+        flushWatch(force = true)
     }
 
-    private fun launchSync(progressSeconds: Int, watchDuration: Int, isFinished: Int) {
-        viewModelScope.launch {
-            try {
-                courseRepository.syncProgress(
-                    ProgressSyncRequest(
-                        courseId = courseId,
-                        lessonId = lessonId,
-                        progressSeconds = progressSeconds,
-                        watchDuration = watchDuration,
-                        isFinished = isFinished,
-                        deviceType = DEVICE_TYPE_ANDROID
-                    )
+    /**
+     * 上报累计的真实播放秒数，并把服务端结算结果写入任务中心展示缓存。
+     *
+     * 请求挂在 appScope 而不是 viewModelScope：退出播放页时 ViewModel 会立刻清理，
+     * 挂在 viewModelScope 上的请求会被取消，最后一批秒数就丢了。
+     */
+    fun flushWatch(force: Boolean = false) {
+        val targetLesson = resolvedLessonId ?: return
+        val report = watchAccumulator.takeForReport(force) ?: return
+        val duration = latestDurationSeconds
+        appScope.launch {
+            runCatching {
+                contentWatchRepository.reportCourseVideo(
+                    lessonId = targetLesson,
+                    seconds = report.seconds,
+                    finished = report.finished,
+                    durationSeconds = duration
                 )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                // 忽略：下次心跳会覆盖
+            }.onSuccess { result ->
+                // 积分是否发放由服务端判定，这里只缓存展示结果
+                taskCenterStore.applyContentResult(
+                    ContentTaskType.VIDEO,
+                    targetLesson,
+                    result
+                )
+            }.onFailure {
+                // 网络失败：秒数放回累计器，下一次继续上报
+                watchAccumulator.restore(report)
             }
         }
     }
 
-    /**
-     * 退出播放页的最后一次进度上报。
-     *
-     * 不能在 PlayerScreen 的 onDispose 里调 syncProgress：那个协程挂在 viewModelScope 上，
-     * 页面被 pop 时 ViewModel 立刻清理，请求会被取消掉，最后一次进度永远丢。
-     * onCleared 里改用 NonCancellable 挂在 Application 作用域上发送。
-     */
     override fun onCleared() {
         if (courseId == 0L) return
-        val position = lastKnownSeconds
-        val finished = if (completed) 1 else 0
-        val delta = (position - lastReportedSeconds).coerceAtLeast(0)
-        val request = ProgressSyncRequest(
-            courseId = courseId,
-            lessonId = lessonId,
-            progressSeconds = position,
-            watchDuration = delta,
-            isFinished = finished,
-            deviceType = DEVICE_TYPE_ANDROID
-        )
-        appScope.launch {
-            withContext(NonCancellable) {
-                runCatching { courseRepository.syncProgress(request) }
-            }
-        }
+        // 补报最后一批；appScope 上的请求不会随 ViewModel 取消
+        flushWatch(force = true)
     }
 
     // ---------------------------------------------------------------- 写笔记
@@ -186,9 +187,8 @@ class PlayerViewModel @Inject constructor(
      * 「该笔记对应视频第几分钟」，是视频笔记相对文章笔记的核心差别。
      *
      * @param positionSeconds **由 UI 传入的真实播放位置**。
-     *   不要在这里读 `lastKnownSeconds`：那个值只在 `syncProgress`（心跳，15-30 秒一次）
-     *   和 `onPlayerDetached` 时更新，拿它当时间戳会**偏最多 30 秒**，而且不报错、很难发现。
-     *   播放位置只有持有 ExoPlayer 的那一层知道，必须由 UI 传进来。
+     *   播放位置只有持有 ExoPlayer 的那一层知道；ViewModel 里的累计器只记秒数，
+     *   不保存实时位置，拿它当时间戳会偏、而且不报错、很难发现。
      */
     fun createNote(title: String, content: String, positionSeconds: Int) {
         if (_uiState.value.noteSaving) return

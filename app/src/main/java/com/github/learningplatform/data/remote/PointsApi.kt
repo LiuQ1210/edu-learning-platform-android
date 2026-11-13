@@ -2,19 +2,18 @@ package com.github.learningplatform.data.remote
 
 import kotlinx.serialization.json.JsonObject
 import retrofit2.Response
+import retrofit2.http.Field
+import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
 import retrofit2.http.POST
-import retrofit2.http.Query
 
 /**
- * 积分账户 / 免广告兑换接口（对齐后端 ApiV1PointsController）。
+ * 积分接口（对齐后端 ApiV1PointsController）。
  *
- *  - `GET  /api/v1/points/account`         余额 + 免广告权益
- *  - `GET  /api/v1/points/exchange/tiers`  兑换档位 `{tiers:[{tier,cost,minutes,label}]}`
- *  - `POST /api/v1/points/exchange?tier=N` 兑换（服务端扣积分 + 权益叠加）
+ *  - `POST /api/v1/points/watch`：帖子阅读秒数上报，满 30 秒 +5；
+ *  - `GET /api/v1/points/account`：积分余额（后端尚未实现路由，暂不使用）。
  *
- * 免广告状态一律以服务端 `adFree` / `adFreeRemainMinutes` 为准，
- * 客户端不要拿本地时间减 `adFreeExpireTime`。
+ * 课程视频走 [StudyApi.reportStudy]，由学习上报接口内部结算积分。
  */
 interface PointsApi {
 
@@ -22,13 +21,18 @@ interface PointsApi {
     @GET("api/v1/points/account")
     suspend fun getAccount(): Response<JsonObject>
 
-    /** 免广告兑换档位 */
-    @GET("api/v1/points/exchange/tiers")
-    suspend fun getExchangeTiers(): Response<JsonObject>
-
-    /** 兑换免广告 */
-    @POST("api/v1/points/exchange")
-    suspend fun exchange(
-        @Query("tier") tier: Int
+    /**
+     * 帖子阅读时长上报。
+     *
+     * @param targetType 固定传 `post`
+     * @param targetId   帖子 ID
+     * @param seconds    本次新增秒数，1~3600（服务端当天累计满 30 秒才发分）
+     */
+    @FormUrlEncoded
+    @POST("api/v1/points/watch")
+    suspend fun reportWatch(
+        @Field("targetType") targetType: String,
+        @Field("targetId") targetId: Long,
+        @Field("seconds") seconds: Int
     ): Response<JsonObject>
 }
