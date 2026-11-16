@@ -27,6 +27,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.github.learningplatform.ui.ad.rememberSplashAdGate
 import com.github.learningplatform.ui.article.ArticleDetailScreen
 import com.github.learningplatform.ui.theme.BottomNavContainer
 import com.github.learningplatform.ui.theme.BottomNavUnselected
@@ -94,12 +95,14 @@ fun AppNavHost(
     appViewModel: AppViewModel = hiltViewModel()
 ) {
     val startState by appViewModel.startState.collectAsStateWithLifecycle()
+    // 启动页同时承担开屏广告的等待窗口：广告就绪并展示后才放行主界面
+    val splashAdPassed = rememberSplashAdGate()
 
-    when (startState) {
+    when {
         // 启动页：对齐设计稿的奶油渐变 + 柔光圆 + 品牌名
-        AppStartState.LOADING -> SplashScreen()
-        AppStartState.LOGGED_IN -> RootNavHost(navController, Routes.MAIN)
-        AppStartState.LOGGED_OUT -> RootNavHost(navController, Routes.LOGIN)
+        startState == AppStartState.LOADING || !splashAdPassed -> SplashScreen()
+        startState == AppStartState.LOGGED_IN -> RootNavHost(navController, Routes.MAIN)
+        else -> RootNavHost(navController, Routes.LOGIN)
     }
 }
 
