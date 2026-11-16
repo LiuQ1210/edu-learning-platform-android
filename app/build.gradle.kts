@@ -1,9 +1,17 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+}
+
+// Taku 的 AppID / AppKey / PlacementID / DebugKey 只存在 local.properties，不进仓库
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
 }
 
 android {
@@ -44,6 +52,11 @@ android {
             ?.takeIf { it.isNotEmpty() } ?: "http://127.0.0.1:80/"
         val baseUrl = if (rawBaseUrl.endsWith("/")) rawBaseUrl else "$rawBaseUrl/"
         buildConfigField("String", "BASE_URL", "\"$baseUrl\"")
+
+        buildConfigField("String", "TAKU_APP_ID", "\"${localProperties.getProperty("taku.appId").orEmpty()}\"")
+        buildConfigField("String", "TAKU_APP_KEY", "\"${localProperties.getProperty("taku.appKey").orEmpty()}\"")
+        buildConfigField("String", "TAKU_PLACEMENT_ID", "\"${localProperties.getProperty("taku.placementId").orEmpty()}\"")
+        buildConfigField("String", "TAKU_SPLASH_PLACEMENT_ID", "\"${localProperties.getProperty("taku.splashPlacementId").orEmpty()}\"")
 
     }
 
@@ -173,6 +186,11 @@ dependencies {
 
     // Log
     implementation(libs.timber)
+
+    // Ads（Taku 聚合 + 酷盈，调试阶段无其他广告源）
+    implementation("com.anythink.sdk:core-taku:6.6.40")
+    implementation("com.anythink.sdk:adapter-taku-sdm:6.5.90.1.0")
+    implementation("com.smartdigimkttech.sdk:sdm-sdk-cn:6.5.90")
 
     // Test
     //

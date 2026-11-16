@@ -19,6 +19,13 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven {
+            url = uri("https://jfrog.takuad.com/artifactory/china_sdk")
+            content {
+                includeGroup("com.anythink.sdk")
+                includeGroup("com.smartdigimkttech.sdk")
+            }
+        }
     }
 }
 
