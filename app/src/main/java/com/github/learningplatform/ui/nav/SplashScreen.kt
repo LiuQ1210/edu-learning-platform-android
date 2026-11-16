@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,9 +26,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.github.learningplatform.ui.ad.AdSlot
 import com.github.learningplatform.ui.theme.BrandGradient
-import com.github.learningplatform.ui.common.AdSlotPlaceholder
 import com.github.learningplatform.ui.theme.GlowOrb
 import com.github.learningplatform.ui.theme.GradientBackground
 import com.github.learningplatform.ui.theme.Primary
@@ -44,16 +41,11 @@ import com.github.learningplatform.ui.theme.TextSecondary
  * 插画位（学生伏案）用柔光圆 + 占位图形代替 —— 有正式插画素材后替换
  * [SplashIllustration] 即可，版式不用动。
  *
- * 最短展示时长与 MainActivity 的系统启动窗口一致（450ms，任务⑤冷启动优化后同步缩短），
- * 两者接力，中间不会出现空白帧。
+ * 最短展示时长由开屏广告闸门（[com.github.learningplatform.ui.ad.rememberSplashAdGate]）控制，
+ * 这里只负责画面本身。
  */
 @Composable
-fun SplashScreen(minDurationMs: Long = 450L) {
-    // 保证最少展示时间，否则 DataStore 读得比一帧还快，启动页会一闪而过
-    LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(minDurationMs)
-    }
-
+fun SplashScreen() {
     GradientBackground(showGlow = false) {
         // 中央柔光圆：设计稿里那个大圆形，插画与品牌名都压在它上面
         GlowOrb(
@@ -88,19 +80,7 @@ fun SplashScreen(minDurationMs: Long = 450L) {
                 fontSize = 15.sp,
                 color = TextSecondary
             )
-
-            Spacer(Modifier.height(16.dp))
-
-            // 【广告位预留】开屏广告位：固定预留区域，接入 Taku 时替换内部即可
-            AdSlotPlaceholder(
-                slotCode = "startup_splash",
-                height = 56.dp,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
         }
-
-        // 开屏广告位（预留）
-        AdSlot(slotId = "startup_splash", modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp))
 
         // 底部品牌行
         Row(

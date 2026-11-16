@@ -3,18 +3,25 @@ package com.github.learningplatform.ui.article
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.learningplatform.core.constants.Constants
+import com.github.learningplatform.data.local.TaskCenterStore
 import com.github.learningplatform.data.remote.dto.ArticleDetailDto
 import com.github.learningplatform.data.remote.dto.CommentDto
 import com.github.learningplatform.data.remote.dto.CreateCommentRequest
 import com.github.learningplatform.data.remote.dto.CreateNoteRequest
 import com.github.learningplatform.data.remote.dto.ReportRequest
 import com.github.learningplatform.data.repository.ArticleRepository
+import com.github.learningplatform.data.repository.ContentWatchRepository
 import com.github.learningplatform.data.repository.InteractionRepository
 import com.github.learningplatform.data.repository.NoteRepository
+import com.github.learningplatform.domain.model.ContentTaskType
+import com.github.learningplatform.domain.model.WatchAccumulator
 import com.github.learningplatform.ui.readableMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,7 +64,9 @@ class ArticleDetailViewModel @Inject constructor(
     private val interactionRepository: InteractionRepository,
     private val noteRepository: NoteRepository,
     private val userRepository: com.github.learningplatform.data.repository.UserRepository,
-    private val userPreferences: com.github.learningplatform.data.local.UserPreferences
+    private val userPreferences: com.github.learningplatform.data.local.UserPreferences,
+    private val contentWatchRepository: ContentWatchRepository,
+    private val taskCenterStore: TaskCenterStore
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ArticleDetailUiState())
@@ -65,7 +74,12 @@ class ArticleDetailViewModel @Inject constructor(
 
     private var articleId: Long = 0L
 
+    /** 前台阅读秒数累计；积分是否到账由服务端判定 */
+    private val watchAccumulator = WatchAccumulator()
+
     fun load(id: Long) {
+        // 同一 ViewModel 切换到另一篇帖子前，先把上一篇未上报的秒数结算掉
+        if (articleId != 0L && articleId != id) flushReading(force = true)
         articleId = id
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
@@ -106,6 +120,48 @@ class ArticleDetailViewModel @Inject constructor(
 
     fun consumeMessage() {
         _uiState.value = _uiState.value.copy(message = null)
+    }
+
+    /**
+     * 文章页在前台停留时每秒调用一次。
+     *
+     * 只累计正文加载成功后的前台时间；详情未加载成功时不计数，
+     * 避免把失败页算成浏览。满一个上报间隔后触发一次增量上报。
+     */
+    fun onForegroundSecond() {
+        if (articleId == 0L || _uiState.value.detail == null) return
+        if (watchAccumulator.addSecond()) {
+            flushReading()
+        }
+    }
+
+    /**
+     * 上报累计的前台阅读秒数，并把服务端结算结果写入任务中心展示缓存。
+     *
+     * 请求挂在 appScope 上：退出文章页时 ViewModel 可能立即清理，
+     * 挂在 viewModelScope 上的请求会被取消，最后一批秒数就丢了。
+     */
+    fun flushReading(force: Boolean = false) {
+        if (articleId == 0L) return
+        val report = watchAccumulator.takeForReport(force) ?: return
+        val postId = articleId
+        appScope.launch {
+            runCatching {
+                contentWatchRepository.reportPost(postId, report.seconds)
+            }.onSuccess { result ->
+                taskCenterStore.applyContentResult(
+                    ContentTaskType.ARTICLE,
+                    postId,
+                    result
+                )
+            }.onFailure {
+                watchAccumulator.restore(report)
+            }
+        }
+    }
+
+    override fun onCleared() {
+        flushReading(force = true)
     }
 
     fun toggleLike() {
@@ -324,5 +380,10 @@ class ArticleDetailViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    private companion object {
+        /** 退出页面后仍需要把最后一批阅读秒数送达服务端 */
+        val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 }

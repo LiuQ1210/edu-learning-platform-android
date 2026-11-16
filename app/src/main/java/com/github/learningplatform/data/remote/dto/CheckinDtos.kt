@@ -15,8 +15,6 @@ data class DailySignStatusDto(
     val points: Int = 0,
     /** 累计签到次数 */
     val totalSigns: Int = 0,
-    /** 免广告到期时间戳（毫秒），0 表示当前无免广告权益 */
-    val adFreeUntil: Long = 0L,
     /** 今日签到可得积分 */
     val todayPoints: Int = 5
 )
@@ -32,26 +30,6 @@ data class DailySignResultDto(
     val continuousDays: Int = 0,
     /** 当前积分余额 */
     val points: Int = 0
-)
-
-/** 9.3 免广告兑换选项 */
-@Serializable
-data class AdFreeRewardDto(
-    val rewardId: String = "",
-    val label: String = "",
-    /** 所需积分 */
-    val costPoints: Int = 0,
-    /** 免广告时长（分钟） */
-    val durationMinutes: Int = 0
-)
-
-/** 9.4 兑换结果 */
-@Serializable
-data class ExchangeResultDto(
-    val success: Boolean = false,
-    val message: String = "",
-    val pointsLeft: Int = 0,
-    val adFreeUntil: Long = 0L
 )
 
 // ---------------------------------------------------------------------------
@@ -98,9 +76,5 @@ data class CheckinRulesDto(
 /** 积分账户（`GET /api/v1/points/account`） */
 @Serializable
 data class PointsAccountDto(
-    val balance: Int = 0,
-    /** 服务端算好的免广告状态，客户端不要用本地时间判断 */
-    val adFree: Boolean = false,
-    val adFreeExpireTime: String? = null,
-    val adFreeRemainMinutes: Int = 0
+    val balance: Int = 0
 )

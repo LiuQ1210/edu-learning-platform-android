@@ -533,7 +533,9 @@ fun CommonTextField(
     errorMessage: String = "",
     visualTransformation: VisualTransformation = VisualTransformation.None,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
-    singleLine: Boolean = true
+    singleLine: Boolean = true,
+    /** 多行输入时的最小行数，如详细地址传 3 */
+    minLines: Int = 1
 ) {
     Column(modifier = modifier) {
         OutlinedTextField(
@@ -543,6 +545,7 @@ fun CommonTextField(
             placeholder = { Text(placeholder) },
             isError = isError,
             singleLine = singleLine,
+            minLines = minLines,
             visualTransformation = visualTransformation,
             keyboardOptions = keyboardOptions,
             modifier = Modifier.fillMaxWidth(),

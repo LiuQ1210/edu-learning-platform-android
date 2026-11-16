@@ -37,3 +37,9 @@ app/build/
 /tools/
 *.jks
 *.keystore
+
+# DSH 文档渲染临时目录（自动生成，不入库）
+/.dsh-office-*/
+
+# 设计参考图（第三方商城截图，仅本地参考，不入库）
+/docs/reference/

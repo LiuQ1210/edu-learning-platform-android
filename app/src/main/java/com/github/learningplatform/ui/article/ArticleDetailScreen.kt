@@ -1,5 +1,6 @@
 package com.github.learningplatform.ui.article
 
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import android.annotation.SuppressLint
 import android.os.Build
@@ -38,6 +39,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -105,6 +107,27 @@ fun ArticleDetailScreen(
     var replyToName by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(articleId) { viewModel.load(articleId) }
+
+    // 帖子积分：正文加载后按「页面处于前台的秒数」计时，每满一个上报周期就把增量交给服务端，
+    // 由服务端判断是否满 30 秒、是否已达每日上限。切后台不计时，避免把后台停留算成阅读。
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val detailLoaded = uiState.detail != null
+    LaunchedEffect(articleId, lifecycleOwner, detailLoaded) {
+        if (!detailLoaded) return@LaunchedEffect
+        while (true) {
+            delay(1_000)
+            if (lifecycleOwner.lifecycle.currentState.isAtLeast(
+                    androidx.lifecycle.Lifecycle.State.RESUMED
+                )
+            ) {
+                viewModel.onForegroundSecond()
+            }
+        }
+    }
+    // 离开页面时把最后不足一个上报周期的秒数也发出去，否则每次不足 20 秒的阅读都会被丢弃
+    DisposableEffect(articleId) {
+        onDispose { viewModel.flushReading(force = true) }
+    }
 
     // 从通知点进来时自动滚动到高亮评论
     LaunchedEffect(highlightCommentId, uiState.comments.size) {

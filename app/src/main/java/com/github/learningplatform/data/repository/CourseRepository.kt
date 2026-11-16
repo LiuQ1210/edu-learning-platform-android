@@ -218,11 +218,6 @@ class CourseRepository @Inject constructor(
         )
     }
 
-    /** 播放进度心跳（后端暂未提供） */
-    suspend fun syncProgress(request: com.github.learningplatform.data.remote.dto.ProgressSyncRequest) {
-        // 暂不实现
-    }
-
     /** 课程评分提交（后端暂未提供，返回假结果） */
     suspend fun rateCourse(courseId: Long, score: Double): com.github.learningplatform.data.remote.dto.RatingResultDto {
         return DemoData.rateResult(score)
