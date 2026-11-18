@@ -220,7 +220,10 @@ class VideoViewModel @Inject constructor(
                         val idx = accumulated.indexOfFirst { it.courseId == pendingFocusId }
                         if (idx >= 0) {
                             _focusIndex.value = idx
+                            val focusTarget = pendingFocusId
                             pendingFocusId = 0L
+                            // 从评论通知进来：有待定位的评论 id，自动展开评论弹窗
+                            if (VideoCommentHighlightBus.highlightCommentId != null) openComments(focusTarget)
                         } else if (accumulated.size < page.total) {
                             fetch(reset = false)
                         } else {
@@ -443,9 +446,31 @@ class VideoViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 interactionRepository.deleteComment(commentId)
-                _uiState.value = _uiState.value.copy(
-                    comments = _uiState.value.comments.filterNot { it.commentId == commentId }
-                )
+                val state = _uiState.value
+                val target = state.commentsTarget
+                // 先判定被删的是回复项还是一级评论，用于计数递减口径
+                val isReply = state.comments.any { c -> c.hotReplies.any { it.commentId == commentId } }
+                val targetComment = state.comments.find { it.commentId == commentId }
+                // 先在各一级评论的回复列表里移除该回复；若不是回复项，再整项移除一级评论
+                val comments = state.comments
+                    .map { c ->
+                        if (c.hotReplies.any { it.commentId == commentId }) {
+                            c.copy(hotReplies = c.hotReplies.filterNot { it.commentId == commentId })
+                        } else c
+                    }
+                    .filterNot { it.commentId == commentId }
+                // 计数口径含回复：删一级连带其已加载回复一起减；删回复减 1
+                val delta = when {
+                    isReply -> 1
+                    targetComment != null -> 1 + targetComment.hotReplies.size
+                    else -> 0
+                }
+                val videos = state.videos.map {
+                    if (target != null && it.courseId == target) {
+                        it.copy(commentCount = (it.commentCount - delta).coerceAtLeast(0))
+                    } else it
+                }
+                _uiState.value = state.copy(comments = comments, videos = videos)
             } catch (e: Throwable) {
                 _uiState.value = _uiState.value.copy(message = e.readableMessage())
             }

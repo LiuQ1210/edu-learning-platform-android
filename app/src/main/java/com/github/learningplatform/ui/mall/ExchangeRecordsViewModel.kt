@@ -2,68 +2,45 @@ package com.github.learningplatform.ui.mall
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.github.learningplatform.data.local.ExchangeRecord
-import com.github.learningplatform.data.local.ExchangeStatus
-import com.github.learningplatform.data.local.UserPreferences
+import com.github.learningplatform.data.remote.dto.ShopOrderDto
+import com.github.learningplatform.data.repository.ShopRepository
+import com.github.learningplatform.ui.readableMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+data class RecordsUiState(
+    val isLoading: Boolean = false,
+    val error: String? = null,
+    val orders: List<ShopOrderDto> = emptyList()
+)
+
+/** 我的兑换记录（后端 GET /api/v1/shop/order/list，只能看自己） */
 @HiltViewModel
 class ExchangeRecordsViewModel @Inject constructor(
-    private val userPreferences: UserPreferences
+    private val shopRepository: ShopRepository
 ) : ViewModel() {
 
-    val records: StateFlow<List<ExchangeRecord>> = userPreferences.exchangeRecords
-        .map { list -> list.sortedByDescending { it.createdAt } }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = emptyList()
-        )
+    private val _uiState = MutableStateFlow(RecordsUiState())
+    val uiState: StateFlow<RecordsUiState> = _uiState.asStateFlow()
 
-    init {
+    init { load() }
+
+    fun load() {
         viewModelScope.launch {
-            userPreferences.seedExchangeRecordsIfNeeded(demoRecords())
+            _uiState.value = RecordsUiState(isLoading = true)
+            try {
+                val orders = shopRepository.getOrders().list
+                _uiState.value = RecordsUiState(isLoading = false, orders = orders)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                _uiState.value = RecordsUiState(isLoading = false, error = e.readableMessage())
+            }
         }
-    }
-
-    /** 首次进入时填充的演示记录，保证列表样式可见 */
-    private fun demoRecords(): List<ExchangeRecord> {
-        val now = System.currentTimeMillis()
-        val day = 24 * 60 * 60 * 1000L
-        return listOf(
-            ExchangeRecord(
-                id = "demo_youku",
-                prizeId = "youku_video_week",
-                title = "优酷视频 VIP 周卡",
-                emoji = "📺",
-                points = 1000,
-                createdAt = now - 12 * day,
-                status = ExchangeStatus.COMPLETED
-            ),
-            ExchangeRecord(
-                id = "demo_notebook",
-                prizeId = "study_notebook",
-                title = "精品学习笔记本",
-                emoji = "📒",
-                points = 500,
-                createdAt = now - 4 * day,
-                status = ExchangeStatus.SHIPPED
-            ),
-            ExchangeRecord(
-                id = "demo_bookmark",
-                prizeId = "bookmark",
-                title = "精美书签",
-                emoji = "🔖",
-                points = 200,
-                createdAt = now - 1 * day,
-                status = ExchangeStatus.PENDING
-            )
-        )
     }
 }

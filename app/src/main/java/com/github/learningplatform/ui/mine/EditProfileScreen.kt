@@ -3,7 +3,6 @@ package com.github.learningplatform.ui.mine
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import coil3.compose.AsyncImage
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,12 +14,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -30,10 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.github.learningplatform.ui.common.Avatar
 import com.github.learningplatform.ui.common.BackTopBar
 import com.github.learningplatform.ui.common.CommonTextField
 import com.github.learningplatform.ui.theme.Primary
@@ -60,13 +57,6 @@ fun EditProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-
-    // 预设头像色板（点击切换）
-    val avatarColors = listOf(
-        Color(0xFFFF6B6B), Color(0xFF4ECDC4), Color(0xFFFFD93D),
-        Color(0xFF6C5CE7), Color(0xFF00B894), Color(0xFFE17055)
-    )
-    var avatarIdx by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -88,7 +78,7 @@ fun EditProfileScreen(
             Surface(shadowElevation = 8.dp) {
                 Button(
                     onClick = viewModel::save,
-                    enabled = !uiState.saving,
+                    enabled = !uiState.saving && !uiState.avatarUploading,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp)
@@ -111,11 +101,10 @@ fun EditProfileScreen(
         ) {
             Spacer(Modifier.height(16.dp))
 
-            // 头像：点击从相册选图
-            var avatarUri by remember { mutableStateOf<android.net.Uri?>(null) }
+            // 头像：点击从相册选图，选完先上传拿 url，保存资料时随表单提交
             val imagePicker = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.GetContent()
-            ) { uri -> avatarUri = uri }
+            ) { uri -> uri?.let { viewModel.onAvatarPicked(it) } }
 
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -125,28 +114,27 @@ fun EditProfileScreen(
                     modifier = Modifier
                         .size(80.dp)
                         .clip(CircleShape)
-                        .background(avatarColors[avatarIdx])
                         .clickable { imagePicker.launch("image/*") },
                     contentAlignment = Alignment.Center
                 ) {
-                    if (avatarUri != null) {
-                        AsyncImage(
-                            model = avatarUri,
-                            contentDescription = "头像",
-                            modifier = Modifier.size(80.dp),
-                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                        )
-                    } else {
-                        Text(
-                            text = uiState.nickname.take(1).ifEmpty { "我" },
-                            color = Color.White,
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.Bold
+                    Avatar(
+                        url = uiState.avatar,
+                        name = uiState.nickname,
+                        size = 80.dp
+                    )
+                    if (uiState.avatarUploading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(28.dp),
+                            strokeWidth = 2.dp
                         )
                     }
                 }
                 Spacer(Modifier.height(6.dp))
-                Text("点击头像从相册选择", fontSize = 12.sp, color = TextHint)
+                Text(
+                    if (uiState.avatarUploading) "头像上传中..." else "点击头像从相册选择",
+                    fontSize = 12.sp,
+                    color = TextHint
+                )
             }
 
             Spacer(Modifier.height(24.dp))

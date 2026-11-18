@@ -61,10 +61,13 @@ fun ShippingAddressScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    LaunchedEffect(uiState.saved) {
+    LaunchedEffect(uiState.saved, uiState.errorMessage) {
         if (uiState.saved) {
             Toast.makeText(context, "收货信息已保存", Toast.LENGTH_SHORT).show()
             onBack()
+        }
+        uiState.errorMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -171,7 +174,7 @@ fun ShippingAddressScreen(
 
             Spacer(Modifier.height(16.dp))
             Text(
-                "收货信息仅保存在本机，兑换奖品时自动填入",
+                "收货信息将保存到当前账号，兑换奖品时自动填入",
                 fontSize = 11.sp,
                 color = TextHint,
                 textAlign = TextAlign.Center,

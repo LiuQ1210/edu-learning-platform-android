@@ -3,6 +3,7 @@ package com.github.learningplatform.ui.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.learningplatform.core.network.ApiException
+import com.github.learningplatform.data.local.UserPreferences
 import com.github.learningplatform.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -16,22 +17,34 @@ data class RegisterUiState(
     val username: String = "",
     val password: String = "",
     val confirmPassword: String = "",
-    val agreed: Boolean = false,
     val isLoading: Boolean = false,
     val usernameError: String? = null,
     val passwordError: String? = null,
     val confirmError: String? = null,
     val error: String? = null,
+    /** 是否已同意《用户协议》和《隐私政策》；未勾选不允许注册 */
+    val agreed: Boolean = false,
+    val agreementError: String? = null,
     val registerSuccess: Boolean = false
 )
 
 @HiltViewModel
 class RegisterViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val userPreferences: UserPreferences
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RegisterUiState())
     val uiState: StateFlow<RegisterUiState> = _uiState.asStateFlow()
+
+    init {
+        // 与登录页共享同一个协议同意标记：持续观察，任一页面勾选/取消后两页状态实时一致
+        viewModelScope.launch {
+            userPreferences.agreementAgreed.collect { agreed ->
+                _uiState.value = _uiState.value.copy(agreed = agreed)
+            }
+        }
+    }
 
     fun onUsernameChange(value: String) {
         _uiState.value = _uiState.value.copy(username = value, usernameError = null, error = null)
@@ -46,7 +59,8 @@ class RegisterViewModel @Inject constructor(
     }
 
     fun onAgreedChange(value: Boolean) {
-        _uiState.value = _uiState.value.copy(agreed = value, error = null)
+        _uiState.value = _uiState.value.copy(agreed = value, agreementError = null)
+        viewModelScope.launch { runCatching { userPreferences.setAgreed(value) } }
     }
 
     fun register() {
@@ -67,7 +81,7 @@ class RegisterViewModel @Inject constructor(
                 return
             }
             !state.agreed -> {
-                _uiState.value = state.copy(error = "请先阅读并同意服务条款")
+                _uiState.value = state.copy(agreementError = "请先阅读并同意《用户协议》和《隐私政策》")
                 return
             }
         }

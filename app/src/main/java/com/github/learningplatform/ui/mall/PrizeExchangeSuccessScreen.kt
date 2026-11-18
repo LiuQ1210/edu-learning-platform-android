@@ -25,11 +25,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -38,9 +38,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.github.learningplatform.data.local.ShippingAddress
+import com.github.learningplatform.data.remote.dto.ShopAddressDto
 import com.github.learningplatform.ui.common.AppCard
 import com.github.learningplatform.ui.common.BackTopBar
+import com.github.learningplatform.ui.common.NetImage
 import com.github.learningplatform.ui.common.TagChip
 import com.github.learningplatform.ui.nav.NavIcons
 import com.github.learningplatform.ui.theme.Primary
@@ -51,37 +52,21 @@ import com.github.learningplatform.ui.theme.TextSecondary
 import com.github.learningplatform.ui.theme.pageGradientBrush
 
 /**
- * 兑换结果页。
- *
- * 兑换确认页确认后进入本页，展示结果反馈、订单摘要和收货信息；
- * 兑换确认页会从回退栈移除，因此返回直接回到商城。
- * 后端暂无兑换接口，奖品与积分均为前端演示数据。
+ * 兑换结果页：商品详情、默认收货信息来自后端，兑换码由确认页兑换结果带入。
+ * 兑换确认页会从回退栈移除，返回直接回到商城。
  */
 @Composable
 fun PrizeExchangeSuccessScreen(
-    prize: MallPrize?,
+    productId: String,
+    redemptionCode: String,
     remaining: Int,
     onViewRecords: () -> Unit,
     onBackToMall: () -> Unit,
     viewModel: PrizeExchangeViewModel = hiltViewModel()
 ) {
-    val address by viewModel.shippingAddress.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    if (prize == null) {
-        Scaffold(
-            containerColor = Color.Transparent,
-            modifier = Modifier.background(pageGradientBrush(strong = true)),
-            topBar = { BackTopBar(title = "兑换成功", onBack = onBackToMall) }
-        ) { padding ->
-            Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("奖品不存在或已下架", fontSize = 14.sp, color = TextSecondary)
-            }
-        }
-        return
-    }
+    LaunchedEffect(productId) { viewModel.load(productId) }
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -91,6 +76,17 @@ fun PrizeExchangeSuccessScreen(
             SuccessBottomBar(onViewRecords = onViewRecords, onBackToMall = onBackToMall)
         }
     ) { padding ->
+        val product = uiState.product
+        if (product == null) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("商品不存在或已下架", fontSize = 14.sp, color = TextSecondary)
+            }
+            return@Scaffold
+        }
+
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 20.dp),
@@ -98,19 +94,9 @@ fun PrizeExchangeSuccessScreen(
         ) {
             item { SuccessHeader() }
 
-            item { RedeemedPrizeCard(prize) }
+            item { RedeemedPrizeCard(product) }
 
-            item { ResultInfoCard(prize = prize, remaining = remaining, address = address) }
-
-            item {
-                Text(
-                    "当前为示例流程，兑换功能即将上线",
-                    fontSize = 11.sp,
-                    color = TextHint,
-                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                    textAlign = TextAlign.Center
-                )
-            }
+            item { ResultInfoCard(product = product, remaining = remaining, address = uiState.address, code = redemptionCode) }
         }
     }
 }
@@ -159,7 +145,7 @@ private fun SuccessHeader() {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun RedeemedPrizeCard(prize: MallPrize) {
+private fun RedeemedPrizeCard(product: MallPrize) {
     AppCard {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -169,15 +155,26 @@ private fun RedeemedPrizeCard(prize: MallPrize) {
                 modifier = Modifier
                     .size(56.dp)
                     .clip(RoundedCornerShape(15.dp))
-                    .background(Brush.linearGradient(listOf(prize.visualStart, prize.visualEnd))),
+                    .background(MallPlaceholderEnd),
                 contentAlignment = Alignment.Center
             ) {
-                Text(prize.emoji, fontSize = 26.sp)
+                if (product.coverUrl.isNotBlank()) {
+                    NetImage(url = product.coverUrl, modifier = Modifier.fillMaxSize(), radius = 15.dp)
+                } else if (product.emoji.isNotBlank()) {
+                    Text(product.emoji, fontSize = 26.sp)
+                } else {
+                    Icon(
+                        NavIcons.School,
+                        contentDescription = null,
+                        tint = Primary.copy(alpha = 0.35f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    prize.title,
+                    product.title,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = TextPrimary,
@@ -186,15 +183,17 @@ private fun RedeemedPrizeCard(prize: MallPrize) {
                 )
                 Spacer(Modifier.height(5.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    TagChip(prize.categoryLabel)
-                    Spacer(Modifier.width(6.dp))
+                    if (product.categoryLabel.isNotBlank()) {
+                        TagChip(product.categoryLabel)
+                        Spacer(Modifier.width(6.dp))
+                    }
                     TagChip("已兑换", Success)
                 }
             }
             Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    "-${prize.points}",
+                    "-${product.points}",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = Primary,
@@ -207,13 +206,17 @@ private fun RedeemedPrizeCard(prize: MallPrize) {
 }
 
 @Composable
-private fun ResultInfoCard(prize: MallPrize, remaining: Int, address: ShippingAddress) {
+private fun ResultInfoCard(product: MallPrize, remaining: Int, address: ShopAddressDto?, code: String) {
     AppCard {
         Column(Modifier.padding(16.dp)) {
-            InfoRow("本次消耗", "${prize.points} 积分", Primary, bold = true)
+            InfoRow("本次消耗", "${product.points} 积分", Primary, bold = true)
             if (remaining >= 0) {
                 Spacer(Modifier.height(10.dp))
                 InfoRow("剩余积分", "$remaining 积分", TextPrimary)
+            }
+            if (code.isNotBlank()) {
+                Spacer(Modifier.height(10.dp))
+                InfoRow("兑换码", code, TextPrimary)
             }
 
             Spacer(Modifier.height(14.dp))
@@ -236,20 +239,20 @@ private fun ResultInfoCard(prize: MallPrize, remaining: Int, address: ShippingAd
                 Text("收货信息", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
             }
             Spacer(Modifier.height(8.dp))
-            if (address.isComplete) {
+            if (address != null && address.isComplete()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        address.receiver,
+                        address.receiverName,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = TextPrimary
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text(maskPhone(address.phone), fontSize = 12.sp, color = TextSecondary)
+                    Text(maskPhone(address.receiverPhone), fontSize = 12.sp, color = TextSecondary)
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    address.fullAddress,
+                    address.detailAddress,
                     fontSize = 12.sp,
                     color = TextSecondary,
                     lineHeight = 18.sp
@@ -260,6 +263,9 @@ private fun ResultInfoCard(prize: MallPrize, remaining: Int, address: ShippingAd
         }
     }
 }
+
+private fun ShopAddressDto.isComplete(): Boolean =
+    receiverName.isNotBlank() && receiverPhone.isNotBlank() && detailAddress.isNotBlank()
 
 @Composable
 private fun InfoRow(label: String, value: String, valueColor: Color, bold: Boolean = false) {

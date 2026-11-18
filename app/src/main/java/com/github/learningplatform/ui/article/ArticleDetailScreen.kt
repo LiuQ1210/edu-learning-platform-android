@@ -57,6 +57,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.learningplatform.data.remote.dto.ArticleDetailDto
 import com.github.learningplatform.data.remote.dto.CommentDto
+import com.github.learningplatform.data.remote.dto.HotReplyDto
 import com.github.learningplatform.ui.common.Avatar
 import com.github.learningplatform.ui.common.BackTopBar
 import com.github.learningplatform.ui.common.WriteNoteDialog
@@ -129,13 +130,15 @@ fun ArticleDetailScreen(
         onDispose { viewModel.flushReading(force = true) }
     }
 
-    // 从通知点进来时自动滚动到高亮评论
+    // 从通知点进来时自动滚动到高亮评论；目标若是二级回复，则滚动到其父一级评论
     LaunchedEffect(highlightCommentId, uiState.comments.size) {
         val target = highlightCommentId ?: return@LaunchedEffect
-        val idx = uiState.comments.indexOfFirst { it.commentId == target }
-        if (idx >= 0) {
+        val rootIdx = uiState.comments.indexOfFirst { it.commentId == target }
+        val parentIdx = if (rootIdx >= 0) rootIdx else
+            uiState.comments.indexOfFirst { c -> c.hotReplies.any { r -> r.commentId == target } }
+        if (parentIdx >= 0) {
             // 前面有 3 个 item：Header、正文、评论标题
-            listState.animateScrollToItem(3 + idx)
+            listState.animateScrollToItem(3 + parentIdx)
         }
     }
 
@@ -264,10 +267,27 @@ fun ArticleDetailScreen(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(24.dp),
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text("还没有评论", color = TextHint, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+
+                    // 首次拉取评论期间：标题下给一个小尺寸居中 loading，避免留一大块空白
+                    if (uiState.comments.isEmpty() && uiState.commentsLoading) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp
+                                )
                             }
                         }
                     }
@@ -276,6 +296,7 @@ fun ArticleDetailScreen(
                         CommentItem(
                             comment = comment,
                             highlighted = comment.commentId == highlightCommentId,
+                            highlightReplyId = highlightCommentId,
                             isMine = comment.userId == uiState.myUserId,
                             myUserId = uiState.myUserId,
                             onDelete = { viewModel.deleteComment(comment.commentId) },
@@ -283,6 +304,10 @@ fun ArticleDetailScreen(
                             onReply = {
                                 replyToCommentId = comment.commentId
                                 replyToName = comment.userName
+                            },
+                            onReplyReply = { reply ->
+                                replyToCommentId = reply.commentId
+                                replyToName = reply.userName
                             }
                         )
                     }
@@ -442,8 +467,9 @@ private fun RichContent(html: String, modifier: Modifier = Modifier) {
     }
 
     val density = androidx.compose.ui.platform.LocalDensity.current
-    // 初始给一个可见的最小高度，测量完成后按真实内容高度替换
-    var contentHeightDp by remember { mutableIntStateOf(240) }
+    // 初始给一个可见的最小高度，测量完成后按真实内容高度替换；
+    // 初始值不宜过大，避免正文还没测出来就撑出一大块空白
+    var contentHeightDp by remember { mutableIntStateOf(120) }
 
     AndroidView(
         modifier = modifier.height(contentHeightDp.dp),
@@ -473,7 +499,7 @@ private fun RichContent(html: String, modifier: Modifier = Modifier) {
                             val px = value?.trim()?.trim('"')?.toFloatOrNull() ?: return@evaluateJavascript
                             if (px > 0f) {
                                 val dp = with(density) { px.toDp().value }.toInt()
-                                if (dp > 0) contentHeightDp = dp.coerceAtLeast(120)
+                                if (dp > 0) contentHeightDp = dp.coerceAtLeast(60)
                             }
                         }
                     }
@@ -496,11 +522,13 @@ private fun RichContent(html: String, modifier: Modifier = Modifier) {
 private fun CommentItem(
     comment: CommentDto,
     highlighted: Boolean = false,
+    highlightReplyId: Long? = null,
     isMine: Boolean = false,
     myUserId: Long = 0L,
     onDelete: () -> Unit,
     onDeleteReply: (Long) -> Unit,
-    onReply: () -> Unit = {}
+    onReply: () -> Unit = {},
+    onReplyReply: (HotReplyDto) -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -510,32 +538,36 @@ private fun CommentItem(
             .background(if (highlighted) HighlightWash else Color.Transparent)
             .padding(horizontal = if (highlighted) 8.dp else 0.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.Top) {
             Avatar(url = comment.userAvatar, name = comment.userName, size = 32.dp)
             Spacer(Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = comment.userName.ifBlank { "匿名用户" },
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TextPrimary
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = comment.userName.ifBlank { "匿名用户" },
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (comment.likeCount > 0) {
+                        Text(
+                            text = "${formatCount(comment.likeCount)} 赞",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextHint
+                        )
+                    }
+                }
                 MetaText(comment.createTime)
-            }
-            if (comment.likeCount > 0) {
+                Spacer(Modifier.height(6.dp))
+                // 点击评论正文即进入回复，不再单独放「回复」按钮
                 Text(
-                    text = "${formatCount(comment.likeCount)} 赞",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextHint
+                    text = comment.content,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextPrimary,
+                    modifier = Modifier.clickable(onClick = onReply)
                 )
             }
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = "回复",
-                style = MaterialTheme.typography.labelSmall,
-                color = Primary,
-                modifier = Modifier.clickable(onClick = onReply)
-            )
             if (isMine) {
                 Spacer(Modifier.width(8.dp))
                 Text(
@@ -547,13 +579,6 @@ private fun CommentItem(
             }
         }
 
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = comment.content,
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextPrimary
-        )
-
         if (comment.hotReplies.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
             Column(
@@ -563,22 +588,33 @@ private fun CommentItem(
                     .padding(10.dp)
             ) {
                 comment.hotReplies.forEach { reply ->
-                    Column(modifier = Modifier.padding(vertical = 3.dp)) {
-                        Row {
-                            Text(
-                                text = reply.userName + if (reply.replyToName != null) " 回复 ${reply.replyToName}：" else "：",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Primary,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = reply.content,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = TextSecondary
-                            )
+                    val replyHighlighted = reply.commentId == highlightReplyId
+                    Row(
+                        verticalAlignment = Alignment.Top,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (replyHighlighted) HighlightWash else Color.Transparent)
+                            .padding(horizontal = if (replyHighlighted) 6.dp else 0.dp)
+                            .padding(vertical = 3.dp)
+                            .clickable { onReplyReply(reply) }
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row {
+                                Text(
+                                    text = reply.userName + if (reply.replyToName != null) " 回复 ${reply.replyToName}：" else "：",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Primary,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = reply.content,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TextSecondary
+                                )
+                            }
                         }
                         if (reply.userId == myUserId) {
-                            Spacer(Modifier.height(2.dp))
+                            Spacer(Modifier.width(8.dp))
                             Text(
                                 text = "删除",
                                 style = MaterialTheme.typography.labelSmall,

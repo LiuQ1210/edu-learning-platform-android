@@ -1038,16 +1038,13 @@ private fun RuleButton(onClick: () -> Unit) {
 /** 占位广告内容 id：同一广告每天只计一次，每天最多 3 条 */
 private val AD_CONTENT_IDS = listOf("rewarded_ad_001", "rewarded_ad_002", "rewarded_ad_003")
 
-/** 占位广告观看时长（秒） */
-private const val AD_WATCH_SECONDS = 15
-
 @Composable
 private fun AdWatchDialog(
     availableCount: Int,
     onDismiss: () -> Unit,
     onClaim: () -> Unit
 ) {
-    var remaining by remember { mutableIntStateOf(AD_WATCH_SECONDS) }
+    var remaining by remember { mutableIntStateOf(TaskCenterRules.AD_WATCH_SECONDS) }
 
     LaunchedEffect(Unit) {
         while (remaining > 0) {
@@ -1098,7 +1095,7 @@ private fun AdWatchDialog(
 
                 Spacer(Modifier.height(14.dp))
                 ThinProgressBar(
-                    fraction = (AD_WATCH_SECONDS - remaining).toFloat() / AD_WATCH_SECONDS,
+                    fraction = (TaskCenterRules.AD_WATCH_SECONDS - remaining).toFloat() / TaskCenterRules.AD_WATCH_SECONDS,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(6.dp),

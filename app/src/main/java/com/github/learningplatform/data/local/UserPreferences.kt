@@ -54,6 +54,8 @@ class UserPreferences @Inject constructor(
         val SHIP_DETAIL = stringPreferencesKey("ship_detail")
         val EXCHANGE_RECORDS = stringPreferencesKey("exchange_records")
         val EXCHANGE_RECORDS_SEEDED = booleanPreferencesKey("exchange_records_seeded")
+        /** 是否已同意《用户协议》《隐私政策》：勾选过一次后不再重复要求 */
+        val AGREED = booleanPreferencesKey("agreement_agreed")
     }
 
     val token: Flow<String> = context.appDataStore.data.map { it[Keys.TOKEN] ?: "" }
@@ -62,6 +64,9 @@ class UserPreferences @Inject constructor(
     val nickname: Flow<String> = context.appDataStore.data.map { it[Keys.NICKNAME] ?: "" }
     val avatar: Flow<String> = context.appDataStore.data.map { it[Keys.AVATAR] ?: "" }
     val phone: Flow<String> = context.appDataStore.data.map { it[Keys.PHONE] ?: "" }
+
+    /** 是否已同意协议；勾选过一次后默认勾选，不重复要求 */
+    val agreementAgreed: Flow<Boolean> = context.appDataStore.data.map { it[Keys.AGREED] ?: false }
 
     /** 登录态判断：有 token 即视为已登录 */
     val isLoggedIn: Flow<Boolean> = token.map { it.isNotBlank() }
@@ -163,7 +168,56 @@ class UserPreferences @Inject constructor(
     }
 
     suspend fun clear() {
+        // 协议同意属于一次性法律偏好，登出/改密清空登录态后仍保留，不重复要求勾选
+        val agreed = runCatching { agreementAgreed.first() }.getOrDefault(false)
         context.appDataStore.edit { it.clear() }
+        if (agreed) setAgreed(true)
+    }
+
+    /** 记录协议同意状态 */
+    suspend fun setAgreed(agreed: Boolean) {
+        context.appDataStore.edit { it[Keys.AGREED] = agreed }
+    }
+
+    /**
+     * 仅清除登录态字段（token + 用户资料），保留手机号与主题、收货地址、兑换记录等本地偏好。
+     * 手机号保留是为了下次登录回填历史账号；密码从不落盘。
+     * 用于「不记住我」登录时清掉上一次持久化残留，避免冷启动读到旧账号。
+     */
+    suspend fun clearLoginInfo() {
+        context.appDataStore.edit {
+            it.remove(Keys.TOKEN)
+            it.remove(Keys.USER_ID)
+            it.remove(Keys.USER_NAME)
+            it.remove(Keys.NICKNAME)
+            it.remove(Keys.AVATAR)
+        }
+    }
+
+    /** 单独持久化最近登录的手机号（历史账号回填用，不涉及密码与登录态） */
+    suspend fun saveLastPhone(phone: String) {
+        if (phone.isBlank()) return
+        context.appDataStore.edit { it[Keys.PHONE] = phone }
+    }
+
+    /**
+     * 退出登录时清除：登录态资料、收货地址、本地兑换记录；
+     * 保留最近手机号（下次登录回填）、主题模式、协议同意标记。
+     */
+    suspend fun clearOnLogout() {
+        context.appDataStore.edit { p ->
+            p.remove(Keys.TOKEN)
+            p.remove(Keys.USER_ID)
+            p.remove(Keys.USER_NAME)
+            p.remove(Keys.NICKNAME)
+            p.remove(Keys.AVATAR)
+            p.remove(Keys.SHIP_RECEIVER)
+            p.remove(Keys.SHIP_PHONE)
+            p.remove(Keys.SHIP_REGION)
+            p.remove(Keys.SHIP_DETAIL)
+            p.remove(Keys.EXCHANGE_RECORDS)
+            p.remove(Keys.EXCHANGE_RECORDS_SEEDED)
+        }
     }
 }
 

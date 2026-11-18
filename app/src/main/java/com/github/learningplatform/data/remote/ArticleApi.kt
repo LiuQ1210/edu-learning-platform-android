@@ -42,12 +42,16 @@ interface ArticleApi {
      * @param categoryId 类别ID；不传 = 全部分类
      * @param featured 只看精华：true 只看精华，不传 = 全部
      * @param sortBy 排序：createTime（缺省）/ likeCount
+     * @param userId 作者ID（可选）：他人主页传被查看人的 userId
+     * @param topicId 话题ID（可选）：话题页传话题ID
      */
     @GET("api/v1/post/list")
     suspend fun getPublishedArticles(
         @Query("categoryId") categoryId: Long? = null,
         @Query("featured") featured: Boolean? = null,
         @Query("sortBy") sortBy: String? = null,
+        @Query("userId") userId: Long? = null,
+        @Query("topicId") topicId: Long? = null,
         @Query("pageNum") pageNum: Int = 1,
         @Query("pageSize") pageSize: Int = 20
     ): Response<RawTableData>

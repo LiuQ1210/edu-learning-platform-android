@@ -7,8 +7,8 @@ import com.github.learningplatform.core.network.okBody
 import com.github.learningplatform.core.network.okTable
 import com.github.learningplatform.core.network.payload
 import com.github.learningplatform.core.network.str
-import com.github.learningplatform.data.demo.DemoData
 import com.github.learningplatform.data.remote.ArticleApi
+import com.github.learningplatform.data.remote.TopicApi
 import com.github.learningplatform.data.remote.dto.ArticleDetailDto
 import com.github.learningplatform.data.remote.dto.ArticleDto
 import com.github.learningplatform.data.remote.dto.ArticleTagDto
@@ -18,6 +18,7 @@ import com.github.learningplatform.data.remote.dto.PageData
 import com.github.learningplatform.data.remote.dto.PostStatus
 import com.github.learningplatform.data.remote.dto.PublishArticleRequest
 import com.github.learningplatform.data.remote.dto.ReportRequest
+import com.github.learningplatform.data.remote.dto.TopicDetailDto
 import com.github.learningplatform.data.remote.dto.UpdateArticleRequest
 import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
@@ -26,12 +27,14 @@ import javax.inject.Singleton
 /**
  * 社区文章仓库。
  *
- * 已与后端对齐：文章列表流 / 详情 / 我的发布 / 发布 / 删除（后端 post 系列，字段名是 postId/postTitle）。
- * 后端尚未提供：编辑、撤回、标签、举报。
+ * 已与后端对齐：文章列表流 / 详情 / 我的发布 / 发布 / 删除（后端 post 系列，字段名是 postId/postTitle）；
+ * 话题字典与话题详情走 topic 系列。
+ * 后端尚未提供：编辑、撤回、举报。
  */
 @Singleton
 class ArticleRepository @Inject constructor(
-    private val articleApi: ArticleApi
+    private val articleApi: ArticleApi,
+    private val topicApi: TopicApi
 ) {
 
     /**
@@ -49,6 +52,7 @@ class ArticleRepository @Inject constructor(
         pageSize: Int = 20,
         categoryId: Long? = null,
         tagId: Long? = null,
+        authorId: Long? = null,
         sort: Int? = null
     ): PageData<ArticleDto> {
         // 社区排序 tab（1最新 / 2最热 / 3精华）映射到后端参数：
@@ -63,6 +67,8 @@ class ArticleRepository @Inject constructor(
             categoryId = categoryId,
             featured = featured,
             sortBy = sortBy,
+            userId = authorId,
+            topicId = tagId,
             pageNum = pageNum,
             pageSize = pageSize
         ).okTable()
@@ -83,7 +89,8 @@ class ArticleRepository @Inject constructor(
             PublishArticleRequest(
                 postTitle = request.title,
                 categoryId = request.categoryId.toString(),
-                content = request.content
+                content = request.content,
+                topicIds = request.tagIds?.takeIf { it.isNotEmpty() }?.joinToString(",")
             )
         ).okBody().payload()
         return CreateArticleResponse(
@@ -115,8 +122,28 @@ class ArticleRepository @Inject constructor(
     /** 撤回为草稿：后端未提供 */
     suspend fun withdrawArticle(articleId: Long) = Unit
 
-    /** 标签：后端未提供，使用本地样例 */
-    suspend fun getTags(): List<ArticleTagDto> = DemoData.articleTags
+    /** 话题字典（后端 GET /api/v1/topic/list），复用标签 DTO 展示在发帖选择器 */
+    suspend fun getTags(): List<ArticleTagDto> {
+        val table = topicApi.getTopicList(pageNum = 1, pageSize = 50).okTable()
+        return table.rows.map {
+            ArticleTagDto(
+                tagId = it.long("topicId"),
+                name = it.str("topicName"),
+                useCount = it.int("postCount")
+            )
+        }
+    }
+
+    /** 话题详情（话题页顶部：名称 + 简介 + 文章数） */
+    suspend fun getTopicDetail(topicId: Long): TopicDetailDto {
+        val d = topicApi.getTopicDetail(topicId).okBody().payload()
+        return TopicDetailDto(
+            topicId = d.long("topicId"),
+            topicName = d.str("topicName"),
+            topicDesc = d.str("topicDesc"),
+            postCount = d.int("postCount")
+        )
+    }
 
     /** 举报：后端未提供 */
     suspend fun reportArticle(articleId: Long, request: ReportRequest) = Unit
@@ -149,7 +176,7 @@ private fun JsonObject.toArticleDetail(): ArticleDetailDto = ArticleDetailDto(
     coverUrl = str("coverUrl"),
     authorId = long("userId"),
     authorName = str("userName"),
-    authorAvatar = str("userAvatar"),
+    authorAvatar = str("avatar").ifBlank { str("userAvatar") },
     categoryId = long("categoryId"),
     categoryName = str("categoryName"),
     viewCount = int("viewCount"),

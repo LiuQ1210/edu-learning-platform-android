@@ -56,7 +56,12 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.learningplatform.ui.common.BackTopBar
+import com.github.learningplatform.ui.common.ErrorState
+import com.github.learningplatform.ui.common.LoadingState
+import com.github.learningplatform.ui.common.NetImage
 import com.github.learningplatform.ui.nav.NavIcons
 import com.github.learningplatform.ui.theme.BrandGradient
 import com.github.learningplatform.ui.theme.Primary
@@ -70,12 +75,8 @@ import kotlinx.coroutines.launch
 /**
  * 积分商城。
  *
- * 视觉参考了积分商城类页面：积分概览、搜索、活动 banner、积分档位筛选、
- * 双列奖品卡。结合当前项目做了这些调整：
- *  - 红色电商头部改为项目已有的奶油渐变 + 品牌蓝积分卡 + 橙色活动位；
- *  - 不做购物车/订单底栏，商城是任务中心的子页面，保留单页返回结构；
- *  - 奖品、原价均为本地死数据，点击「立即兑换」进入填写收货信息的确认页；
- *  - 积分余额与今日任务积分由任务中心通过路由参数传入。
+ * 商品列表、分类来自后端 shopping 模块；积分余额与今日任务积分由任务中心通过路由参数传入。
+ * 关键词、积分档位、「只看我能兑」在客户端本地过滤。
  */
 @Composable
 fun PointsMallScreen(
@@ -83,8 +84,10 @@ fun PointsMallScreen(
     todayPoints: Int,
     onExchangePrize: (MallPrize) -> Unit,
     onOpenRecords: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    viewModel: MallViewModel = hiltViewModel()
 ) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
@@ -101,13 +104,13 @@ fun PointsMallScreen(
         query,
         selectedPriceLabel,
         affordableOnly,
-        balance
+        balance,
+        uiState.products
     ) {
-        demoMallPrizes.filter { prize ->
+        uiState.products.filter { prize ->
             val matchesQuery = query.isBlank() ||
                 prize.title.contains(query, ignoreCase = true) ||
-                prize.categoryLabel.contains(query, ignoreCase = true) ||
-                (prize.tag?.contains(query, ignoreCase = true) == true)
+                prize.categoryLabel.contains(query, ignoreCase = true)
             val matchesPrice = selectedRange.contains(prize.points)
             // 余额未知（两条接口都失败）时，「只看我能兑」不参与过滤
             val matchesAffordable = !affordableOnly || !balanceKnown || prize.points <= balance
@@ -135,77 +138,75 @@ fun PointsMallScreen(
             )
         }
     ) { padding ->
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            item {
-                PointsSummaryCard(
-                    balance = balance,
-                    todayPoints = todayPoints,
-                    onDetails = { notify("积分明细功能开发中") }
-                )
-            }
-
-            item {
-                MallSearchBar(
-                    query = query,
-                    onQueryChange = { query = it }
-                )
-            }
-
-            item { PrizeSectionHeader(count = filteredPrizes.size) }
-
-            item {
-                PriceFilterRow(
-                    selectedLabel = selectedPriceLabel,
-                    affordableOnly = affordableOnly,
-                    balanceKnown = balanceKnown,
-                    onSelect = { selectedPriceLabel = it },
-                    onToggleAffordable = { affordableOnly = !affordableOnly }
-                )
-            }
-
-            if (filteredPrizes.isEmpty()) {
+        when {
+            uiState.isLoading -> LoadingState(modifier = Modifier.padding(padding))
+            uiState.error != null -> ErrorState(
+                message = uiState.error.orEmpty(),
+                modifier = Modifier.padding(padding),
+                onRetry = { viewModel.load() }
+            )
+            else -> LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
                 item {
-                    EmptyPrizeCard(
-                        onReset = {
-                            query = ""
-                            selectedPriceLabel = mallPriceRanges.first().label
-                            affordableOnly = false
-                        }
+                    PointsSummaryCard(
+                        balance = balance,
+                        todayPoints = todayPoints,
+                        onDetails = { notify("积分明细功能开发中") }
                     )
                 }
-            } else {
-                items(filteredPrizes.chunked(2)) { row ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        row.forEach { prize ->
-                            PrizeCard(
-                                prize = prize,
-                                onExchange = onExchangePrize,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                        if (row.size == 1) {
-                            Spacer(Modifier.weight(1f))
+
+                item {
+                    MallSearchBar(
+                        query = query,
+                        onQueryChange = { query = it }
+                    )
+                }
+
+                item { PrizeSectionHeader(count = filteredPrizes.size) }
+
+                item {
+                    PriceFilterRow(
+                        selectedLabel = selectedPriceLabel,
+                        affordableOnly = affordableOnly,
+                        balanceKnown = balanceKnown,
+                        onSelect = { selectedPriceLabel = it },
+                        onToggleAffordable = { affordableOnly = !affordableOnly }
+                    )
+                }
+
+                if (filteredPrizes.isEmpty()) {
+                    item {
+                        EmptyPrizeCard(
+                            onReset = {
+                                query = ""
+                                selectedPriceLabel = mallPriceRanges.first().label
+                                affordableOnly = false
+                            }
+                        )
+                    }
+                } else {
+                    items(filteredPrizes.chunked(2)) { row ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            row.forEach { prize ->
+                                PrizeCard(
+                                    prize = prize,
+                                    onExchange = onExchangePrize,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            if (row.size == 1) {
+                                Spacer(Modifier.weight(1f))
+                            }
                         }
                     }
                 }
-            }
-
-            item {
-                Text(
-                    "奖品信息为示例数据，兑换功能即将上线",
-                    fontSize = 11.sp,
-                    color = TextHint,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
-                )
             }
         }
     }
@@ -431,11 +432,28 @@ private fun PrizeCard(
                         )
                     )
             ) {
-                Text(
-                    prize.emoji,
-                    fontSize = 44.sp,
-                    modifier = Modifier.align(Alignment.Center)
-                )
+                if (prize.coverUrl.isNotBlank()) {
+                    NetImage(
+                        url = prize.coverUrl,
+                        modifier = Modifier.fillMaxSize(),
+                        radius = 0.dp
+                    )
+                } else if (prize.emoji.isNotBlank()) {
+                    Text(
+                        prize.emoji,
+                        fontSize = 44.sp,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                } else {
+                    Icon(
+                        NavIcons.School,
+                        contentDescription = null,
+                        tint = Primary.copy(alpha = 0.35f),
+                        modifier = Modifier
+                            .size(40.dp)
+                            .align(Alignment.Center)
+                    )
+                }
                 val tag = prize.tag
                 if (tag != null) {
                     Text(
@@ -488,17 +506,21 @@ private fun PrizeCard(
                     }
                 }
                 Spacer(Modifier.weight(1f))
+                val soldOut = prize.stock <= 0
                 Button(
-                    onClick = { onExchange(prize) },
+                    onClick = { if (!soldOut) onExchange(prize) },
+                    enabled = !soldOut,
                     shape = RoundedCornerShape(50),
                     contentPadding = PaddingValues(horizontal = 0.dp),
                     modifier = Modifier.fillMaxWidth().height(30.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Primary.copy(alpha = 0.10f),
-                        contentColor = Primary
+                        contentColor = Primary,
+                        disabledContainerColor = MaterialTheme.colorScheme.outlineVariant,
+                        disabledContentColor = TextHint
                     )
                 ) {
-                    Text("立即兑换", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    Text(if (soldOut) "已兑完" else "立即兑换", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }

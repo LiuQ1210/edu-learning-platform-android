@@ -2,6 +2,7 @@ package com.github.learningplatform.core.di
 
 import com.github.learningplatform.core.network.RetrofitClient
 import com.github.learningplatform.data.remote.AppApi
+import com.github.learningplatform.data.remote.AgreementApi
 import com.github.learningplatform.data.remote.ArticleApi
 import com.github.learningplatform.data.remote.AuthApi
 import com.github.learningplatform.data.remote.BannerApi
@@ -17,8 +18,10 @@ import com.github.learningplatform.data.remote.PointsApi
 import com.github.learningplatform.data.remote.RatingApi
 import com.github.learningplatform.data.remote.ResourceApi
 import com.github.learningplatform.data.remote.SearchApi
+import com.github.learningplatform.data.remote.ShopApi
 import com.github.learningplatform.data.remote.StudyApi
 import com.github.learningplatform.data.remote.TodoApi
+import com.github.learningplatform.data.remote.TopicApi
 import com.github.learningplatform.data.remote.UserApi
 import com.github.learningplatform.data.remote.VideoApi
 import dagger.Module
@@ -104,4 +107,16 @@ object NetworkModule {
     /** 首页轮播图 */
     @Provides @Singleton
     fun provideBannerApi(client: RetrofitClient): BannerApi = client.create()
+
+    /** 话题字典 / 话题详情 */
+    @Provides @Singleton
+    fun provideTopicApi(client: RetrofitClient): TopicApi = client.create()
+
+    /** 积分商城：商品 / 分类 / 兑换 / 记录 / 地址 */
+    @Provides @Singleton
+    fun provideShopApi(client: RetrofitClient): ShopApi = client.create()
+
+    /** 平台协议：用户协议 / 隐私政策 / 关于我们 */
+    @Provides @Singleton
+    fun provideAgreementApi(client: RetrofitClient): AgreementApi = client.create()
 }

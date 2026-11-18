@@ -110,9 +110,9 @@ modifier = Modifier
 
                             Row(modifier = Modifier.fillMaxWidth()) {
                                 StatItem("文章", blog.articleCount, Modifier.weight(1f))
-                                StatItem("阅读", blog.totalViewCount, Modifier.weight(1f))
-                                StatItem("获赞", blog.totalLikeCount, Modifier.weight(1f))
-                                StatItem("收藏", blog.totalFavoriteCount, Modifier.weight(1f))
+                                StatItem("关注", blog.followCount, Modifier.weight(1f))
+                                StatItem("粉丝", blog.fansCount, Modifier.weight(1f))
+                                StatItem("获赞", blog.likeReceivedCount, Modifier.weight(1f))
                             }
                         }
                     }

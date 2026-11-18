@@ -78,3 +78,14 @@ data class CheckinRulesDto(
 data class PointsAccountDto(
     val balance: Int = 0
 )
+
+/** 看完广告领积分结果（`POST /api/v1/points/ad/reward`） */
+@Serializable
+data class AdRewardResultDto(
+    /** 本次实际入账积分（重复广告 / 达每日上限时为 0） */
+    val awardedPoints: Int = 0,
+    /** 今日已计分广告条数 */
+    val todayAdCount: Int = 0,
+    /** 今日广告计分上限 */
+    val todayAdLimit: Int = 3
+)

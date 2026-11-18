@@ -57,6 +57,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.github.learningplatform.data.remote.dto.CommentDto
+import com.github.learningplatform.data.remote.dto.HotReplyDto
 import com.github.learningplatform.data.remote.dto.CourseDto
 import com.github.learningplatform.ui.common.Avatar
 import com.github.learningplatform.ui.common.EmptyState
@@ -65,6 +66,7 @@ import com.github.learningplatform.ui.common.LoadingState
 import com.github.learningplatform.ui.common.NetImage
 import com.github.learningplatform.ui.common.formatCount
 import com.github.learningplatform.ui.nav.NavIcons
+import com.github.learningplatform.ui.theme.HighlightWash
 import com.github.learningplatform.ui.theme.Primary
 import com.github.learningplatform.ui.theme.TextHint
 import com.github.learningplatform.ui.theme.TextSecondary
@@ -510,6 +512,20 @@ private fun CommentsSheet(
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // 从评论通知进来时要定位高亮的评论 id；读取后即清空，避免二次进入重复滚动
+    val highlightCommentId = remember {
+        VideoCommentHighlightBus.highlightCommentId.also {
+            VideoCommentHighlightBus.highlightCommentId = null
+        }
+    }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    LaunchedEffect(highlightCommentId, comments.size) {
+        val target = highlightCommentId ?: return@LaunchedEffect
+        val rootIdx = comments.indexOfFirst { it.commentId == target }
+        val parentIdx = if (rootIdx >= 0) rootIdx else
+            comments.indexOfFirst { c -> c.hotReplies.any { r -> r.commentId == target } }
+        if (parentIdx >= 0) listState.animateScrollToItem(parentIdx)
+    }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
             modifier = Modifier
@@ -540,6 +556,7 @@ private fun CommentsSheet(
                 error != null && comments.isEmpty() -> Box(Modifier.weight(1f).fillMaxWidth()) { ErrorState(message = error) }
                 comments.isEmpty() -> Box(Modifier.weight(1f).fillMaxWidth()) { EmptyState(message = "还没有评论") }
                 else -> LazyColumn(
+                    state = listState,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
@@ -549,11 +566,18 @@ private fun CommentsSheet(
                     items(comments, key = { it.commentId }) { comment ->
                         CommentRow(
                             comment = comment,
+                            highlighted = comment.commentId == highlightCommentId,
+                            highlightReplyId = highlightCommentId,
+                            forceExpand = comment.hotReplies.any { it.commentId == highlightCommentId },
                             isMine = comment.userId == myUserId,
                             myUserId = myUserId,
                             onReply = {
                                 replyToCommentId = comment.commentId
                                 replyToUser = comment.userName
+                            },
+                            onReplyReply = { reply ->
+                                replyToCommentId = reply.commentId
+                                replyToUser = reply.userName
                             },
                             onDelete = { onDeleteComment(comment.commentId) },
                             onDeleteReply = onDeleteComment
@@ -625,12 +649,14 @@ private fun CommentsSheet(
 }
 
 @Composable
-private fun CommentRow(comment: CommentDto, isMine: Boolean = false, myUserId: Long = 0L, onReply: () -> Unit = {}, onDelete: () -> Unit = {}, onDeleteReply: (Long) -> Unit = {}) {
+private fun CommentRow(comment: CommentDto, highlighted: Boolean = false, highlightReplyId: Long? = null, forceExpand: Boolean = false, isMine: Boolean = false, myUserId: Long = 0L, onReply: () -> Unit = {}, onDelete: () -> Unit = {}, onDeleteReply: (Long) -> Unit = {}, onReplyReply: (HotReplyDto) -> Unit = {}) {
     var liked by remember { mutableStateOf(comment.isLiked) }
     var likeCnt by remember { mutableStateOf(comment.likeCount) }
     Row(modifier = Modifier
         .fillMaxWidth()
-        .padding(vertical = 10.dp)
+        .clip(RoundedCornerShape(10.dp))
+        .background(if (highlighted) HighlightWash else Color.Transparent)
+        .padding(horizontal = if (highlighted) 8.dp else 0.dp, vertical = 10.dp)
     ) {
         Avatar(url = comment.userAvatar, name = comment.userName, size = 36.dp)
         Spacer(Modifier.width(10.dp))
@@ -641,9 +667,15 @@ private fun CommentRow(comment: CommentDto, isMine: Boolean = false, myUserId: L
                 fontWeight = FontWeight.SemiBold
             )
             Spacer(Modifier.height(2.dp))
-            Text(text = comment.content, style = MaterialTheme.typography.bodyMedium)
+            // 点击评论正文即进入回复，不再单独放回复图标
+            Text(
+                text = comment.content,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.clickable(onClick = onReply)
+            )
             Spacer(Modifier.height(4.dp))
-            var expanded by remember { mutableStateOf(false) }
+            var expanded by remember { mutableStateOf(forceExpand) }
+            LaunchedEffect(forceExpand) { if (forceExpand) expanded = true }
             Text(
                 text = if (comment.replyCount > 0) {
                     (if (expanded) "收起回复" else "查看 " + comment.replyCount + " 条回复")
@@ -664,14 +696,24 @@ private fun CommentRow(comment: CommentDto, isMine: Boolean = false, myUserId: L
                 ) {
                     comment.hotReplies.forEachIndexed { index, reply ->
                         if (index > 0) Spacer(Modifier.height(6.dp))
-                        Column {
-                            Text(
-                                text = reply.userName + (reply.replyToName?.let { " 回复 $it" } ?: "") + "：" + reply.content,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = TextSecondary
-                            )
+                        val replyHighlighted = reply.commentId == highlightReplyId
+                        Row(
+                            verticalAlignment = Alignment.Top,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (replyHighlighted) HighlightWash else Color.Transparent)
+                                .padding(horizontal = if (replyHighlighted) 6.dp else 0.dp)
+                                .clickable { onReplyReply(reply) }
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = reply.userName + (reply.replyToName?.let { " 回复 $it" } ?: "") + "：" + reply.content,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TextSecondary
+                                )
+                            }
                             if (reply.userId == myUserId) {
-                                Spacer(Modifier.height(2.dp))
+                                Spacer(Modifier.width(8.dp))
                                 Text(
                                     text = "删除",
                                     style = MaterialTheme.typography.labelSmall,
@@ -684,13 +726,15 @@ private fun CommentRow(comment: CommentDto, isMine: Boolean = false, myUserId: L
                 }
             }
         }
-        // 评论回复 + 删除（自己的评论才显示删除）
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(NavIcons.Comment, contentDescription = "回复", tint = TextHint, modifier = Modifier.size(16.dp).clickable { onReply() })
-            if (isMine) {
-                Spacer(Modifier.height(8.dp))
-                Text("删除", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.clickable { onDelete() })
-            }
+        // 删除按钮固定在评论最右侧（仅自己的评论显示）
+        if (isMine) {
+            Spacer(Modifier.width(10.dp))
+            Text(
+                "删除",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.clickable { onDelete() }
+            )
         }
     }
 }

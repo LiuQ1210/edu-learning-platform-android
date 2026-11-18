@@ -1,9 +1,12 @@
 package com.github.learningplatform.ui.mine
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.learningplatform.data.local.UserPreferences
 import com.github.learningplatform.data.remote.dto.UpdateProfileRequest
+import com.github.learningplatform.data.remote.dto.UploadScene
+import com.github.learningplatform.data.repository.FileRepository
 import com.github.learningplatform.data.repository.UserRepository
 import com.github.learningplatform.ui.readableMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,6 +24,8 @@ data class EditProfileUiState(
     val gender: Int = 0,
     val bio: String = "",
     val saving: Boolean = false,
+    /** 头像上传中（选图后先传 /api/v1/upload 拿 url，再随资料保存） */
+    val avatarUploading: Boolean = false,
     val saved: Boolean = false,
     val message: String? = null
 )
@@ -28,6 +33,7 @@ data class EditProfileUiState(
 @HiltViewModel
 class EditProfileViewModel @Inject constructor(
     private val userRepository: UserRepository,
+    private val fileRepository: FileRepository,
     private val userPreferences: UserPreferences
 ) : ViewModel() {
 
@@ -60,8 +66,24 @@ class EditProfileViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(nickname = value)
     }
 
-    fun onAvatarChange(value: String) {
-        _uiState.value = _uiState.value.copy(avatar = value)
+    /**
+     * 相册选图：先把 content Uri 落缓存文件，上传到 `/api/v1/upload` 拿到服务端 url 后回写头像；
+     * 真正落库发生在点「保存」时随资料表单一起提交。上传失败保留原头像并提示。
+     */
+    fun onAvatarPicked(uri: Uri) {
+        if (_uiState.value.avatarUploading) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(avatarUploading = true, message = null)
+            try {
+                val file = fileRepository.uriToCacheFile(uri)
+                val dto = fileRepository.upload(file, UploadScene.AVATAR)
+                _uiState.value = _uiState.value.copy(avatarUploading = false, avatar = dto.url)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                _uiState.value = _uiState.value.copy(avatarUploading = false, message = e.readableMessage())
+            }
+        }
     }
 
     fun onGenderChange(value: Int) {
@@ -78,7 +100,7 @@ class EditProfileViewModel @Inject constructor(
 
     fun save() {
         val state = _uiState.value
-        if (state.saving) return
+        if (state.saving || state.avatarUploading) return
         if (state.nickname.isBlank()) {
             _uiState.value = state.copy(message = "昵称不能为空")
             return

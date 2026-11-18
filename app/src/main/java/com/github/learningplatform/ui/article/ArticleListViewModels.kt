@@ -118,6 +118,8 @@ data class TagArticlesUiState(
     val isLoadingMore: Boolean = false,
     val error: String? = null,
     val tagName: String = "",
+    val tagDesc: String = "",
+    val postCount: Int = 0,
     val articles: List<ArticleDto> = emptyList(),
     val pageNum: Int = 1,
     val hasMore: Boolean = false,
@@ -125,9 +127,10 @@ data class TagArticlesUiState(
 ) : PagedUiState
 
 /**
- * 按标签浏览（接口 7.1 tagId）。
+ * 话题页（后端 topicId）。
  *
- * 标签名需要从 7.8 标签列表里反查：7.1 的响应只带文章，不带标签名。
+ * 话题名 / 简介 / 文章数由 `/api/v1/topic/{topicId}` 提供；文章列表复用
+ * `/api/v1/post/list?topicId=xxx`。
  */
 @HiltViewModel
 class TagArticlesViewModel @Inject constructor(
@@ -146,12 +149,16 @@ class TagArticlesViewModel @Inject constructor(
         loaded = true
         viewModelScope.launch {
             try {
-                val name = articleRepository.getTags().firstOrNull { it.tagId == id }?.name.orEmpty()
-                _uiState.value = _uiState.value.copy(tagName = name)
+                val detail = articleRepository.getTopicDetail(id)
+                _uiState.value = _uiState.value.copy(
+                    tagName = detail.topicName,
+                    tagDesc = detail.topicDesc,
+                    postCount = detail.postCount
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                // 标签名拿不到就只显示 ID，不影响列表
+                // 话题详情拿不到就只显示 ID，不影响列表
             }
         }
         loadPage(reset = true)

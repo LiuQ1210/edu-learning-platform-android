@@ -29,14 +29,23 @@ interface UserApi {
     @GET("api/v1/user/profile")
     suspend fun getProfile(): Response<JsonObject>
 
-    /**
-     * 我的主页聚合数据（对齐后端 `GET /api/v1/user/home`）。
+    /** 我的主页聚合数据（对齐后端 `GET /api/v1/user/home`）。
      *
      * 平铺返回：`userId / userName / avatar / sex / sexLabel / bio /
      * followCount（关注数）/ fansCount（粉丝数）/ likeReceivedCount（获赞数）/ fanPreview`
      */
     @GET("api/v1/user/home")
     suspend fun getUserHome(): Response<JsonObject>
+
+    /**
+     * 他人主页公开资料（对齐后端 `GET /api/v1/user/publicProfile`）。
+     *
+     * 只返回公开字段，不带手机号 / 登录名；`isFollowing` 直接给关注按钮用。
+     */
+    @GET("api/v1/user/publicProfile")
+    suspend fun getPublicProfile(
+        @Query("userId") userId: Long
+    ): Response<JsonObject>
 
     /** 保存资料（表单提交，字段同后端 update(userName, avatar, sex, bio)） */
     @FormUrlEncoded

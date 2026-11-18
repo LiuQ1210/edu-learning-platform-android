@@ -54,6 +54,7 @@ import com.github.learningplatform.ui.course.HomeScreen
 import com.github.learningplatform.ui.course.SearchScreen
 import com.github.learningplatform.ui.mine.BlogHomeScreen
 import com.github.learningplatform.ui.mine.ChangePasswordScreen
+import com.github.learningplatform.ui.mine.AgreementScreen
 import com.github.learningplatform.ui.mine.EditProfileScreen
 import com.github.learningplatform.ui.mine.FavoritesScreen
 import com.github.learningplatform.ui.mine.DownloadsScreen
@@ -72,7 +73,6 @@ import com.github.learningplatform.ui.mall.ExchangeRecordsScreen
 import com.github.learningplatform.ui.mall.PointsMallScreen
 import com.github.learningplatform.ui.mall.PrizeExchangeScreen
 import com.github.learningplatform.ui.mall.PrizeExchangeSuccessScreen
-import com.github.learningplatform.ui.mall.demoMallPrizes
 import com.github.learningplatform.ui.note.NoteDetailScreen
 import com.github.learningplatform.ui.note.NotesScreen
 import com.github.learningplatform.ui.todo.TodosScreen
@@ -123,11 +123,8 @@ private fun RootNavHost(navController: NavHostController, startDestination: Stri
 
         composable(Routes.REGISTER) {
             RegisterScreen(
-                onRegisterSuccess = {
-                    navController.navigate(Routes.MAIN) {
-                        popUpTo(Routes.LOGIN) { inclusive = true }
-                    }
-                },
+                // 注册成功不自动登录，返回登录页由用户手动登录
+                onRegisterSuccess = { navController.popBackStack() },
                 onNavigateToLogin = { navController.popBackStack() }
             )
         }
@@ -187,7 +184,7 @@ private fun RootNavHost(navController: NavHostController, startDestination: Stri
             )
         }
 
-        // 奖品兑换：填写收货信息，确认后兑换（当前仅前端流程）
+        // 奖品兑换：商品详情与默认地址来自后端，确认后调用兑换接口
         composable(
             route = Routes.PRIZE_EXCHANGE,
             arguments = listOf(
@@ -198,14 +195,16 @@ private fun RootNavHost(navController: NavHostController, startDestination: Stri
                 }
             )
         ) { entry ->
-            val prizeId = entry.arguments?.getString("prizeId").orEmpty()
+            val productId = entry.arguments?.getString("prizeId").orEmpty()
             PrizeExchangeScreen(
-                prize = demoMallPrizes.firstOrNull { it.id == prizeId },
+                productId = productId,
                 balance = entry.arguments?.getInt("balance") ?: -1,
                 onEditAddress = { navController.navigate(Routes.SHIPPING_ADDRESS) },
-                onSuccess = { remaining ->
+                onSuccess = { result ->
                     // 成功页替换确认页：返回不会再回到已完成的兑换
-                    navController.navigate(Routes.prizeExchangeSuccess(prizeId, remaining)) {
+                    navController.navigate(
+                        Routes.prizeExchangeSuccess(productId, result.balance, result.redemptionCode)
+                    ) {
                         popUpTo(Routes.PRIZE_EXCHANGE) { inclusive = true }
                     }
                 },
@@ -221,13 +220,16 @@ private fun RootNavHost(navController: NavHostController, startDestination: Stri
                 navArgument("remaining") {
                     type = NavType.IntType
                     defaultValue = -1
+                },
+                navArgument("code") {
+                    type = NavType.StringType
+                    defaultValue = ""
                 }
             )
         ) { entry ->
             PrizeExchangeSuccessScreen(
-                prize = demoMallPrizes.firstOrNull {
-                    it.id == entry.arguments?.getString("prizeId").orEmpty()
-                },
+                productId = entry.arguments?.getString("prizeId").orEmpty(),
+                redemptionCode = entry.arguments?.getString("code").orEmpty(),
                 remaining = entry.arguments?.getInt("remaining") ?: -1,
                 onViewRecords = { navController.navigate(Routes.EXCHANGE_RECORDS) },
                 onBackToMall = { navController.popBackStack() }
@@ -647,7 +649,18 @@ fun MainScaffold(
                     onBack = { navController.popBackStack() },
                     onOpenChangePassword = { navController.navigate(Routes.CHANGE_PASSWORD) },
                     onOpenShippingAddress = onOpenShippingAddress,
+                    onOpenAgreement = { type -> navController.navigate(Routes.agreement(type)) },
                     onLoggedOut = onLoggedOut
+                )
+            }
+
+            composable(
+                route = Routes.AGREEMENT,
+                arguments = listOf(navArgument("type") { type = NavType.StringType })
+            ) { entry ->
+                AgreementScreen(
+                    agreementType = entry.arguments?.getString("type").orEmpty(),
+                    onBack = { navController.popBackStack() }
                 )
             }
 
@@ -670,9 +683,13 @@ fun MainScaffold(
                         com.github.learningplatform.ui.article.CommentHighlightBus.highlightCommentId = commentId
                         navController.navigate(Routes.articleDetail(articleId))
                     },
-                    onOpenVideo = { videoId ->
-                            navController.navigate(Routes.video(focusId = videoId))
-                        },
+                    onOpenVideo = { videoId, commentId ->
+                        com.github.learningplatform.ui.video.VideoCommentHighlightBus.highlightCommentId = commentId
+                        navController.navigate(Routes.video(focusId = videoId)) {
+                            launchSingleTop = true
+                            popUpTo(Routes.HOME) { inclusive = false }
+                        }
+                    },
                     onOpenUser = { userId -> navController.navigate(Routes.blogHome(userId)) },
                     onOpenTodos = { navController.navigate(Routes.TODOS) }
                 )

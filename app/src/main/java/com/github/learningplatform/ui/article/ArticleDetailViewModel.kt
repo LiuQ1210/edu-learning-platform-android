@@ -250,8 +250,28 @@ class ArticleDetailViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 interactionRepository.deleteComment(commentId)
+                val state = _uiState.value
+                // 先判定被删的是回复项还是一级评论，用于计数递减口径
+                val isReply = state.comments.any { c -> c.hotReplies.any { it.commentId == commentId } }
+                val targetComment = state.comments.find { it.commentId == commentId }
+                // 先在各一级评论的回复列表里移除该回复；若不是回复项，再整项移除一级评论
+                val comments = state.comments
+                    .map { c ->
+                        if (c.hotReplies.any { it.commentId == commentId }) {
+                            c.copy(hotReplies = c.hotReplies.filterNot { it.commentId == commentId })
+                        } else c
+                    }
+                    .filterNot { it.commentId == commentId }
+                // 计数口径含回复：删一级连带其已加载回复一起减；删回复减 1
+                val delta = when {
+                    isReply -> 1
+                    targetComment != null -> 1 + targetComment.hotReplies.size
+                    else -> 0
+                }
+                val newCount = (state.detail?.commentCount ?: 0) - delta
                 _uiState.value = _uiState.value.copy(
-                    comments = _uiState.value.comments.filterNot { it.commentId == commentId },
+                    comments = comments,
+                    detail = state.detail?.copy(commentCount = newCount.coerceAtLeast(0)),
                     message = "已删除"
                 )
             } catch (e: CancellationException) {

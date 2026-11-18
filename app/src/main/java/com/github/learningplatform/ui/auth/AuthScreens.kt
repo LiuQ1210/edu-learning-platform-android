@@ -1,6 +1,7 @@
 ﻿package com.github.learningplatform.ui.auth
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,7 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Checkbox
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +30,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -68,6 +70,8 @@ fun LoginScreen(
     viewModel: LoginViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var showAgreement by remember { mutableStateOf(false) }
+    var showPrivacy by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.loginSuccess) {
         if (uiState.loginSuccess) onLoginSuccess()
@@ -112,11 +116,13 @@ fun LoginScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            AuthCheckbox(
                 checked = uiState.rememberMe,
-                onCheckedChange = viewModel::onRememberMeChange,
-                modifier = Modifier.size(22.dp)
+                onCheckedChange = viewModel::onRememberMeChange
             )
             Spacer(Modifier.width(4.dp))
             Text(
@@ -130,6 +136,43 @@ fun LoginScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = Primary,
                 modifier = Modifier.clickable { viewModel.notifyForgotPassword() }
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // 协议勾选：未勾选不允许登录
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            AuthCheckbox(
+                checked = uiState.agreed,
+                onCheckedChange = viewModel::onAgreedChange
+            )
+            Spacer(Modifier.width(4.dp))
+            Text("我已阅读并同意", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+            Text(
+                "《用户协议》",
+                style = MaterialTheme.typography.bodySmall,
+                color = Primary,
+                modifier = Modifier.clickable { showAgreement = true }
+            )
+            Text("和", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+            Text(
+                "《隐私政策》",
+                style = MaterialTheme.typography.bodySmall,
+                color = Primary,
+                modifier = Modifier.clickable { showPrivacy = true }
+            )
+        }
+
+        if (uiState.agreementError != null) {
+            Text(
+                text = uiState.agreementError.orEmpty(),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(start = 18.dp, top = 4.dp)
             )
         }
 
@@ -164,6 +207,22 @@ fun LoginScreen(
         }
 
         Spacer(Modifier.height(40.dp))
+    }
+
+    if (showAgreement) {
+        AuthInfoDialog(
+            title = "用户协议",
+            text = "欢迎使用本学习平台。使用本应用即表示您同意：\n\n1. 您应妥善保管账号，因账号泄露造成的损失由您自行承担；\n2. 平台内容仅供个人学习使用，未经许可不得商用或二次分发；\n3. 我们有权根据运营需要调整课程内容与功能，重要变更会提前通知。",
+            onDismiss = { showAgreement = false }
+        )
+    }
+
+    if (showPrivacy) {
+        AuthInfoDialog(
+            title = "隐私政策",
+            text = "我们重视您的隐私：\n\n1. 仅收集学习行为（观看历史、进度、点赞收藏）用于改进推荐与记录学习进度；\n2. 不会向第三方共享您的个人身份信息；\n3. 您可在「设置-清除缓存」中清除本地缓存数据。",
+            onDismiss = { showPrivacy = false }
+        )
     }
 }
 
@@ -232,6 +291,42 @@ internal fun AuthBrand(title: String, subtitle: String) {
         style = MaterialTheme.typography.bodyMedium,
         color = TextSecondary
     )
+}
+
+/**
+ * 登录/注册页统一勾选框。
+ *
+ * 固定 18dp 方框、从起始位置绘制，替代 M3 Checkbox（其内部默认最小尺寸与居中
+ * 会让同一列的两个勾选框左缘错位）。两行复用此组件保证左缘对齐。
+ */
+@Composable
+internal fun AuthCheckbox(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .size(18.dp)
+            .clip(RoundedCornerShape(5.dp))
+            .background(if (checked) Primary else Color.Transparent)
+            .border(
+                width = 1.5.dp,
+                color = if (checked) Primary else TextHint,
+                shape = RoundedCornerShape(5.dp)
+            )
+            .clickable { onCheckedChange(!checked) },
+        contentAlignment = Alignment.Center
+    ) {
+        if (checked) {
+            Icon(
+                NavIcons.Check,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(12.dp)
+            )
+        }
+    }
 }
 
 /** 圆角输入框（与 UI 稿的浅色胶囊输入框一致） */
@@ -310,4 +405,17 @@ internal fun AuthField(
             )
         }
     }
+}
+
+/** 登录页协议 / 隐私政策说明弹窗（文案与设置页保持一致） */
+@Composable
+internal fun AuthInfoDialog(title: String, text: String, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(text, style = MaterialTheme.typography.bodyMedium) },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("知道了") }
+        }
+    )
 }

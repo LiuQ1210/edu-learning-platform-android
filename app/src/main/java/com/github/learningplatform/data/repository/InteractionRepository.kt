@@ -134,6 +134,47 @@ class InteractionRepository @Inject constructor(
         interactionApi.removeComment(commentId).okBody()
     }
 
+    /**
+     * 评论定位结果（对齐后端 `GET /api/v1/comment/locate`）。
+     *
+     * @param targetType 1文章 2课程 3短视频，以后端权威归属为准（纠偏通知表字段错位）
+     * @param targetId 归属内容 id
+     * @param rootId 一级评论 id；回复项指向其根评论
+     * @param rootIndex 根评论在列表中的序号（0 起），供高亮定位
+     * @param pageNum 目标评论所在页码（1 起）
+     * @param deleted 评论是否已被软删
+     */
+    data class CommentLocateResult(
+        val commentId: Long,
+        val targetType: String,
+        val targetId: Long,
+        val rootId: Long,
+        val rootIndex: Int,
+        val pageNum: Int,
+        val deleted: Boolean
+    )
+
+    /**
+     * 按评论 id 反查定位。请求失败 / 评论不存在时返回 null，调用方回退到通知表自带字段跳转。
+     */
+    suspend fun locateComment(commentId: Long): CommentLocateResult? {
+        if (commentId <= 0L) return null
+        return try {
+            val data = interactionApi.locateComment(commentId).okBody().payload()
+            CommentLocateResult(
+                commentId = data.long("commentId"),
+                targetType = data.str("targetType"),
+                targetId = data.long("targetId"),
+                rootId = data.long("rootId"),
+                rootIndex = data.int("rootIndex"),
+                pageNum = data.int("pageNum").coerceAtLeast(1),
+                deleted = data.bool("deleted")
+            )
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
     suspend fun toggleCommentLike(commentId: Long): LikeToggleResultDto {
         // 后端 comment 表没有点赞字段，暂用本地点赞态占位
         return LikeToggleResultDto(isLiked = true, likeCount = 13)

@@ -27,6 +27,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -35,7 +36,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -43,9 +43,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.github.learningplatform.data.local.ShippingAddress
+import com.github.learningplatform.data.remote.dto.ExchangeResultDto
+import com.github.learningplatform.data.remote.dto.ShopAddressDto
 import com.github.learningplatform.ui.common.AppCard
 import com.github.learningplatform.ui.common.BackTopBar
+import com.github.learningplatform.ui.common.ErrorState
+import com.github.learningplatform.ui.common.LoadingState
+import com.github.learningplatform.ui.common.NetImage
 import com.github.learningplatform.ui.common.TagChip
 import com.github.learningplatform.ui.nav.NavIcons
 import com.github.learningplatform.ui.theme.Error
@@ -55,54 +59,48 @@ import com.github.learningplatform.ui.theme.TextHint
 import com.github.learningplatform.ui.theme.TextPrimary
 import com.github.learningplatform.ui.theme.TextSecondary
 import com.github.learningplatform.ui.theme.pageGradientBrush
+import com.github.learningplatform.ui.readableMessage
 import kotlinx.coroutines.launch
 
 /**
  * 奖品兑换确认页。
  *
- * 收货信息不再在这里填写：用户只需在「设置 → 收货信息」维护一次，
- * 本页直接展示已保存的地址卡片，点卡片可跳过去修改；没有地址时引导去添加。
- * 当前后端还没有兑换接口，确认只做地址校验，通过后进入本地的「兑换成功」页。
+ * 商品详情与默认收货信息来自后端；收货信息可在「设置 → 收货信息」维护。
+ * 确认兑换调用 `/shop/exchange`，成功后把兑换结果交给成功页。
  */
 @Composable
 fun PrizeExchangeScreen(
-    prize: MallPrize?,
+    productId: String,
     balance: Int,
     onEditAddress: () -> Unit,
-    onSuccess: (Int) -> Unit,
+    onSuccess: (ExchangeResultDto) -> Unit,
     onBack: () -> Unit,
     viewModel: PrizeExchangeViewModel = hiltViewModel()
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val address by viewModel.shippingAddress.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    if (prize == null) {
-        Scaffold(
-            containerColor = Color.Transparent,
-            modifier = Modifier.background(pageGradientBrush(strong = true)),
-            topBar = { BackTopBar(title = "确认兑换", onBack = onBack) }
-        ) { padding ->
-            Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("奖品不存在或已下架", fontSize = 14.sp, color = TextSecondary)
-            }
-        }
-        return
+    LaunchedEffect(productId) { viewModel.load(productId) }
+
+    fun notify(message: String) {
+        scope.launch { snackbarHostState.showSnackbar(message) }
     }
 
     fun submit() {
-        if (!address.isComplete) {
-            scope.launch { snackbarHostState.showSnackbar("请先在设置中填写收货信息") }
+        val product = uiState.product ?: return
+        val address = uiState.address
+        if (address == null || !address.isComplete()) {
+            notify("请先在设置中填写收货信息")
             return
         }
-        // 后端未接入，直接进本地结果页；余额未知或扣完时传 -1，结果页隐藏剩余积分
-        val remaining = (balance - prize.points).takeIf { balance >= 0 && it >= 0 } ?: -1
         scope.launch {
-            viewModel.recordExchange(prize)
-            onSuccess(remaining)
+            try {
+                val result = viewModel.exchange(productId)
+                onSuccess(result)
+            } catch (e: Throwable) {
+                notify(e.readableMessage())
+            }
         }
     }
 
@@ -112,39 +110,46 @@ fun PrizeExchangeScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = { BackTopBar(title = "确认兑换", onBack = onBack) },
         bottomBar = {
-            ExchangeBottomBar(prize = prize, balance = balance, onSubmit = ::submit)
+            uiState.product?.let { product ->
+                ExchangeBottomBar(product = product, balance = balance, onSubmit = ::submit)
+            }
         }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            item { PrizeSummaryCard(prize = prize, balance = balance) }
-
-            item { AddressCard(address = address, onEdit = onEditAddress) }
-
-            item { ExchangeNoticeCard() }
-
-            item {
-                Text(
-                    "当前为示例流程，兑换功能即将上线",
-                    fontSize = 11.sp,
-                    color = TextHint,
-                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                    textAlign = TextAlign.Center
-                )
+        when {
+            uiState.isLoading -> LoadingState(modifier = Modifier.padding(padding))
+            uiState.error != null -> ErrorState(
+                message = uiState.error.orEmpty(),
+                modifier = Modifier.padding(padding),
+                onRetry = { viewModel.load(productId) }
+            )
+            uiState.product == null -> Box(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("商品不存在或已下架", fontSize = 14.sp, color = TextSecondary)
+            }
+            else -> LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                item { PrizeSummaryCard(product = uiState.product!!, balance = balance) }
+                item { AddressCard(address = uiState.address, onEdit = onEditAddress) }
+                item { ExchangeNoticeCard() }
             }
         }
     }
 }
+
+private fun ShopAddressDto.isComplete(): Boolean =
+    receiverName.isNotBlank() && receiverPhone.isNotBlank() && detailAddress.isNotBlank()
 
 // ---------------------------------------------------------------------------
 // 奖品摘要
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun PrizeSummaryCard(prize: MallPrize, balance: Int) {
+private fun PrizeSummaryCard(product: MallPrize, balance: Int) {
     AppCard {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -152,17 +157,26 @@ private fun PrizeSummaryCard(prize: MallPrize, balance: Int) {
                     modifier = Modifier
                         .size(64.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(
-                            Brush.linearGradient(listOf(prize.visualStart, prize.visualEnd))
-                        ),
+                        .background(Brush.linearGradient(listOf(product.visualStart, product.visualEnd))),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(prize.emoji, fontSize = 30.sp)
+                    if (product.coverUrl.isNotBlank()) {
+                        NetImage(url = product.coverUrl, modifier = Modifier.fillMaxSize(), radius = 16.dp)
+                    } else if (product.emoji.isNotBlank()) {
+                        Text(product.emoji, fontSize = 30.sp)
+                    } else {
+                        Icon(
+                            NavIcons.School,
+                            contentDescription = null,
+                            tint = Primary.copy(alpha = 0.35f),
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        prize.title,
+                        product.title,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = TextPrimary,
@@ -171,16 +185,14 @@ private fun PrizeSummaryCard(prize: MallPrize, balance: Int) {
                     )
                     Spacer(Modifier.height(5.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        TagChip(prize.categoryLabel)
-                        prize.originalPrice?.let { price ->
-                            Spacer(Modifier.width(6.dp))
-                            Text("参考价 $price", fontSize = 10.sp, color = TextHint)
+                        if (product.categoryLabel.isNotBlank()) {
+                            TagChip(product.categoryLabel)
                         }
                     }
                 }
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "${prize.points} 积分",
+                    "${product.points} 积分",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Primary
@@ -203,7 +215,7 @@ private fun PrizeSummaryCard(prize: MallPrize, balance: Int) {
                         color = TextSecondary,
                         modifier = Modifier.weight(1f)
                     )
-                    val remaining = balance - prize.points
+                    val remaining = balance - product.points
                     if (remaining >= 0) {
                         Text("兑换后剩余 $remaining", fontSize = 12.sp, color = Success)
                     } else {
@@ -216,11 +228,11 @@ private fun PrizeSummaryCard(prize: MallPrize, balance: Int) {
 }
 
 // ---------------------------------------------------------------------------
-// 收货信息卡片（已保存的地址，点击去设置页修改）
+// 收货信息卡片（默认地址，点击去设置页修改）
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun AddressCard(address: ShippingAddress, onEdit: () -> Unit) {
+private fun AddressCard(address: ShopAddressDto?, onEdit: () -> Unit) {
     AppCard(modifier = Modifier.clickable(onClick = onEdit)) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -242,26 +254,26 @@ private fun AddressCard(address: ShippingAddress, onEdit: () -> Unit) {
                 Text("收货信息", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
                 Spacer(Modifier.weight(1f))
                 Text(
-                    if (address.isComplete) "修改 >" else "去添加 >",
+                    if (address?.isComplete() == true) "修改 >" else "去添加 >",
                     fontSize = 12.sp,
                     color = Primary
                 )
             }
 
             Spacer(Modifier.height(12.dp))
-            if (address.isComplete) {
+            if (address != null && address.isComplete()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        address.receiver,
+                        address.receiverName,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = TextPrimary
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text(maskPhone(address.phone), fontSize = 12.sp, color = TextSecondary)
+                    Text(maskPhone(address.receiverPhone), fontSize = 12.sp, color = TextSecondary)
                 }
                 Spacer(Modifier.height(4.dp))
-                Text(address.fullAddress, fontSize = 12.sp, color = TextSecondary, lineHeight = 18.sp)
+                Text(address.detailAddress, fontSize = 12.sp, color = TextSecondary, lineHeight = 18.sp)
             } else {
                 Text(
                     "还没有收货信息",
@@ -317,7 +329,7 @@ internal fun NoticeLine(text: String) {
 
 @Composable
 private fun ExchangeBottomBar(
-    prize: MallPrize,
+    product: MallPrize,
     balance: Int,
     onSubmit: () -> Unit
 ) {
@@ -331,7 +343,7 @@ private fun ExchangeBottomBar(
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
-                        "${prize.points}",
+                        "${product.points}",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Primary,
@@ -341,7 +353,7 @@ private fun ExchangeBottomBar(
                     Text("积分", fontSize = 12.sp, color = Primary)
                 }
                 Text(
-                    if (balance >= 0) "可用 $balance 积分" else "共需 ${prize.points} 积分",
+                    if (balance >= 0) "可用 $balance 积分" else "共需 ${product.points} 积分",
                     fontSize = 10.sp,
                     color = TextHint
                 )

@@ -83,4 +83,14 @@ interface InteractionApi {
     suspend fun removeComment(
         @Query("commentId") commentId: Long
     ): Response<JsonObject>
+
+    /**
+     * 按评论 id 反查权威定位（通知跳转前校验评论是否被删、纠偏归属内容）。
+     * @return 平铺字段 targetType/targetId/rootId/rootIndex/pageNum/deleted
+     */
+    @GET("api/v1/comment/locate")
+    suspend fun locateComment(
+        @Query("commentId") commentId: Long,
+        @Query("pageSize") pageSize: Int = 20
+    ): Response<JsonObject>
 }

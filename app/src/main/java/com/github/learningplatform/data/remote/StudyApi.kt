@@ -4,6 +4,7 @@ import kotlinx.serialization.json.JsonObject
 import retrofit2.Response
 import retrofit2.http.Field
 import retrofit2.http.FormUrlEncoded
+import retrofit2.http.GET
 import retrofit2.http.POST
 
 /**
@@ -33,4 +34,8 @@ interface StudyApi {
         @Field("finished") finished: Int,
         @Field("duration") duration: Int?
     ): Response<JsonObject>
+
+    /** 学习数据总览（今日 / 连续天数 / 本周时长 / 已完成课程 / 笔记 / 待办） */
+    @GET("api/v1/learn/stats")
+    suspend fun getStudyStats(): Response<JsonObject>
 }
