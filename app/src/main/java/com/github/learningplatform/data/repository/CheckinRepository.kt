@@ -10,6 +10,7 @@ import com.github.learningplatform.core.network.payload
 import com.github.learningplatform.core.network.str
 import com.github.learningplatform.data.remote.CheckinApi
 import com.github.learningplatform.data.remote.PointsApi
+import com.github.learningplatform.data.remote.dto.AdRewardResultDto
 import com.github.learningplatform.data.remote.dto.CheckinCalendarDto
 import com.github.learningplatform.data.remote.dto.CheckinRecordDto
 import com.github.learningplatform.data.remote.dto.CheckinRulesDto
@@ -18,6 +19,7 @@ import com.github.learningplatform.data.remote.dto.DailySignResultDto
 import com.github.learningplatform.data.remote.dto.DailySignStatusDto
 import com.github.learningplatform.data.remote.dto.PageData
 import com.github.learningplatform.data.remote.dto.PointsAccountDto
+import com.github.learningplatform.domain.model.TaskCenterRules
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
@@ -111,6 +113,20 @@ class CheckinRepository @Inject constructor(
     suspend fun getAccount(): PointsAccountDto {
         val d = pointsApi.getAccount().okBody().payload()
         return PointsAccountDto(balance = d.int("balance"))
+    }
+
+    /**
+     * 看完广告后上报后端领取积分（`POST /api/v1/points/ad/reward`）。
+     * 同一广告当天只记一次、每天最多 [TaskCenterRules.AD_DAILY_LIMIT] 条；
+     * 是否入账由服务端判定，返回 [AdRewardResultDto.awardedPoints] 为 0 即未加分。
+     */
+    suspend fun reportAdReward(adId: String, seconds: Int): AdRewardResultDto {
+        val d = pointsApi.reportAdReward(adId, seconds).okBody().payload()
+        return AdRewardResultDto(
+            awardedPoints = d.int("awardedPoints"),
+            todayAdCount = d.int("todayAdCount"),
+            todayAdLimit = d.int("todayAdLimit", TaskCenterRules.AD_DAILY_LIMIT)
+        )
     }
 }
 

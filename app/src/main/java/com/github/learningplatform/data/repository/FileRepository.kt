@@ -1,6 +1,7 @@
 package com.github.learningplatform.data.repository
 
 import android.content.Context
+import android.net.Uri
 import androidx.core.graphics.scale
 import com.github.learningplatform.core.network.okBody
 import com.github.learningplatform.core.network.payload
@@ -73,6 +74,28 @@ class FileRepository @Inject constructor(
             url = data.str("url"),
             fileName = data.str("fileName").ifEmpty { file.name }
         )
+    }
+
+    /**
+     * 把相册/相机返回的 content Uri 复制成缓存目录下的临时文件，供 [upload] 读取。
+     *
+     * Multipart 上传需要真实文件路径，content:// Uri 无法直接作为文件提交，
+     * 所以先通过 ContentResolver 落一份到缓存目录，上传完由系统缓存自行回收。
+     */
+    suspend fun uriToCacheFile(uri: Uri): File = withContext(Dispatchers.IO) {
+        val mime = runCatching { context.contentResolver.getType(uri) }.getOrNull()
+        val ext = when (mime) {
+            "image/png" -> "png"
+            "image/gif" -> "gif"
+            "image/webp" -> "webp"
+            else -> "jpg"
+        }
+        val target = File(context.cacheDir, "avatar_${System.currentTimeMillis()}.$ext")
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            FileOutputStream(target).use { output -> input.copyTo(output) }
+        } ?: throw IllegalArgumentException("无法读取所选图片，请重新选择")
+        require(target.exists() && target.length() > 0L) { "所选图片内容为空" }
+        target
     }
 
     /**

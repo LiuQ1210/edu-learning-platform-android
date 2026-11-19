@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.learningplatform.ui.common.Avatar
 import com.github.learningplatform.ui.common.BackTopBar
+import com.github.learningplatform.ui.common.LoadingState
 import com.github.learningplatform.ui.theme.pageGradientBrush
 import com.github.learningplatform.ui.theme.TextHint
 import com.github.learningplatform.ui.theme.TextPrimary
@@ -56,7 +57,7 @@ fun CommunityProfileScreen(
 ) {
     val profileState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // 进入页面时拉取资料与关注/粉丝数（自己走 /user/home，他人走 follow/count、follow/status）
+    // 进入页面时拉取资料与文章（自己走 /user/home + /post/myList，他人走 /publicProfile + /post/list）
     LaunchedEffect(userId, isSelf) {
         viewModel.load(userId, isSelf)
     }
@@ -73,9 +74,12 @@ fun CommunityProfileScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // 昵称/简介：自己来自 /user/home；他人没有资料接口，用中性占位而不是写死某个人名
+    // 渲染语义以后端返回的 isSelf 为准（导航入参 self 只决定首次拉哪个接口）
+    val self = profileState.isSelf
+
+    // 昵称/简介：自己来自 /user/home，他人来自 /publicProfile；昵称仍为空时用「用户 id」兜底而不编造人名
     val userName = profileState.nickname.ifBlank {
-        if (isSelf) "未设置昵称" else "用户 $userId"
+        if (self) "未设置昵称" else "用户 $userId"
     }
     val bio = profileState.bio
     var pendingDeleteId by remember { mutableStateOf<Long?>(null) }
@@ -85,8 +89,11 @@ fun CommunityProfileScreen(
             .fillMaxSize()
             .background(pageGradientBrush())
     ) {
-        BackTopBar(title = if (isSelf) "我的主页" else "$userName 的主页", onBack = onBack)
+        BackTopBar(title = if (self) "我的主页" else "$userName 的主页", onBack = onBack)
 
+        if (profileState.isLoading) {
+            LoadingState()
+        } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
@@ -102,9 +109,9 @@ fun CommunityProfileScreen(
                         .padding(12.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        // 头像：自己用后端头像地址，空地址由 Avatar 用昵称首字母兜底；他人保持首字母占位
+                        // 头像：自己/他人都用后端头像地址，空地址由 Avatar 用昵称首字母兜底
                         Avatar(
-                            url = if (isSelf) profileState.avatar else "",
+                            url = profileState.avatar,
                             name = userName,
                             size = 56.dp
                         )
@@ -123,7 +130,7 @@ fun CommunityProfileScreen(
                             )
                         }
                         // 右上角按钮：自己显示编辑，别人显示关注/取消关注
-                        if (isSelf && onEdit != null) {
+                        if (self && onEdit != null) {
                             OutlinedButton(
                                 onClick = onEdit,
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
@@ -153,19 +160,15 @@ fun CommunityProfileScreen(
 
                     Spacer(Modifier.height(8.dp))
 
-                    // 关注/粉丝/获赞 数据（小一点，横排）
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        StatColumn(profileState.followCount.toString(), "关注")
-                        StatColumn(profileState.fansCount.toString(), "粉丝")
-                        // 获赞：只有「我自己」能从 /user/home 拿到；他人后端未提供
-                        StatColumn(
-                            if (isSelf) profileState.likeReceivedCount.toString() else "—",
-                            "获赞"
-                        )
-                    }
+                        // 关注/粉丝/获赞 数据（小一点，横排）
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            StatColumn(profileState.followCount.toString(), "关注")
+                            StatColumn(profileState.fansCount.toString(), "粉丝")
+                            StatColumn(profileState.likeReceivedCount.toString(), "获赞")
+                        }
 
                     // 失败/提示信息（后端返回的业务文案）
                     val tip = profileState.error ?: profileState.message
@@ -201,14 +204,14 @@ fun CommunityProfileScreen(
                 }
             }
 
-            // 文章：自己来自 /post/myList；他人后端无按作者查询接口，故为空
+            // 文章：自己来自 /post/myList；他人来自 /post/list?userId=
             item {
-                Text(if (isSelf) "我的文章" else "TA 的文章", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text(if (self) "我的文章" else "TA 的文章", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
             }
             if (profileState.articles.isEmpty()) {
                 item {
                     Text(
-                        text = if (isSelf) "还没有发布文章" else "暂无文章",
+                        text = if (self) "还没有发布文章" else "暂无文章",
                         fontSize = 13.sp,
                         color = TextHint,
                         modifier = Modifier
@@ -246,7 +249,7 @@ fun CommunityProfileScreen(
                         }.joinToString(" · ")
                         Text(meta, fontSize = 12.sp, color = TextSecondary)
                     }
-                    if (isSelf) {
+                    if (self) {
                         Text(
                             text = "编辑",
                             fontSize = 13.sp,
@@ -268,6 +271,7 @@ fun CommunityProfileScreen(
                     }
                 }
             }
+        }
         }
     }
 

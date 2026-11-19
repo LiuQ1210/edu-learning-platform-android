@@ -27,7 +27,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -36,62 +35,52 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.github.learningplatform.data.local.ExchangeRecord
-import com.github.learningplatform.data.local.ExchangeStatus
+import com.github.learningplatform.data.remote.dto.ShopOrderDto
 import com.github.learningplatform.ui.common.AppCard
 import com.github.learningplatform.ui.common.BackTopBar
+import com.github.learningplatform.ui.common.ErrorState
+import com.github.learningplatform.ui.common.LoadingState
+import com.github.learningplatform.ui.common.NetImage
 import com.github.learningplatform.ui.common.TagChip
 import com.github.learningplatform.ui.nav.NavIcons
-import com.github.learningplatform.ui.theme.AccentYellow
 import com.github.learningplatform.ui.theme.Primary
 import com.github.learningplatform.ui.theme.Success
 import com.github.learningplatform.ui.theme.TextHint
 import com.github.learningplatform.ui.theme.TextPrimary
 import com.github.learningplatform.ui.theme.TextSecondary
 import com.github.learningplatform.ui.theme.pageGradientBrush
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
-/**
- * 兑换记录：按时间倒序展示本机保存的兑换记录。
- * 后端暂无兑换接口，记录在兑换成功时写入 DataStore。
- */
+/** 兑换记录：按兑换时间倒序展示后端返回的我的兑换订单。 */
 @Composable
 fun ExchangeRecordsScreen(
     onGoMall: () -> Unit,
     onBack: () -> Unit,
     viewModel: ExchangeRecordsViewModel = hiltViewModel()
 ) {
-    val records by viewModel.records.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
         containerColor = Color.Transparent,
         modifier = Modifier.background(pageGradientBrush(strong = true)),
         topBar = { BackTopBar(title = "兑换记录", onBack = onBack) }
     ) { padding ->
-        if (records.isEmpty()) {
-            EmptyRecords(modifier = Modifier.padding(padding), onGoMall = onGoMall)
-        } else {
-            LazyColumn(
+        when {
+            uiState.isLoading -> LoadingState(modifier = Modifier.padding(padding))
+            uiState.error != null -> ErrorState(
+                message = uiState.error.orEmpty(),
+                modifier = Modifier.padding(padding),
+                onRetry = { viewModel.load() }
+            )
+            uiState.orders.isEmpty() -> EmptyRecords(modifier = Modifier.padding(padding), onGoMall = onGoMall)
+            else -> LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 28.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                item { RecordsSummary(records) }
+                item { RecordsSummary(uiState.orders) }
 
-                items(records, key = { it.id }) { record ->
-                    RecordCard(record)
-                }
-
-                item {
-                    Text(
-                        "记录仅保存在本机，用于前端演示",
-                        fontSize = 11.sp,
-                        color = TextHint,
-                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                        textAlign = TextAlign.Center
-                    )
+                items(uiState.orders, key = { it.orderId }) { order ->
+                    RecordCard(order)
                 }
             }
         }
@@ -103,13 +92,13 @@ fun ExchangeRecordsScreen(
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun RecordsSummary(records: List<ExchangeRecord>) {
-    val totalPoints = records.sumOf { it.points }
+private fun RecordsSummary(orders: List<ShopOrderDto>) {
+    val totalPoints = orders.sumOf { it.pointsCost }
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("共 ${records.size} 笔兑换", fontSize = 12.sp, color = TextSecondary)
+        Text("共 ${orders.size} 笔兑换", fontSize = 12.sp, color = TextSecondary)
         Spacer(Modifier.weight(1f))
         Text("累计消耗 ", fontSize = 12.sp, color = TextSecondary)
         Text(
@@ -122,8 +111,7 @@ private fun RecordsSummary(records: List<ExchangeRecord>) {
 }
 
 @Composable
-private fun RecordCard(record: ExchangeRecord) {
-    val prize = demoMallPrizes.firstOrNull { it.id == record.prizeId }
+private fun RecordCard(order: ShopOrderDto) {
     AppCard {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -133,22 +121,24 @@ private fun RecordCard(record: ExchangeRecord) {
                 modifier = Modifier
                     .size(52.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(
-                        Brush.linearGradient(
-                            listOf(
-                                prize?.visualStart ?: Primary.copy(alpha = 0.12f),
-                                prize?.visualEnd ?: Primary.copy(alpha = 0.04f)
-                            )
-                        )
-                    ),
+                    .background(MallPlaceholderEnd),
                 contentAlignment = Alignment.Center
             ) {
-                Text(record.emoji, fontSize = 24.sp)
+                if (order.coverUrl.isNotBlank()) {
+                    NetImage(url = order.coverUrl, modifier = Modifier.fillMaxSize(), radius = 14.dp)
+                } else {
+                    Icon(
+                        NavIcons.School,
+                        contentDescription = null,
+                        tint = Primary.copy(alpha = 0.35f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    record.title,
+                    order.productName,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = TextPrimary,
@@ -156,32 +146,27 @@ private fun RecordCard(record: ExchangeRecord) {
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(Modifier.height(5.dp))
-                Text(formatRecordTime(record.createdAt), fontSize = 11.sp, color = TextHint)
+                Text(order.createTime, fontSize = 11.sp, color = TextHint)
+                if (order.redemptionCode.isNotBlank()) {
+                    Spacer(Modifier.height(2.dp))
+                    Text("兑换码 ${order.redemptionCode}", fontSize = 11.sp, color = TextSecondary)
+                }
             }
             Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    "-${record.points}",
+                    "-${order.pointsCost}",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Primary,
                     lineHeight = 18.sp
                 )
                 Spacer(Modifier.height(5.dp))
-                TagChip(record.status.label, statusColor(record.status))
+                TagChip("已兑换", Success)
             }
         }
     }
 }
-
-private fun statusColor(status: ExchangeStatus): Color = when (status) {
-    ExchangeStatus.PENDING -> Primary
-    ExchangeStatus.SHIPPED -> AccentYellow
-    ExchangeStatus.COMPLETED -> Success
-}
-
-private fun formatRecordTime(createdAt: Long): String =
-    SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(createdAt))
 
 // ---------------------------------------------------------------------------
 // 空状态

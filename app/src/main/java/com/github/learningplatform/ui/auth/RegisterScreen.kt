@@ -6,14 +6,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -29,8 +31,8 @@ import com.github.learningplatform.ui.theme.TextSecondary
 /**
  * 注册页（【登录注册联调】按若依 RegisterDTO 适配）。
  *
- * 若依注册无短信/邮箱验证码通道，账号为 username（用户名/手机号），
- * 验证码为**图形验证码**（uuid + 图片，点击图片刷新）。
+ * 若依注册无短信/邮箱验证码通道，账号为 username（用户名/手机号）。
+ * 协议勾选与登录页共享同一持久化标记：任一页面勾选过，另一页默认已勾选。
  */
 @Composable
 fun RegisterScreen(
@@ -39,6 +41,8 @@ fun RegisterScreen(
     viewModel: RegisterViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var showAgreement by remember { mutableStateOf(false) }
+    var showPrivacy by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.registerSuccess) {
         if (uiState.registerSuccess) onRegisterSuccess()
@@ -93,19 +97,38 @@ fun RegisterScreen(
         )
         Spacer(Modifier.height(12.dp))
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(
+        // 协议勾选：与登录页共享同一持久化标记，未勾选不允许注册
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            AuthCheckbox(
                 checked = uiState.agreed,
-                onCheckedChange = viewModel::onAgreedChange,
-                modifier = Modifier.size(22.dp)
+                onCheckedChange = viewModel::onAgreedChange
             )
             Spacer(Modifier.width(4.dp))
-            Text("我已阅读并同意 ", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+            Text("我已阅读并同意", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
             Text(
-                text = "服务条款",
+                "《用户协议》",
                 style = MaterialTheme.typography.bodySmall,
                 color = Primary,
-                modifier = Modifier.clickable { }
+                modifier = Modifier.clickable { showAgreement = true }
+            )
+            Text("和", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+            Text(
+                "《隐私政策》",
+                style = MaterialTheme.typography.bodySmall,
+                color = Primary,
+                modifier = Modifier.clickable { showPrivacy = true }
+            )
+        }
+
+        if (uiState.agreementError != null) {
+            Text(
+                text = uiState.agreementError.orEmpty(),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(start = 18.dp, top = 4.dp)
             )
         }
 
@@ -140,5 +163,21 @@ fun RegisterScreen(
         }
 
         Spacer(Modifier.height(40.dp))
+    }
+
+    if (showAgreement) {
+        AuthInfoDialog(
+            title = "用户协议",
+            text = "欢迎使用本学习平台。使用本应用即表示您同意：\n\n1. 您应妥善保管账号，因账号泄露造成的损失由您自行承担；\n2. 平台内容仅供个人学习使用，未经许可不得商用或二次分发；\n3. 我们有权根据运营需要调整课程内容与功能，重要变更会提前通知。",
+            onDismiss = { showAgreement = false }
+        )
+    }
+
+    if (showPrivacy) {
+        AuthInfoDialog(
+            title = "隐私政策",
+            text = "我们重视您的隐私：\n\n1. 仅收集学习行为（观看历史、进度、点赞收藏）用于改进推荐与记录学习进度；\n2. 不会向第三方共享您的个人身份信息；\n3. 您可在「设置-清除缓存」中清除本地缓存数据。",
+            onDismiss = { showPrivacy = false }
+        )
     }
 }

@@ -1,6 +1,7 @@
 package com.github.learningplatform.ui.mall
 
 import androidx.compose.ui.graphics.Color
+import com.github.learningplatform.data.remote.dto.ShopProductDto
 
 /**
  * 积分商城「死数据」。
@@ -32,6 +33,10 @@ data class MallPrize(
     val emoji: String,
     /** 角标：热门 / 新品 / 限量 / 超值 */
     val tag: String?,
+    /** 商品图地址（后端 coverUrl，为空时用渐变 + emoji 占位） */
+    val coverUrl: String = "",
+    /** 商品库存（后端 stock，0 表示兑完） */
+    val stock: Int = 0,
     /** 商品图占位渐变色 */
     val visualStart: Color,
     val visualEnd: Color
@@ -195,4 +200,24 @@ val demoMallPrizes: List<MallPrize> = listOf(
         visualStart = Color(0xFFEEE7FF),
         visualEnd = Color(0xFFF9F6FF)
     )
+)
+
+/** 后端商品无 emoji / 原价 / 角标 / 渐变字段，统一用这套占位色兜底 */
+internal val MallPlaceholderStart = Color(0xFFE3ECFF)
+internal val MallPlaceholderEnd = Color(0xFFF7FAFF)
+
+/** 后端商品 DTO → 商城展示模型 */
+internal fun ShopProductDto.toMallPrize(): MallPrize = MallPrize(
+    id = productId.toString(),
+    title = productName,
+    categoryKey = categoryId.toString(),
+    categoryLabel = categoryName,
+    points = pointsPrice,
+    originalPrice = null,
+    emoji = "",
+    tag = null,
+    coverUrl = coverUrl,
+    stock = stock,
+    visualStart = MallPlaceholderStart,
+    visualEnd = MallPlaceholderEnd
 )

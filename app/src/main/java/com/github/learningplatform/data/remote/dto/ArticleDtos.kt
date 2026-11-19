@@ -64,12 +64,21 @@ data class ArticleDetailDto(
     val publishTime: String = ""
 )
 
-/** 7.8 标签 */
+/** 7.8 标签（复用为话题列表项：后端 topicId/topicName/postCount） */
 @Serializable
 data class ArticleTagDto(
     val tagId: Long = 0,
     val name: String = "",
     val useCount: Int = 0
+)
+
+/** 话题详情（后端 GET /api/v1/topic/{topicId}） */
+@Serializable
+data class TopicDetailDto(
+    val topicId: Long = 0,
+    val topicName: String = "",
+    val topicDesc: String = "",
+    val postCount: Int = 0
 )
 
 /** 7.3 发布文章 */
@@ -101,7 +110,9 @@ data class PublishArticleRequest(
     /** 后端用 Convert.toLong 解析，传字符串可避免类型不匹配 */
     val categoryId: String,
     /** 正文（后端按 Markdown/HTML 原样存，长度上限 65535） */
-    val content: String
+    val content: String,
+    /** 话题ID，逗号分隔（可选，最多 5 个） */
+    val topicIds: String? = null
 )
 
 /** 7.4 编辑文章 */

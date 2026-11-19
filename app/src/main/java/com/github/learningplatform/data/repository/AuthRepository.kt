@@ -4,6 +4,7 @@ import android.util.Base64
 import com.github.learningplatform.core.network.ApiException
 import com.github.learningplatform.core.network.AuthInterceptor
 import com.github.learningplatform.core.network.okBody
+import com.github.learningplatform.data.local.TaskCenterStore
 import com.github.learningplatform.data.local.UserPreferences
 import com.github.learningplatform.data.remote.AuthApi
 import com.github.learningplatform.domain.model.User
@@ -23,7 +24,8 @@ import javax.inject.Singleton
 class AuthRepository @Inject constructor(
     private val authApi: AuthApi,
     private val userPreferences: UserPreferences,
-    private val authInterceptor: AuthInterceptor
+    private val authInterceptor: AuthInterceptor,
+    private val taskCenterStore: TaskCenterStore
 ) {
 
     /** 图形验证码：下载 JPEG 字节流，转 base64 返回给 UI */
@@ -34,8 +36,13 @@ class AuthRepository @Inject constructor(
         return Base64.encodeToString(bytes, Base64.NO_WRAP)
     }
 
-    /** 手机号密码登录（v1，返回 token） */
-    suspend fun login(phone: String, password: String): User {
+    /**
+     * 手机号密码登录（v1，返回 token）。
+     *
+     * @param rememberMe true=持久化登录态到 DataStore，下次冷启动自动登录；
+     *                  false=token 只放内存拦截器，本次会话有效，进程结束后需重新登录。
+     */
+    suspend fun login(phone: String, password: String, rememberMe: Boolean): User {
         val resp = authApi.login(phone, password)
         if (!resp.isSuccessful) throw ApiException(resp.code(), "HTTP错误: ${resp.code()}")
         val body = resp.body() ?: throw ApiException(-1, "响应体为空")
@@ -46,29 +53,39 @@ class AuthRepository @Inject constructor(
         val userName = body.userName.orEmpty().ifBlank { phone }
         val phoneNumber = body.phonenumber.orEmpty().ifBlank { phone }
 
-        // 存 token 到本地内存 + DataStore
+        // token 先放内存，保证本次会话的请求都带鉴权
         authInterceptor.setToken(token)
-        userPreferences.saveLoginInfo(
-            token = token,
-            userId = userId,
-            userName = userName,
-            phone = phoneNumber,
-            nickname = userName
-        )
+        // 仅「记住我」才把登录态写入 DataStore；不记住时不落盘，冷启动回到登录页。
+        // 同时清掉上一次可能残留的持久化登录资料，避免冷启动读到旧账号。
+        if (rememberMe) {
+            userPreferences.saveLoginInfo(
+                token = token,
+                userId = userId,
+                userName = userName,
+                phone = phoneNumber,
+                nickname = userName
+            )
+        } else {
+            // 清掉上一次可能残留的登录态资料，但保留手机号用于下次回填历史账号
+            userPreferences.clearLoginInfo()
+            userPreferences.saveLastPhone(phoneNumber)
+        }
 
         return User(id = body.userId ?: 0, username = userName, nickname = userName, phone = phoneNumber)
     }
 
-    /** 手机号注册（v1） */
+    /** 手机号注册（v1）。注册成功后回填手机号到登录页，密码不落盘 */
     suspend fun register(phone: String, password: String, confirmPassword: String): User {
         val resp = authApi.register(phone, password, confirmPassword)
         if (!resp.isSuccessful) throw ApiException(resp.code(), "HTTP错误: ${resp.code()}")
         val body = resp.body() ?: throw ApiException(-1, "响应体为空")
         if (body.code != 0) throw ApiException(body.code, body.msg.ifBlank { "注册失败" })
+        // 记住本次注册的手机号：注册成功回登录页后自动回填，无需重复输入；密码不保存
+        userPreferences.saveLastPhone(phone)
         return User(id = 0, username = phone, nickname = phone, phone = phone)
     }
 
-    /** 登出：调后端吊销 token，清空本地 */
+    /** 登出：调后端吊销 token，清空本地登录态；保留最近手机号用于下次回填 */
     suspend fun logout() {
         try {
             authApi.logout()
@@ -76,7 +93,8 @@ class AuthRepository @Inject constructor(
             // 后端吊销失败也不影响本地退出
         }
         authInterceptor.clearToken()
-        userPreferences.clear()
+        userPreferences.clearOnLogout()
+        taskCenterStore.clear()
     }
 
     /**

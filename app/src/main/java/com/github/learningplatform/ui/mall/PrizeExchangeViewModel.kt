@@ -2,44 +2,51 @@ package com.github.learningplatform.ui.mall
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.github.learningplatform.data.local.ExchangeRecord
-import com.github.learningplatform.data.local.ExchangeStatus
-import com.github.learningplatform.data.local.ShippingAddress
-import com.github.learningplatform.data.local.UserPreferences
+import com.github.learningplatform.data.remote.dto.ExchangeResultDto
+import com.github.learningplatform.data.remote.dto.ShopAddressDto
+import com.github.learningplatform.data.repository.ShopRepository
+import com.github.learningplatform.ui.readableMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.stateIn
-import java.util.UUID
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * 兑换确认页只读取收货信息；修改入口跳到「设置 → 收货信息」。
- * 用 StateFlow 订阅 DataStore，从设置页返回时地址卡片会自动刷新。
- * 确认兑换时把记录写入本机，供兑换记录页展示。
- */
+data class ExchangeUiState(
+    val isLoading: Boolean = false,
+    val error: String? = null,
+    val product: MallPrize? = null,
+    val address: ShopAddressDto? = null
+)
+
+/** 兑换确认页：商品详情 + 默认收货地址来自后端，确认兑换调用 `/shop/exchange`。 */
 @HiltViewModel
 class PrizeExchangeViewModel @Inject constructor(
-    private val userPreferences: UserPreferences
+    private val shopRepository: ShopRepository
 ) : ViewModel() {
 
-    val shippingAddress: StateFlow<ShippingAddress> = userPreferences.shippingAddress.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = ShippingAddress()
-    )
+    private val _uiState = MutableStateFlow(ExchangeUiState())
+    val uiState: StateFlow<ExchangeUiState> = _uiState.asStateFlow()
 
-    suspend fun recordExchange(prize: MallPrize) {
-        userPreferences.addExchangeRecord(
-            ExchangeRecord(
-                id = UUID.randomUUID().toString(),
-                prizeId = prize.id,
-                title = prize.title,
-                emoji = prize.emoji,
-                points = prize.points,
-                createdAt = System.currentTimeMillis(),
-                status = ExchangeStatus.forCategory(prize.categoryKey)
-            )
-        )
+    fun load(productId: String) {
+        viewModelScope.launch {
+            _uiState.value = ExchangeUiState(isLoading = true)
+            try {
+                val product = shopRepository.getProductDetail(productId.toLong()).toMallPrize()
+                val addresses = runCatching { shopRepository.getAddresses() }.getOrDefault(emptyList())
+                val address = addresses.firstOrNull { it.isDefault } ?: addresses.firstOrNull()
+                _uiState.value = ExchangeUiState(isLoading = false, product = product, address = address)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                _uiState.value = ExchangeUiState(isLoading = false, error = e.readableMessage())
+            }
+        }
     }
+
+    /** 提交兑换，返回兑换码、消耗积分与兑换后余额 */
+    suspend fun exchange(productId: String): ExchangeResultDto =
+        shopRepository.exchange(productId.toLong())
 }

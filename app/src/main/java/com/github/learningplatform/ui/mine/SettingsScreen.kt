@@ -56,6 +56,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onOpenChangePassword: () -> Unit,
     onOpenShippingAddress: () -> Unit,
+    onOpenAgreement: (String) -> Unit,
     onLoggedOut: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
@@ -63,9 +64,6 @@ fun SettingsScreen(
     val context = LocalContext.current
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
-    var showAgreement by remember { mutableStateOf(false) }
-    var showPrivacy by remember { mutableStateOf(false) }
-    var showAbout by remember { mutableStateOf(false) }
     var showClearCache by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.loggedOut) {
@@ -119,11 +117,11 @@ fun SettingsScreen(
             ) {
                 SettingRow(NavIcons.Inbox, "清除缓存", trailing = uiState.cacheSizeLabel, onClick = { showClearCache = true })
                 Divider()
-                SettingRow(NavIcons.Note, "用户协议", onClick = { showAgreement = true })
+                SettingRow(NavIcons.Note, "用户协议", onClick = { onOpenAgreement(AgreementType.USER_AGREEMENT) })
                 Divider()
-                SettingRow(NavIcons.Bookmark, "隐私政策", onClick = { showPrivacy = true })
+                SettingRow(NavIcons.Bookmark, "隐私政策", onClick = { onOpenAgreement(AgreementType.PRIVACY_POLICY) })
                 Divider()
-                SettingRow(NavIcons.Community, "关于我们", trailing = "v" + BuildConfig.VERSION_NAME, onClick = { showAbout = true })
+                SettingRow(NavIcons.Community, "关于我们", trailing = "v" + BuildConfig.VERSION_NAME, onClick = { onOpenAgreement(AgreementType.ABOUT_US) })
             }
 
             Spacer(Modifier.height(24.dp))
@@ -204,30 +202,6 @@ fun SettingsScreen(
         )
     }
 
-    if (showAgreement) {
-        InfoDialog(
-            title = "用户协议",
-            text = "欢迎使用本学习平台。使用本应用即表示您同意：\n\n1. 您应妥善保管账号，因账号泄露造成的损失由您自行承担；\n2. 平台内容仅供个人学习使用，未经许可不得商用或二次分发；\n3. 我们有权根据运营需要调整课程内容与功能，重要变更会提前通知。",
-            onDismiss = { showAgreement = false }
-        )
-    }
-
-    if (showPrivacy) {
-        InfoDialog(
-            title = "隐私政策",
-            text = "我们重视您的隐私：\n\n1. 仅收集学习行为（观看历史、进度、点赞收藏）用于改进推荐与记录学习进度；\n2. 不会向第三方共享您的个人身份信息；\n3. 您可在「设置-清除缓存」中清除本地缓存数据。",
-            onDismiss = { showPrivacy = false }
-        )
-    }
-
-    if (showAbout) {
-        InfoDialog(
-            title = "关于我们",
-            text = "学习平台 v" + BuildConfig.VERSION_NAME + "\n\n面向学习者的综合学习社区，提供课程、文章与短视频学习内容。",
-            onDismiss = { showAbout = false }
-        )
-    }
-
     if (showClearCache) {
         AlertDialog(
             onDismissRequest = { showClearCache = false },
@@ -246,17 +220,6 @@ fun SettingsScreen(
     }
 }
 
-@Composable
-private fun InfoDialog(title: String, text: String, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = { Text(text, style = MaterialTheme.typography.bodyMedium) },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("知道了") }
-        }
-    )
-}
 @Composable
 private fun ThemeOption(label: String, selected: Boolean, onClick: () -> Unit) {
     Row(

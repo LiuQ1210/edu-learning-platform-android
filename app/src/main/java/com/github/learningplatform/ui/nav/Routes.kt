@@ -50,6 +50,7 @@ object Routes {
     const val SETTINGS = "settings"
     const val SHIPPING_ADDRESS = "shipping_address"
     const val CHANGE_PASSWORD = "change_password"
+    const val AGREEMENT = "agreement/{type}"
     const val FOLLOWING = "following"
     const val FANS = "fans"
 
@@ -63,7 +64,7 @@ object Routes {
     // ---- 积分商城（全屏）----
     const val POINTS_MALL = "points_mall?balance={balance}&todayPoints={todayPoints}"
     const val PRIZE_EXCHANGE = "prize_exchange/{prizeId}?balance={balance}"
-    const val PRIZE_EXCHANGE_SUCCESS = "prize_exchange_success/{prizeId}?remaining={remaining}"
+    const val PRIZE_EXCHANGE_SUCCESS = "prize_exchange_success/{prizeId}?remaining={remaining}&code={code}"
     const val EXCHANGE_RECORDS = "exchange_records"
 
     // ---- 播放（全屏）----
@@ -78,7 +79,7 @@ object Routes {
         COURSE_DETAIL, SEARCH, CATEGORY_ALL,
         ARTICLE_DETAIL, ARTICLE_PUBLISH, ARTICLE_EDIT, TAG_ARTICLES, BLOG_HOME,
         EDIT_PROFILE, MY_COURSES, MY_FAVORITES, MY_LIKES, MY_DOWNLOADS, WATCH_HISTORY,
-        NOTES, NOTE_DETAIL, TODOS, SETTINGS, CHANGE_PASSWORD, FOLLOWING, FANS
+        NOTES, NOTE_DETAIL, TODOS, SETTINGS, CHANGE_PASSWORD, FOLLOWING, FANS, AGREEMENT
     )
 
     /**
@@ -94,6 +95,9 @@ object Routes {
     fun noteDetail(noteId: Long) = "note_detail/$noteId"
     fun tagArticles(tagId: Long) = "tag_articles/$tagId"
     fun blogHome(userId: Long, self: Boolean = false) = "blog_home/$userId?self=$self"
+
+    /** 协议详情：type 取 user_agreement / privacy_policy / about_us */
+    fun agreement(type: String) = "agreement/$type"
     fun player(courseId: Long, lessonId: Long? = null) =
         "player/$courseId?lessonId=${lessonId ?: 0L}"
 
@@ -105,7 +109,7 @@ object Routes {
     fun prizeExchange(prizeId: String, balance: Int) =
         "prize_exchange/$prizeId?balance=$balance"
 
-    /** 兑换成功：携带奖品 id 与兑换后剩余积分（-1 表示余额未知/已扣光），仅供结果展示 */
-    fun prizeExchangeSuccess(prizeId: String, remaining: Int) =
-        "prize_exchange_success/$prizeId?remaining=$remaining"
+    /** 兑换成功：携带奖品 id、兑换后剩余积分与兑换码（-1 表示余额未知/已扣光），仅供结果展示 */
+    fun prizeExchangeSuccess(prizeId: String, remaining: Int, code: String = "") =
+        "prize_exchange_success/$prizeId?remaining=$remaining&code=$code"
 }

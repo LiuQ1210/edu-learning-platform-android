@@ -3,12 +3,14 @@ package com.github.learningplatform.ui.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.learningplatform.core.network.ApiException
+import com.github.learningplatform.data.local.UserPreferences
 import com.github.learningplatform.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -20,16 +22,34 @@ data class LoginUiState(
     val passwordError: String? = null,
     val error: String? = null,
     val loginSuccess: Boolean = false,
-    val rememberMe: Boolean = false
+    val rememberMe: Boolean = false,
+    /** 是否已同意《用户协议》和《隐私政策》；未勾选不允许登录 */
+    val agreed: Boolean = false,
+    val agreementError: String? = null
 )
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val userPreferences: UserPreferences
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            // 回填最近登录的手机号作为历史账号；密码从不落盘，始终留空需重新输入
+            val lastPhone = runCatching { userPreferences.phone.first() }.getOrDefault("")
+            _uiState.value = _uiState.value.copy(username = lastPhone)
+        }
+        // 协议同意标记与注册页共享：持续观察，任一页面勾选/取消后两页状态实时一致
+        viewModelScope.launch {
+            userPreferences.agreementAgreed.collect { agreed ->
+                _uiState.value = _uiState.value.copy(agreed = agreed)
+            }
+        }
+    }
 
     fun onUsernameChange(value: String) {
         _uiState.value = _uiState.value.copy(username = value, usernameError = null, error = null)
@@ -41,6 +61,11 @@ class LoginViewModel @Inject constructor(
 
     fun onRememberMeChange(value: Boolean) {
         _uiState.value = _uiState.value.copy(rememberMe = value)
+    }
+
+    fun onAgreedChange(value: Boolean) {
+        _uiState.value = _uiState.value.copy(agreed = value, agreementError = null)
+        viewModelScope.launch { runCatching { userPreferences.setAgreed(value) } }
     }
 
     /** 找回密码（暂未开放） */
@@ -60,11 +85,15 @@ class LoginViewModel @Inject constructor(
             _uiState.value = state.copy(passwordError = "请输入密码")
             return
         }
+        if (!state.agreed) {
+            _uiState.value = state.copy(agreementError = "请先阅读并同意《用户协议》和《隐私政策》")
+            return
+        }
 
         viewModelScope.launch {
             _uiState.value = state.copy(isLoading = true, error = null)
             try {
-                authRepository.login(state.username, state.password)
+                authRepository.login(state.username, state.password, state.rememberMe)
                 _uiState.value = _uiState.value.copy(isLoading = false, loginSuccess = true)
             } catch (e: CancellationException) {
                 throw e

@@ -6,17 +6,20 @@ import kotlinx.serialization.Serializable
 // 用户中心模块 DTO（接口文档 v3.0 第三章，12 个接口）
 // ---------------------------------------------------------------------------
 
-/** 3.3 他人博客主页 */
+/** 他人博客主页（后端 GET /api/v1/user/publicProfile + 文章列表） */
 @Serializable
 data class BlogHomeDto(
     val userId: Long,
     val nickname: String = "",
     val avatar: String = "",
     val bio: String = "",
+    val sexLabel: String = "",
     val articleCount: Int = 0,
-    val totalViewCount: Int = 0,
-    val totalLikeCount: Int = 0,
-    val totalFavoriteCount: Int = 0,
+    val followCount: Int = 0,
+    val fansCount: Int = 0,
+    val likeReceivedCount: Int = 0,
+    val isSelf: Boolean = false,
+    val isFollowing: Boolean = false,
     val articles: PageData<ArticleDto> = PageData()
 )
 

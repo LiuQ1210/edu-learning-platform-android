@@ -18,10 +18,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,18 +49,40 @@ fun NotificationsScreen(
     onBack: () -> Unit,
     onOpenCourse: (Long, Long?) -> Unit,
     onOpenArticle: (Long, Long?) -> Unit,
-    onOpenVideo: (Long?) -> Unit,
+    onOpenVideo: (Long, Long?) -> Unit,
     onOpenUser: (Long) -> Unit,
     onOpenTodos: () -> Unit,
     viewModel: NotificationsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val message by viewModel.message.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    Column(
+    // 导航事件：VM 完成 locate 校验/纠偏后下发，这里按归属类型调用对应跳转回调
+    LaunchedEffect(viewModel) {
+        viewModel.navEvent.collect { nav ->
+            when (nav.targetType) {
+                "1" -> onOpenArticle(nav.targetId, nav.commentId)
+                "2" -> onOpenCourse(nav.targetId, null)
+                "3" -> onOpenVideo(nav.targetId, nav.commentId)
+            }
+        }
+    }
+
+    // 评论已删除等一次性提示
+    LaunchedEffect(message) {
+        message?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.consumeMessage()
+        }
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(pageGradientBrush())
     ) {
+        Column(modifier = Modifier.fillMaxSize()) {
         BackTopBar(title = "通知", onBack = onBack)
 
         // 四个 Tab：点赞、评论、关注、收藏
@@ -96,16 +122,15 @@ fun NotificationsScreen(
                     items(uiState.items) { item ->
                         NotificationRow(
                             item = item,
-                            onClick = {
+                            // 点头像：进入触发者主页
+                            onClickAvatar = {
                                 viewModel.markRead(item.id)
-                                when (item.category) {
-                                    "follow" -> if (item.fromUserId != 0L) onOpenUser(item.fromUserId)
-                                    else -> when (item.targetType) {
-                                        "1" -> if (item.targetId != 0L) onOpenArticle(item.targetId, null)
-                                        "2" -> if (item.targetId != 0L) onOpenCourse(item.targetId, null)
-                                        "3" -> onOpenVideo(item.targetId)
-                                    }
-                                }
+                                if (item.fromUserId != 0L) onOpenUser(item.fromUserId)
+                            },
+                            // 点内容区：由 VM 先 locate 校验/纠偏，再下发导航事件；关注类不跳转
+                            onClickContent = {
+                                viewModel.markRead(item.id)
+                                viewModel.onNotificationClick(item)
                             }
                         )
                     }
@@ -115,20 +140,33 @@ fun NotificationsScreen(
                 }
             }
         }
+        }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }
 
 @Composable
-private fun NotificationRow(item: NotificationUiItem, onClick: () -> Unit = {}) {
+private fun NotificationRow(
+    item: NotificationUiItem,
+    onClickAvatar: () -> Unit = {},
+    onClickContent: () -> Unit = {}
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 触发者头像
-        Box {
+        // 触发者头像：点击进入其主页
+        Box(
+            modifier = Modifier
+                .clip(CircleShape)
+                .clickable(onClick = onClickAvatar)
+        ) {
             Avatar(url = item.fromUserAvatar, name = item.fromUserName.ifBlank { "用户" }, size = 40.dp)
             if (!item.read) {
                 Box(
@@ -141,7 +179,11 @@ private fun NotificationRow(item: NotificationUiItem, onClick: () -> Unit = {}) 
             }
         }
         Spacer(modifier = Modifier.width(12.dp))
-        Column {
+        // 内容区：点击进入具体内容
+        Column(modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClickContent)
+        ) {
             Text(
                 text = item.title,
                 style = MaterialTheme.typography.bodyLarge,

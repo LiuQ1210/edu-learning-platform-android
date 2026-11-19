@@ -1,5 +1,6 @@
 package com.github.learningplatform.data.repository
 
+import com.github.learningplatform.core.network.bool
 import com.github.learningplatform.core.network.int
 import com.github.learningplatform.core.network.long
 import com.github.learningplatform.core.network.okBody
@@ -29,7 +30,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class UserRepository @Inject constructor(
-    private val userApi: UserApi
+    private val userApi: UserApi,
+    private val articleRepository: ArticleRepository
 ) {
 
     suspend fun getProfile(): UserProfileDto {
@@ -85,19 +87,32 @@ class UserRepository @Inject constructor(
         ).okBody()
     }
 
-    /** 他人博客主页：后端未提供，使用本地样例 */
-    suspend fun getBlogHome(userId: Long, pageNum: Int = 1, pageSize: Int = 20): BlogHomeDto =
-        BlogHomeDto(
-            userId = userId,
-            nickname = "张三",
-            avatar = "",
-            bio = "热爱学习",
-            articleCount = DemoData.articles.size,
-            totalViewCount = 15600,
-            totalLikeCount = 890,
-            totalFavoriteCount = 230,
-            articles = DemoData.articlePage(1, 20)
+    /**
+     * 他人主页：`GET /api/v1/user/publicProfile?userId=` 取公开资料，
+     * 文章列表复用 `GET /api/v1/post/list?userId=xxx`。
+     */
+    suspend fun getBlogHome(userId: Long, pageNum: Int = 1, pageSize: Int = 20): BlogHomeDto {
+        val profile = userApi.getPublicProfile(userId).okBody().payload()
+        val articles = articleRepository.getArticles(
+            pageNum = pageNum,
+            pageSize = pageSize,
+            authorId = userId
         )
+        return BlogHomeDto(
+            userId = profile.long("userId"),
+            nickname = profile.str("userName"),
+            avatar = profile.str("avatar"),
+            bio = profile.str("bio"),
+            sexLabel = profile.str("sexLabel"),
+            articleCount = articles.total.toInt(),
+            followCount = profile.int("followCount"),
+            fansCount = profile.int("fansCount"),
+            likeReceivedCount = profile.int("likeReceivedCount"),
+            isSelf = profile.bool("isSelf"),
+            isFollowing = profile.bool("isFollowing"),
+            articles = articles
+        )
+    }
 
     /** 我的课程：后端未提供，使用本地样例 */
     suspend fun getMyCourses(

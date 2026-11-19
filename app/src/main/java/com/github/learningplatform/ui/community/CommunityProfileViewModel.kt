@@ -17,7 +17,7 @@ import javax.inject.Inject
 
 data class CommunityProfileUiState(
     val isLoading: Boolean = false,
-    /** 昵称（自己来自 /user/home；他人后端无资料接口，页面用中性占位） */
+    /** 昵称（自己来自 /user/home；他人来自 /user/publicProfile） */
     val nickname: String = "",
     val avatar: String = "",
     val bio: String = "",
@@ -26,11 +26,13 @@ data class CommunityProfileUiState(
     val followCount: Int = 0,
     /** 该用户有多少粉丝 */
     val fansCount: Int = 0,
-    /** 获赞总数：只有「我自己」能拿到（/user/home），他人后端未提供 */
+    /** 获赞总数：自己来自 /user/home，他人来自 /user/publicProfile */
     val likeReceivedCount: Int = 0,
     val isFollowed: Boolean = false,
+    /** 后端判定是否为当前登录用户本人（publicProfile.isSelf），用于校正按钮/标题语义 */
+    val isSelf: Boolean = false,
     val submitting: Boolean = false,
-    /** 我的文章：来自 /api/v1/post/myList（他人主页后端无按作者查询接口，恒为空） */
+    /** 文章：自己来自 /post/myList，他人来自 /post/list?userId= */
     val articles: List<ArticleDto> = emptyList(),
     val message: String? = null,
     val error: String? = null
@@ -42,12 +44,9 @@ data class CommunityProfileUiState(
  * 后端能提供的：
  *  - 自己：`/api/v1/user/home` → 昵称/头像/简介/性别 + followCount / fansCount / likeReceivedCount
  *          `/api/v1/post/myList` → 我发布的文章
- *  - 他人：`/api/v1/follow/count?userId=` → followCount / fansCount
- *          `/api/v1/follow/status?userIds=` → 是否已关注
+ *  - 他人：`/api/v1/user/publicProfile?userId=` → 昵称/头像/简介/性别/获赞/是否已关注
+ *          `/api/v1/post/list?userId=` → 该作者已发布文章
  *          `/api/v1/follow/add|cancel?targetUserId=` → 关注/取关
- *
- * 后端**没有**「按 userId 查他人资料/文章/获赞」的接口（post/list 不支持 authorId），
- * 所以他人主页的昵称/简介/性别用中性占位（不编造人名），文章列表为空。
  */
 @HiltViewModel
 class CommunityProfileViewModel @Inject constructor(
@@ -67,7 +66,9 @@ class CommunityProfileViewModel @Inject constructor(
         loadedSelf = isSelf
 
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            // 切换到新用户时先清空上一用户残留（昵称/头像/简介/文章/计数/关注态），
+            // 避免接口返回前页面闪现旧主页数据；submitting/message 一并复位
+            _uiState.value = CommunityProfileUiState(isLoading = true)
             try {
                 if (isSelf) {
                     val home = userRepository.getUserHome()
@@ -87,16 +88,25 @@ class CommunityProfileViewModel @Inject constructor(
                         fansCount = home.fansCount,
                         likeReceivedCount = home.likeReceivedCount,
                         isFollowed = false,
+                        isSelf = true,
                         articles = articles
                     )
                 } else {
-                    val counts = followRepository.getFollowCount(userId)
-                    val followed = followRepository.getFollowStatus(listOf(userId))
+                    // 他人：publicProfile?userId= 取公开资料（昵称/头像/简介/性别/获赞/关注状态），
+                    // 文章列表复用 post/list?userId= 过滤该作者已发布文章。
+                    val blog = userRepository.getBlogHome(userId)
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        followCount = counts["followCount"] ?: 0,
-                        fansCount = counts["fansCount"] ?: 0,
-                        isFollowed = followed.contains(userId)
+                        nickname = blog.nickname,
+                        avatar = blog.avatar,
+                        bio = blog.bio,
+                        sexLabel = blog.sexLabel,
+                        followCount = blog.followCount,
+                        fansCount = blog.fansCount,
+                        likeReceivedCount = blog.likeReceivedCount,
+                        isFollowed = blog.isFollowing,
+                        isSelf = blog.isSelf,
+                        articles = blog.articles.list
                     )
                 }
             } catch (e: CancellationException) {

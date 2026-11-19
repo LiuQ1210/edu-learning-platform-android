@@ -2,24 +2,26 @@ package com.github.learningplatform.ui.mine
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.github.learningplatform.data.local.ShippingAddress
-import com.github.learningplatform.data.local.UserPreferences
+import com.github.learningplatform.data.repository.ShopRepository
+import com.github.learningplatform.ui.readableMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class ShippingAddressUiState(
+    val addressId: Long? = null,
     val receiver: String = "",
     val phone: String = "",
     val region: String = "",
     val detail: String = "",
     /** 点过保存后才展示校验错误，避免一进页面就飘红 */
     val attempted: Boolean = false,
-    val saved: Boolean = false
+    val saved: Boolean = false,
+    val errorMessage: String? = null
 ) {
     val phoneValid: Boolean
         get() = phone.matches(Regex("^1[3-9]\\d{9}$"))
@@ -50,22 +52,28 @@ data class ShippingAddressUiState(
 
 @HiltViewModel
 class ShippingAddressViewModel @Inject constructor(
-    private val userPreferences: UserPreferences
+    private val shopRepository: ShopRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ShippingAddressUiState())
     val uiState: StateFlow<ShippingAddressUiState> = _uiState.asStateFlow()
 
-    init {
-        // 回填已保存的收货信息，便于用户只改其中一项
+    init { load() }
+
+    private fun load() {
         viewModelScope.launch {
-            val saved = userPreferences.shippingAddress.first()
-            _uiState.value = _uiState.value.copy(
-                receiver = saved.receiver,
-                phone = saved.phone,
-                region = saved.region,
-                detail = saved.detail
-            )
+            val addresses = runCatching { shopRepository.getAddresses() }.getOrDefault(emptyList())
+            val address = addresses.firstOrNull { it.isDefault } ?: addresses.firstOrNull()
+            address?.let {
+                _uiState.value = _uiState.value.copy(
+                    addressId = it.addressId,
+                    receiver = it.receiverName,
+                    phone = it.receiverPhone,
+                    // 后端地址为单字段，回填到详细地址框，地区框留空
+                    region = "",
+                    detail = it.detailAddress
+                )
+            }
         }
     }
 
@@ -86,20 +94,28 @@ class ShippingAddressViewModel @Inject constructor(
     }
 
     fun save() {
-        val state = _uiState.value.copy(attempted = true)
+        val state = _uiState.value.copy(attempted = true, errorMessage = null)
         _uiState.value = state
         if (!state.isValid) return
 
         viewModelScope.launch {
-            userPreferences.saveShippingAddress(
-                ShippingAddress(
-                    receiver = state.receiver,
-                    phone = state.phone,
-                    region = state.region,
-                    detail = state.detail
+            try {
+                val fullAddress = listOf(state.region, state.detail)
+                    .filter { it.isNotBlank() }
+                    .joinToString(" ")
+                shopRepository.saveAddress(
+                    addressId = state.addressId,
+                    receiverName = state.receiver,
+                    receiverPhone = state.phone,
+                    detailAddress = fullAddress,
+                    isDefault = true
                 )
-            )
-            _uiState.value = _uiState.value.copy(saved = true)
+                _uiState.value = _uiState.value.copy(saved = true)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                _uiState.value = _uiState.value.copy(errorMessage = e.readableMessage())
+            }
         }
     }
 }

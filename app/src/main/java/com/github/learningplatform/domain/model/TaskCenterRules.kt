@@ -38,6 +38,9 @@ object TaskCenterRules {
     /** 广告每天最多计分条数 */
     const val AD_DAILY_LIMIT = 3
 
+    /** 广告完整观看所需秒数（对齐后端 `/points/ad/reward` 最小 15 秒） */
+    const val AD_WATCH_SECONDS = 15
+
     /**
      * 已签到 N 天后，这次签到属于本周期第几天（1..7）。
      *
