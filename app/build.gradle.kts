@@ -29,27 +29,15 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // 后端 BaseUrl。
+        // 后端 BaseUrl：默认指向当前部署的演示服务器。
         //
-        // 这里用 127.0.0.1 + adb reverse，而不是模拟器常用的 10.0.2.2，原因：
-        //   Android 16（API 36+）起有「本地网络访问限制（Local Network Access）」，
-        //   应用默认访问不到本地网段，10.0.2.2 正好落在被拦的网段里。
-        //   本机实测（同一台模拟器、同一端口）：
-        //     shell 用户连 10.0.2.2:80 -> 通
-        //     App  用户连 10.0.2.2:80 -> 超时
-        //   回环地址 127.0.0.1 不受该限制，所以用 adb reverse 把设备回环转发到宿主机：
-        //
-        //     adb reverse tcp:80 tcp:80
-        //
-        //   设备重启或 adb 重连后需重新执行一次；`adb reverse --list` 查看是否生效。
-        //
-        // 后端 application.yml 是 server.port=80、context-path=/，所以转发 80 端口。
-        // 需要换地址时不用改代码：
-        //   ./gradlew :app:assembleDebug -PbaseUrl=http://127.0.0.1:8080/
-        //   ./gradlew :app:assembleDebug -PbaseUrl=http://192.168.1.10:80/   (真机走局域网 IP)
+        // 本机联调时用 -PbaseUrl 覆盖，不需要改代码：
+        //   ./gradlew :app:assembleDebug -PbaseUrl=http://127.0.0.1:80/
+        // 本机后端是 server.port=80、context-path=/；模拟器走 adb reverse tcp:80 tcp:80
+        // （Android 16 起 10.0.2.2 会被「本地网络访问限制」拦截，回环地址不受影响）。
         // Retrofit 要求 baseUrl 必须以 / 结尾，这里统一补齐。
         val rawBaseUrl = (project.findProperty("baseUrl") as String?)?.trim()
-            ?.takeIf { it.isNotEmpty() } ?: "http://127.0.0.1:80/"
+            ?.takeIf { it.isNotEmpty() } ?: "http://192.168.100.3:1000/"
         val baseUrl = if (rawBaseUrl.endsWith("/")) rawBaseUrl else "$rawBaseUrl/"
         buildConfigField("String", "BASE_URL", "\"$baseUrl\"")
 
@@ -57,6 +45,10 @@ android {
         buildConfigField("String", "TAKU_APP_KEY", "\"${localProperties.getProperty("taku.appKey").orEmpty()}\"")
         buildConfigField("String", "TAKU_PLACEMENT_ID", "\"${localProperties.getProperty("taku.placementId").orEmpty()}\"")
         buildConfigField("String", "TAKU_SPLASH_PLACEMENT_ID", "\"${localProperties.getProperty("taku.splashPlacementId").orEmpty()}\"")
+        buildConfigField("String", "TAKU_NATIVE_PLACEMENT_ID", "\"${localProperties.getProperty("taku.nativePlacementId").orEmpty()}\"")
+        buildConfigField("String", "TAKU_HOME_NATIVE_PLACEMENT_ID", "\"${localProperties.getProperty("taku.homeNativePlacementId").orEmpty()}\"")
+        buildConfigField("String", "TAKU_COMMUNITY_NATIVE_PLACEMENT_ID", "\"${localProperties.getProperty("taku.communityNativePlacementId").orEmpty()}\"")
+        buildConfigField("String", "TAKU_REWARD_PLACEMENT_ID", "\"${localProperties.getProperty("taku.rewardPlacementId").orEmpty()}\"")
 
     }
 

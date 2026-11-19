@@ -45,6 +45,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +53,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -62,6 +64,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.github.learningplatform.data.ad.TakuAds
+import com.github.learningplatform.data.ad.findActivity
 import com.github.learningplatform.data.remote.dto.DailySignStatusDto
 import com.github.learningplatform.domain.model.DailyTaskProgress
 import com.github.learningplatform.domain.model.TaskCenterRules
@@ -77,6 +81,7 @@ import com.github.learningplatform.ui.theme.TextPrimary
 import com.github.learningplatform.ui.theme.TextSecondary
 import com.github.learningplatform.ui.theme.pageGradientBrush
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * 任务中心。
@@ -89,8 +94,8 @@ import kotlinx.coroutines.delay
  *  4. 观看广告：完整看完一条 +10 分，同一广告每天只计一次，每天最多 3 条。
  *  课程 + 帖子两类内容当日合计不超过 50 分；广告和签到不占用该额度。
  *
- * 签到 / 积分余额走服务端；视频、帖子、广告的「今日是否已计分」由
- * [com.github.learningplatform.data.local.TaskCenterStore] 在本地记录。
+ * 签到、广告领分与积分余额走服务端；广告点击的是真实激励视频，
+ * 只有 SDK 发奖回调后才会调用 `/points/ad/reward`。
  * 顶栏「规则」按钮进入完整的任务与积分规则页。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -105,13 +110,20 @@ fun CheckinTaskScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val progress by viewModel.taskProgress.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    var showAdDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var adInFlight by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.message) {
         uiState.message?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.consumeMessage()
         }
+    }
+
+    // 进入任务中心就预热激励视频，点击「去观看」时少等几秒
+    LaunchedEffect(Unit) {
+        TakuAds.ensureRewardLoaded(context)
     }
 
     // 每次回到前台（首次进入也算一次）重新拉 /checkin/status：
@@ -123,17 +135,6 @@ fun CheckinTaskScreen(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    if (showAdDialog) {
-        AdWatchDialog(
-            availableCount = progress.remainingAdCount,
-            onDismiss = { showAdDialog = false },
-            onClaim = {
-                viewModel.watchAd(AD_CONTENT_IDS[progress.adCount.coerceAtMost(AD_CONTENT_IDS.lastIndex)])
-                showAdDialog = false
-            }
-        )
     }
 
     Scaffold(
@@ -278,13 +279,41 @@ fun CheckinTaskScreen(
                     },
                     pointsLabel = "+${TaskCenterRules.AD_REWARD}",
                     actionText = when {
+                        adInFlight -> "播放中"
                         progress.adReachedLimit -> "已完成"
                         progress.adCount > 0 -> "再看一条"
                         else -> "去观看"
                     },
-                    actionEnabled = !progress.adReachedLimit,
+                    actionEnabled = !progress.adReachedLimit && !adInFlight,
                     done = progress.adReachedLimit,
-                    onClick = { showAdDialog = true }
+                    onClick = {
+                        if (adInFlight) return@DailyTaskRow
+                        val activity = context.findActivity()
+                        if (activity == null) {
+                            scope.launch { snackbarHostState.showSnackbar("当前环境无法展示广告，请稍后再试") }
+                        } else if (!TakuAds.rewardConfigured) {
+                            scope.launch { snackbarHostState.showSnackbar("广告位未配置，暂时无法观看") }
+                        } else {
+                            adInFlight = true
+                            scope.launch {
+                                try {
+                                    when (val outcome = TakuAds.playReward(activity)) {
+                                        is TakuAds.RewardOutcome.Completed ->
+                                            // 上报秒数由 ViewModel 统一按后端最小 15 秒口径取值
+                                            viewModel.watchAd(outcome.showId)
+                                        TakuAds.RewardOutcome.ClosedEarly ->
+                                            snackbarHostState.showSnackbar("完整观看广告才能获得积分")
+                                        TakuAds.RewardOutcome.NotReady ->
+                                            snackbarHostState.showSnackbar("广告正在加载，请稍候再试")
+                                        else ->
+                                            snackbarHostState.showSnackbar("广告展示失败，请稍后重试")
+                                    }
+                                } finally {
+                                    adInFlight = false
+                                }
+                            }
+                        }
+                    }
                 )
             }
 

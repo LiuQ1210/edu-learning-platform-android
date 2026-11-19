@@ -20,13 +20,14 @@ import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,6 +37,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -45,20 +47,27 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import com.github.learningplatform.data.ad.TakuAds
+import com.github.learningplatform.data.ad.findActivity
 import com.github.learningplatform.data.remote.dto.CommentDto
 import com.github.learningplatform.data.remote.dto.HotReplyDto
 import com.github.learningplatform.data.remote.dto.CourseDto
+import com.github.learningplatform.domain.model.DailyTaskProgress
+import com.github.learningplatform.domain.model.TaskCenterRules
 import com.github.learningplatform.ui.common.Avatar
 import com.github.learningplatform.ui.common.EmptyState
 import com.github.learningplatform.ui.common.ErrorState
@@ -73,6 +82,17 @@ import com.github.learningplatform.ui.theme.TextSecondary
 import com.github.learningplatform.ui.theme.pageGradientBrush
 import java.util.Locale
 
+/** 每看这么多条视频，插入一屏激励广告入口 */
+private const val AD_INTERVAL_VIDEOS = 5
+
+/** 短视频流的分页内容：视频页 or 激励广告入口页 */
+private sealed interface FeedItem {
+    data class Video(val course: CourseDto) : FeedItem
+
+    /** 激励广告必须用户点击才播放，这一页只提供入口，不自动拉起广告 */
+    data object Ad : FeedItem
+}
+
 /**
  * 视频 Tab：短视频流（接口文档 6.1 videoType=1 + 6.3 播放凭证）。
  *
@@ -86,6 +106,7 @@ fun VideoScreen(
     viewModel: VideoViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val taskProgress by viewModel.taskProgress.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     // 点赞/收藏/分享失败都会写 message，必须在画面上可见（黑底视频流里没有别的位置）
@@ -113,48 +134,86 @@ fun VideoScreen(
                 onRefresh = viewModel::refresh,
                 modifier = Modifier.fillMaxSize()
             ) {
-                val pagerState = rememberPagerState(pageCount = { uiState.videos.size })
+                // 每 5 条视频后插一屏激励广告入口；分页下标到视频下标的映射也在这里算好，
+                // 后续浏览上报、定位、预加载都按视频下标走
+                val feedItems = remember(uiState.videos) {
+                    buildList {
+                        uiState.videos.forEachIndexed { index, course ->
+                            add(FeedItem.Video(course))
+                            val afterVideoCount = index + 1
+                            if (TakuAds.rewardConfigured &&
+                                afterVideoCount % AD_INTERVAL_VIDEOS == 0
+                            ) {
+                                add(FeedItem.Ad)
+                            }
+                        }
+                    }
+                }
+                val videoIndexByPage = remember(feedItems) {
+                    var videoIndex = -1
+                    feedItems.map { item ->
+                        if (item is FeedItem.Video) ++videoIndex else -1
+                    }
+                }
+                val pageByVideoIndex = remember(feedItems) {
+                    feedItems.mapIndexedNotNull { page, item ->
+                        page.takeIf { item is FeedItem.Video }
+                    }
+                }
+
+                val pagerState = rememberPagerState(pageCount = { feedItems.size })
 
                 // 从收藏/历史列表带 id 进来：列表加载完后自动跳到目标视频
                 LaunchedEffect(viewModel) {
                     viewModel.focusIndex.collect { idx ->
                         idx?.let {
-                            if (it < uiState.videos.size) pagerState.scrollToPage(it)
+                            pageByVideoIndex.getOrNull(it)?.let { page -> pagerState.scrollToPage(page) }
                             viewModel.consumeFocus()
                         }
                     }
                 }
 
                 // 滑到哪一页就只让那一页持有播放器，避免同时解码多个视频
-                LaunchedEffect(pagerState.currentPage) {
-                    viewModel.onPageChanged(pagerState.currentPage)
+                LaunchedEffect(pagerState.currentPage, videoIndexByPage) {
+                    val videoIndex = videoIndexByPage.getOrNull(pagerState.currentPage) ?: -1
+                    if (videoIndex >= 0) viewModel.onPageChanged(videoIndex)
                 }
-                LaunchedEffect(pagerState.currentPage, uiState.videos.size) {
-                    if (pagerState.currentPage >= uiState.videos.size - 2) viewModel.loadMore()
+                LaunchedEffect(pagerState.currentPage, feedItems.size) {
+                    if (pagerState.currentPage >= feedItems.size - 2) viewModel.loadMore()
                 }
 
                 VerticalPager(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize()
                 ) { page ->
-                    val course = uiState.videos[page]
-                    // 回调按 courseId 固定引用：避免每次主 state 刷新生成新 lambda、
-                    // 导致相邻预加载页 VideoPage 因参数不等被迫重组。
-                    val onToggleLike = remember(course.courseId) { { viewModel.toggleLike(course.courseId) } }
-                    val onToggleFavorite = remember(course.courseId) { { viewModel.toggleFavorite(course.courseId) } }
-                    val onOpenComments = remember(course.courseId) { { viewModel.openComments(course.courseId) } }
-                    val onOpenDetail = remember(course.courseId) { { onOpenCourse(course.courseId) } }
-                    VideoPage(
-                        course = course,
-                        isActive = page == pagerState.currentPage,
-                        playUrl = uiState.playUrls[course.courseId].orEmpty(),
-                        commentCount = course.commentCount,
-                        viewModel = viewModel,
-                        onToggleLike = onToggleLike,
-                        onToggleFavorite = onToggleFavorite,
-                        onOpenComments = onOpenComments,
-                        onOpenDetail = onOpenDetail
-                    )
+                    when (val item = feedItems.getOrNull(page)) {
+                        is FeedItem.Ad -> VideoRewardAdPage(
+                            isActive = page == pagerState.currentPage,
+                            progress = taskProgress,
+                            onClaim = viewModel::claimAdReward
+                        )
+                        is FeedItem.Video -> {
+                            val course = item.course
+                            // 回调按 courseId 固定引用：避免每次主 state 刷新生成新 lambda、
+                            // 导致相邻预加载页 VideoPage 因参数不等被迫重组。
+                            val onToggleLike = remember(course.courseId) { { viewModel.toggleLike(course.courseId) } }
+                            val onToggleFavorite = remember(course.courseId) { { viewModel.toggleFavorite(course.courseId) } }
+                            val onOpenComments = remember(course.courseId) { { viewModel.openComments(course.courseId) } }
+                            val onOpenDetail = remember(course.courseId) { { onOpenCourse(course.courseId) } }
+                            VideoPage(
+                                course = course,
+                                isActive = page == pagerState.currentPage,
+                                playUrl = uiState.playUrls[course.courseId].orEmpty(),
+                                commentCount = course.commentCount,
+                                viewModel = viewModel,
+                                onToggleLike = onToggleLike,
+                                onToggleFavorite = onToggleFavorite,
+                                onOpenComments = onOpenComments,
+                                onOpenDetail = onOpenDetail
+                            )
+                        }
+                        null -> Unit
+                    }
                 }
             }
         }
@@ -177,6 +236,144 @@ fun VideoScreen(
             onDeleteComment = viewModel::deleteComment,
             onDismiss = viewModel::closeComments
         )
+    }
+}
+
+/**
+ * 短视频流里的激励广告入口页。
+ *
+ * 激励视频不允许自动播放，所以这里只放一个入口：用户点按钮才拉起全屏广告，
+ * 完整看完（SDK onReward）后由 ViewModel 调服务端领分；中途关闭不发分。
+ * 不点也没关系，直接上滑就能继续看视频。
+ */
+@Composable
+private fun VideoRewardAdPage(
+    isActive: Boolean,
+    progress: DailyTaskProgress,
+    onClaim: (adId: String, seconds: Int) -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var playing by remember { mutableStateOf(false) }
+
+    // 只在这一页真正被看到时准备广告，相邻预加载页不提前请求
+    LaunchedEffect(isActive) {
+        if (isActive) TakuAds.ensureRewardLoaded(context)
+    }
+
+    val reachedLimit = progress.adReachedLimit
+    val ready = TakuAds.rewardReady
+    val loading = TakuAds.rewardLoading
+    val failed = TakuAds.rewardFailed
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0E1526)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "广告",
+                color = Color.White.copy(alpha = 0.65f),
+                fontSize = 11.sp,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color.White.copy(alpha = 0.14f))
+                    .padding(horizontal = 8.dp, vertical = 3.dp)
+            )
+
+            Spacer(Modifier.height(22.dp))
+            Text(
+                text = if (reachedLimit) "今日广告任务已完成" else "看广告得积分",
+                color = Color.White,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = "+${TaskCenterRules.AD_REWARD} 积分",
+                color = Color(0xFFFFD75E),
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = if (reachedLimit) {
+                    "每天最多 ${TaskCenterRules.AD_DAILY_LIMIT} 条广告任务，明天再来吧"
+                } else {
+                    "完整观看一条广告即可获得积分\n今日还可观看 ${progress.remainingAdCount}/${TaskCenterRules.AD_DAILY_LIMIT} 条"
+                },
+                color = Color.White.copy(alpha = 0.72f),
+                fontSize = 13.sp,
+                lineHeight = 20.sp,
+                textAlign = TextAlign.Center
+            )
+
+            if (!reachedLimit) {
+                Spacer(Modifier.height(28.dp))
+                Button(
+                    onClick = {
+                        if (playing) return@Button
+                        val activity = context.findActivity() ?: return@Button
+                        playing = true
+                        scope.launch {
+                            try {
+                                when (val outcome = TakuAds.playReward(activity)) {
+                                    is TakuAds.RewardOutcome.Completed ->
+                                        onClaim(outcome.showId, outcome.seconds)
+                                    TakuAds.RewardOutcome.NotReady ->
+                                        TakuAds.ensureRewardLoaded(context)
+                                    else -> Unit
+                                }
+                            } finally {
+                                playing = false
+                            }
+                        }
+                    },
+                    enabled = !playing && (ready || failed),
+                    shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFFC107),
+                        contentColor = Color(0xFF1B1B1F),
+                        disabledContainerColor = Color.White.copy(alpha = 0.14f),
+                        disabledContentColor = Color.White.copy(alpha = 0.65f)
+                    ),
+                    modifier = Modifier.height(46.dp)
+                ) {
+                    Text(
+                        text = when {
+                            playing -> "广告播放中…"
+                            ready -> "观看广告 +${TaskCenterRules.AD_REWARD} 积分"
+                            failed -> "重新加载广告"
+                            else -> "广告加载中…"
+                        },
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
+            Text(
+                text = when {
+                    reachedLimit -> "上滑继续看视频"
+                    playing -> "请完整观看广告，中途关闭无法获得积分"
+                    ready -> "点击按钮观看广告，上滑可跳过"
+                    failed -> "暂时没有可用广告，稍后再试或上滑继续"
+                    loading -> "广告加载中，请稍候…"
+                    else -> "上滑继续看视频"
+                },
+                color = Color(0xFF7A8699),
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 

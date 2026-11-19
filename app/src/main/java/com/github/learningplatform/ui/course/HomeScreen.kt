@@ -50,8 +50,9 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.learningplatform.data.remote.dto.BannerDto
 import com.github.learningplatform.data.remote.dto.CourseDto
+import com.github.learningplatform.BuildConfig
+import com.github.learningplatform.ui.ad.TakuNativeAdCard
 import com.github.learningplatform.ui.common.CategoryTabs
-import com.github.learningplatform.ui.common.AdSlotPlaceholder
 import com.github.learningplatform.ui.common.ErrorState
 import com.github.learningplatform.ui.common.LoadingState
 import com.github.learningplatform.ui.common.NetImage
@@ -200,15 +201,12 @@ private fun CourseFeed(
             }
         }
 
-        // 【广告位预留】首页信息流广告位：后端配了 slot 才渲染。
-        // 当前占位外观用于确认位置，接入 Taku 后替换组件内部即可。
-        if (uiState.adSlots.isNotEmpty()) {
-            item {
-                AdSlotPlaceholder(
-                    slotCode = uiState.adSlots.firstOrNull()?.first,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                )
-            }
+        // 首页信息流原生广告位：有素材就显示卡片，无填充整块隐藏
+        item {
+            TakuNativeAdCard(
+                placementId = BuildConfig.TAKU_HOME_NATIVE_PLACEMENT_ID,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
         }
 
         // 排序筛选标签

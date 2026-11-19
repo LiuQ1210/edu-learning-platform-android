@@ -30,8 +30,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** 等待开屏加载完成的最长时间，超时直接进主界面 */
-private const val AD_WAIT_TIMEOUT_MS = 2000L
+/**
+ * 等待开屏加载完成的最长时间，超时直接进主界面。
+ *
+ * 实测 Taku 返回在 1.2s～3s 之间浮动，2s 会把慢的那一次直接掐掉（加载成功后广告已被丢弃，
+ * 表现为「没有开屏广告」），所以放宽到 3.5s，仍远短于 SDK 自己的 10s 超时。
+ */
+private const val AD_WAIT_TIMEOUT_MS = 3500L
 
 /** 启动页最短展示时长，避免广告加载太快导致页面一闪而过 */
 private const val SPLASH_MIN_MS = 900L

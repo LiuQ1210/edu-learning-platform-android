@@ -40,8 +40,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.github.learningplatform.BuildConfig
 import com.github.learningplatform.data.remote.dto.ArticleDto
-import com.github.learningplatform.ui.ad.TakuBannerAd
+import com.github.learningplatform.ui.ad.TakuNativeAdCard
 import com.github.learningplatform.ui.common.Avatar
 import com.github.learningplatform.ui.common.CategoryTabs
 import com.github.learningplatform.ui.common.EmptyState
@@ -110,15 +111,22 @@ fun CommunityScreen(
                         .background(pageGradientBrush(strong = false, theme = "community")),
                     contentPadding = PaddingValues(bottom = 88.dp)
                 ) {
-                    // Taku 横幅广告位：隐私授权后自动加载
+                    items(uiState.articles.take(3), key = { it.articleId }) { article ->
+                        ArticleCard(
+                            article = article,
+                            onClick = { onOpenArticle(article.articleId) },
+                        )
+                    }
+
+                    // 社区信息流原生广告位：有素材就显示卡片，无填充整块隐藏
                     item {
-                        TakuBannerAd(
-                            height = 64.dp,
+                        TakuNativeAdCard(
+                            placementId = BuildConfig.TAKU_COMMUNITY_NATIVE_PLACEMENT_ID,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                         )
                     }
 
-                    items(uiState.articles, key = { it.articleId }) { article ->
+                    items(uiState.articles.drop(3), key = { it.articleId }) { article ->
                         ArticleCard(
                             article = article,
                             onClick = { onOpenArticle(article.articleId) },
