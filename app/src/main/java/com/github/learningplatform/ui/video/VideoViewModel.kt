@@ -3,17 +3,22 @@ package com.github.learningplatform.ui.video
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.learningplatform.core.constants.Constants
+import com.github.learningplatform.data.local.TaskCenterStore
 import com.github.learningplatform.data.remote.dto.CommentDto
 import com.github.learningplatform.data.remote.dto.CreateCommentRequest
 import com.github.learningplatform.data.remote.dto.CourseDto
+import com.github.learningplatform.data.repository.AdRewardRepository
 import com.github.learningplatform.data.repository.CourseRepository
 import com.github.learningplatform.data.repository.InteractionRepository
+import com.github.learningplatform.domain.model.DailyTaskProgress
 import com.github.learningplatform.ui.readableMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -68,7 +73,9 @@ class VideoViewModel @Inject constructor(
     private val interactionRepository: InteractionRepository,
     private val userRepository: com.github.learningplatform.data.repository.UserRepository,
     private val videoApi: com.github.learningplatform.data.remote.VideoApi,
-    private val userPreferences: com.github.learningplatform.data.local.UserPreferences
+    private val userPreferences: com.github.learningplatform.data.local.UserPreferences,
+    private val adRewardRepository: AdRewardRepository,
+    private val taskCenterStore: TaskCenterStore
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(VideoUiState())
@@ -77,6 +84,13 @@ class VideoViewModel @Inject constructor(
     /** courseId -> 点赞/收藏状态与计数；独立于 [uiState]，点赞收藏不刷新主列表状态 */
     private val _interaction = MutableStateFlow<Map<Long, InteractionMeta>>(emptyMap())
     val interaction: StateFlow<Map<Long, InteractionMeta>> = _interaction.asStateFlow()
+
+    /** 今日广告进度：短视频广告入口显示今天还剩几条可领 */
+    val taskProgress: StateFlow<DailyTaskProgress> = taskCenterStore.progress.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = DailyTaskProgress()
+    )
 
     /** 从收藏/历史列表点进来时要定位到的视频 id；0 表示普通进入 */
     private var pendingFocusId: Long = 0L
@@ -339,6 +353,26 @@ class VideoViewModel @Inject constructor(
 
     fun consumeMessage() {
         _uiState.value = _uiState.value.copy(message = null)
+    }
+
+    /** 激励视频发奖回调后领积分；是否发分与每日上限由服务端判定 */
+    fun claimAdReward(adId: String, seconds: Int) {
+        viewModelScope.launch {
+            try {
+                val result = adRewardRepository.claim(adId, seconds)
+                val message = when {
+                    result.awardedPoints > 0 -> "广告观看完成，+${result.awardedPoints} 积分"
+                    result.todayAdCount >= result.todayAdLimit ->
+                        "今日 ${result.todayAdLimit} 条广告任务已完成"
+                    else -> "这条广告今天已经计过分"
+                }
+                _uiState.value = _uiState.value.copy(message = message)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                _uiState.value = _uiState.value.copy(message = e.readableMessage())
+            }
+        }
     }
 
     fun openComments(courseId: Long) {

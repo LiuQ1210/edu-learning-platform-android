@@ -128,9 +128,14 @@ class TaskCenterStore @Inject constructor(
         }
     }
 
-    /** 记录完整看完的一条广告；同一广告每天只计一次，每天最多 3 条。 */
-    suspend fun recordAd(contentId: String): TaskRewardResult = mutex.withLock {
-        if (contentId.isBlank()) return@withLock TaskRewardResult()
+    /**
+     * 按服务端广告结算结果更新本地展示缓存。
+     *
+     * @param awardedPoints 服务端本次实际入账积分；为 0 表示重复观看或已达每日上限，
+     * 本地不再累加广告分，仅记录该广告今日已看过，避免重复点击。
+     */
+    suspend fun applyAdResult(adId: String, awardedPoints: Int): TaskRewardResult = mutex.withLock {
+        if (adId.isBlank()) return@withLock TaskRewardResult()
         val today = today()
         val prefs = context.appDataStore.data.first()
 
@@ -139,17 +144,35 @@ class TaskCenterStore @Inject constructor(
         } else {
             emptySet()
         }
-        if (contentId in todayAdIds) return@withLock TaskRewardResult(alreadyDone = true)
+        if (adId in todayAdIds) return@withLock TaskRewardResult(alreadyDone = true)
         if (todayAdIds.size >= TaskCenterRules.AD_DAILY_LIMIT) {
             return@withLock TaskRewardResult(capped = true)
         }
 
         context.appDataStore.edit { p ->
             if (p[Keys.DATE] != today) resetDaily(p, today)
-            p[Keys.AD_IDS_TODAY] = p[Keys.AD_IDS_TODAY].orEmpty() + contentId
-            p[Keys.AD_POINTS] = (p[Keys.AD_POINTS] ?: 0) + TaskCenterRules.AD_REWARD
+            p[Keys.AD_IDS_TODAY] = p[Keys.AD_IDS_TODAY].orEmpty() + adId
+            if (awardedPoints > 0) {
+                p[Keys.AD_POINTS] = (p[Keys.AD_POINTS] ?: 0) + awardedPoints
+            }
         }
-        TaskRewardResult(awarded = TaskCenterRules.AD_REWARD)
+        TaskRewardResult(awarded = awardedPoints)
+    }
+
+    /** 退出登录时清空今日任务进度，避免下一账号继承 */
+    suspend fun clear() {
+        mutex.withLock {
+            context.appDataStore.edit { p ->
+                p.remove(Keys.DATE)
+                p.remove(Keys.CHECKIN_POINTS)
+                p.remove(Keys.CHECKIN_RECORDED)
+                p.remove(Keys.AD_POINTS)
+                p.remove(Keys.SERVER_CONTENT_POINTS)
+                p.remove(Keys.VIDEO_IDS_TODAY)
+                p.remove(Keys.ARTICLE_IDS_TODAY)
+                p.remove(Keys.AD_IDS_TODAY)
+            }
+        }
     }
 
     // ------------------------------------------------------------------ 内部

@@ -35,4 +35,18 @@ interface PointsApi {
         @Field("targetId") targetId: Long,
         @Field("seconds") seconds: Int
     ): Response<JsonObject>
+
+    /**
+     * 看完广告领积分。
+     *
+     * @param adId   广告唯一标识（最长 64）
+     * @param seconds 本次观看秒数（后端要求至少 15 秒）
+     * 返回 awardedPoints / todayAdCount / todayAdLimit；重复广告或达每日上限时 awardedPoints 为 0。
+     */
+    @FormUrlEncoded
+    @POST("api/v1/points/ad/reward")
+    suspend fun reportAdReward(
+        @Field("adId") adId: String,
+        @Field("seconds") seconds: Int
+    ): Response<JsonObject>
 }

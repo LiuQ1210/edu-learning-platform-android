@@ -121,19 +121,31 @@ class CheckinViewModel @Inject constructor(
     /**
      * 广告完整看完后调用。
      *
-     * 目前没有广告 SDK / 广告任务接口，任务中心用占位广告走完整个观看流程；
-     * 本地按服务端口径记录「同一广告每天 1 次、每天最多 3 条」，不占内容类 50 分额度。
+     * 先上报后端 `/points/ad/reward`，是否入账、今日条数与上限均以服务端返回为准；
+     * 上报成功后再把结果同步到本地任务进度缓存（去重 / 上限仅用于本地展示兜底）。
+     * 网络失败时不写本地，避免虚假计分。
      */
     fun watchAd(adContentId: String) {
         viewModelScope.launch {
-            val result = taskCenterStore.recordAd(adContentId)
-            val message = when {
-                result.awarded > 0 -> "广告观看完成，+${result.awarded} 积分"
-                result.alreadyDone -> "今日这条广告已计分，明天再来吧"
-                result.capped -> "今日 ${TaskCenterRules.AD_DAILY_LIMIT} 条广告任务已完成"
-                else -> null
+            try {
+                val res = checkinRepository.reportAdReward(
+                    adId = adContentId,
+                    seconds = TaskCenterRules.AD_WATCH_SECONDS
+                )
+                // 后端已入账或已记录今日广告，按服务端结果同步本地进度缓存用于任务列表展示
+                runCatching { taskCenterStore.applyAdResult(adContentId, res.awardedPoints) }
+                val message = when {
+                    res.awardedPoints > 0 -> "广告观看完成，+${res.awardedPoints} 积分"
+                    res.todayAdCount >= res.todayAdLimit ->
+                        "今日 ${res.todayAdLimit} 条广告任务已完成"
+                    else -> "今日这条广告已计分，明天再来吧"
+                }
+                _uiState.value = _uiState.value.copy(message = message)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                _uiState.value = _uiState.value.copy(message = e.readableMessage())
             }
-            _uiState.value = _uiState.value.copy(message = message)
         }
     }
 
