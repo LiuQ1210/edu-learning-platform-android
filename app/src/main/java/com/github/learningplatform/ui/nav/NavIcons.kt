@@ -268,4 +268,7 @@ object NavIcons {
         "Inbox",
         "M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 12h-4c0 1.66-1.35 3-3 3s-3-1.34-3-3H5V5h14v10z"
     )
+
+    /** 回到顶部：向上箭头（描边） */
+    val ArrowUp: ImageVector = lineIcon("ArrowUp", "M5 15l7-7 7 7")
 }
