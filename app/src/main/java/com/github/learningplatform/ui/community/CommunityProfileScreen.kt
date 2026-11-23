@@ -33,9 +33,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.github.learningplatform.data.remote.dto.PostStatus
 import com.github.learningplatform.ui.common.Avatar
 import com.github.learningplatform.ui.common.BackTopBar
 import com.github.learningplatform.ui.common.LoadingState
@@ -233,13 +235,20 @@ fun CommunityProfileScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = article.title,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = TextPrimary,
-                            maxLines = 2
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = article.title,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = TextPrimary,
+                                maxLines = 2,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            if (article.status != PostStatus.PUBLISHED) {
+                                Spacer(Modifier.width(6.dp))
+                                ArticleStatusBadge(article.status)
+                            }
+                        }
                         Spacer(Modifier.height(4.dp))
                         // 阅读 / 点赞 / 发布时间全部来自后端字段
                         val meta = buildList {
@@ -250,15 +259,8 @@ fun CommunityProfileScreen(
                         Text(meta, fontSize = 12.sp, color = TextSecondary)
                     }
                     if (self) {
-                        Text(
-                            text = "编辑",
-                            fontSize = 13.sp,
-                            color = Primary,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(50))
-                                .clickable { onOpenArticle(article.articleId) }
-                                .padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
+                        // 后端只有 add / list / myList / info / remove，没有 post/edit，
+                        // 所以这里只留「删除」，编辑入口不假装可用
                         Text(
                             text = "删除",
                             fontSize = 13.sp,
@@ -299,4 +301,24 @@ private fun StatColumn(value: String, label: String) {
         Text(value, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
         Text(label, fontSize = 11.sp, color = TextSecondary)
     }
+}
+
+/** 文章状态徽章：审核中/已下架/草稿，只在非「已发布」时出现 */
+@Composable
+private fun ArticleStatusBadge(status: Int) {
+    val (label, color) = when (status) {
+        PostStatus.PENDING -> "审核中" to androidx.compose.ui.graphics.Color(0xFFE08A1E)
+        PostStatus.REJECTED -> "未通过" to MaterialTheme.colorScheme.error
+        PostStatus.OFFLINE -> "已下架" to TextSecondary
+        else -> "草稿" to TextSecondary
+    }
+    Text(
+        text = label,
+        fontSize = 11.sp,
+        color = color,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(color.copy(alpha = 0.12f))
+            .padding(horizontal = 7.dp, vertical = 2.dp)
+    )
 }

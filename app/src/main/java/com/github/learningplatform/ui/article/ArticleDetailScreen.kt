@@ -8,9 +8,13 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -39,6 +43,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,16 +53,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.learningplatform.data.remote.dto.ArticleDetailDto
 import com.github.learningplatform.data.remote.dto.CommentDto
 import com.github.learningplatform.data.remote.dto.HotReplyDto
+import com.github.learningplatform.data.remote.dto.PostStatus
 import com.github.learningplatform.ui.common.Avatar
 import com.github.learningplatform.ui.common.BackTopBar
 import com.github.learningplatform.ui.common.WriteNoteDialog
@@ -102,10 +113,23 @@ fun ArticleDetailScreen(
     val highlightCommentId = remember { CommentHighlightBus.highlightCommentId.also { CommentHighlightBus.highlightCommentId = null } }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     val scope = androidx.compose.runtime.rememberCoroutineScope()
+    // 滚过首屏后才显示回到顶部按钮
+    val showBackToTop by derivedStateOf { listState.firstVisibleItemIndex > 0 }
     var commentInput by remember { mutableStateOf("") }
+    // 正文超出详情页可视区 2/3 时折叠到 2/3，点击「查看全部内容」展开全文
+    var contentExpanded by remember { mutableStateOf(false) }
+    // 正文高度测出来之前先不铺评论区：否则正文从 48dp 撑到真实高度时，
+    // 下方评论会当着用户的面往下挪一截，看起来像「评论在慢慢下移」
+    var contentReady by remember(articleId) { mutableStateOf(false) }
     // 回复目标：parentId 决定「挂到哪条评论下」，name 只用于输入框上方的提示
     var replyToCommentId by remember { mutableStateOf<Long?>(null) }
     var replyToName by remember { mutableStateOf<String?>(null) }
+
+    // 只读态给一句轻提示（评论/点赞/收藏后端都要求已发布）
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val toast: (String) -> Unit = { msg ->
+        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+    }
 
     LaunchedEffect(articleId) { viewModel.load(articleId) }
 
@@ -150,6 +174,8 @@ fun ArticleDetailScreen(
     }
 
     var menuExpanded by remember { mutableStateOf(false) }
+    // 本人查非已发布文章：评论/点赞/收藏接口都要求 status='0'，前端统一按只读处理
+    val published = uiState.mineStatus == PostStatus.PUBLISHED
 
     Scaffold(
         // 奶油渐变铺在 Scaffold 容器上，正文与评论区共用同一底色
@@ -173,7 +199,9 @@ fun ArticleDetailScreen(
                                 text = { Text("写笔记") },
                                 onClick = {
                                     menuExpanded = false
-                                    viewModel.showNoteDialog()
+                                    // 笔记接口同样只认已发布内容，审核中直接拦下
+                                    if (published) viewModel.showNoteDialog()
+                                    else toast("文章审核通过后才能记笔记")
                                 }
                             )
                             DropdownMenuItem(
@@ -183,15 +211,8 @@ fun ArticleDetailScreen(
                                     viewModel.showReport()
                                 }
                             )
-                            if (uiState.isMine) {
-                                DropdownMenuItem(
-                                    text = { Text("编辑") },
-                                    onClick = {
-                                        menuExpanded = false
-                                        onEdit(articleId)
-                                    }
-                                )
-                            }
+                            // 发布后需走审核，后端没有 post/edit，本人也只能看不能改，
+                            // 所以右上角菜单不再提供「编辑」
                         }
                     }
                 }
@@ -222,9 +243,10 @@ fun ArticleDetailScreen(
                         replyToCommentId = null
                     }
                 },
-                onToggleLike = viewModel::toggleLike,
-                onToggleFavorite = viewModel::toggleFavorite,
-                onShare = viewModel::share
+                onToggleLike = if (published) viewModel::toggleLike else ({ toast("文章审核通过后才能点赞") }),
+                onToggleFavorite = if (published) viewModel::toggleFavorite else ({ toast("文章审核通过后才能收藏") }),
+                onShare = viewModel::share,
+                commentEnabled = published
             )
         }
     ) { padding ->
@@ -242,7 +264,15 @@ fun ArticleDetailScreen(
             uiState.detail == null -> EmptyState(message = "文章不存在", modifier = m)
             else -> {
                 val detail = uiState.detail!!
-                LazyColumn(state = listState, modifier = m.background(pageGradientBrush(strong = true)), contentPadding = PaddingValues(bottom = 24.dp)) {
+                // 正文/评论所在的可视区高度（已由 Scaffold 扣掉顶栏与底部输入栏），折叠阈值按它取 2/3
+                BoxWithConstraints(modifier = m) {
+                val viewportDp = maxHeight.value.toInt()
+                // 兜底：万一 WebView 测不出高度（图片裂图等），也不要让评论区一直不出现
+                LaunchedEffect(detail) {
+                    kotlinx.coroutines.delay(1200)
+                    contentReady = true
+                }
+                LazyColumn(state = listState, modifier = Modifier.fillMaxSize().background(pageGradientBrush(strong = true)), contentPadding = PaddingValues(bottom = 24.dp)) {
                     item {
                         ArticleHeader(
                             detail = detail,
@@ -251,15 +281,28 @@ fun ArticleDetailScreen(
                         )
                     }
 
+                    // 本人文章不在「已发布」时，详情页顶部说明当前状态：作者能看正文，别人看不到
+                    if (uiState.isMine && uiState.mineStatus != PostStatus.PUBLISHED) {
+                        item { ArticleStatusNotice(uiState.mineStatus) }
+                    }
+
                     item {
                         RichContent(
                             html = detail.content,
+                            expanded = contentExpanded,
+                            onExpand = { contentExpanded = true },
+                            onCollapse = { contentExpanded = false },
+                            viewportDp = viewportDp,
+                            onReady = { contentReady = true },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp)
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
                         )
                     }
 
+                    // 正文高度确定后再一起铺评论区，避免评论区被正文撑高一步步推下去
+                    // 非已发布（审核中/草稿/驳回/下架）不给评论区：后端评论接口只认已发布内容
+                    if (contentReady && published) {
                     item { SectionHeader(title = "评论 (${detail.commentCount})") }
 
                     if (uiState.comments.isEmpty() && !uiState.commentsLoading) {
@@ -340,6 +383,44 @@ fun ArticleDetailScreen(
                             }
                         }
                     }
+                    } else if (contentReady) {
+                        // 待审核/草稿等：不请求评论，也不留一块空评论区
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "文章审核通过后，这里才会收到评论",
+                                    color = TextHint,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (showBackToTop) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 16.dp, bottom = 72.dp)
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .clickable { scope.launch { listState.animateScrollToItem(0) } },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            NavIcons.ArrowUp,
+                            contentDescription = "回到顶部",
+                            modifier = Modifier.size(20.dp),
+                            tint = Primary
+                        )
+                    }
+                }
                 }
             }
         }
@@ -404,8 +485,11 @@ private fun ArticleHeader(
 
         if (detail.tags.isNotEmpty()) {
             Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                detail.tags.take(5).forEach { tag ->
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                detail.tags.take(8).forEach { tag ->
                     Box(modifier = Modifier.clickable { onOpenTag(tag.tagId) }) {
                         TagChip("#${tag.name}")
                     }
@@ -430,7 +514,15 @@ private fun ArticleHeader(
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun RichContent(html: String, modifier: Modifier = Modifier) {
+private fun RichContent(
+    html: String,
+    expanded: Boolean,
+    onExpand: () -> Unit,
+    onCollapse: () -> Unit,
+    viewportDp: Int,
+    onReady: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     if (html.isBlank()) {
         Text(
             text = "暂无正文",
@@ -443,36 +535,72 @@ private fun RichContent(html: String, modifier: Modifier = Modifier) {
 
     val dark = com.github.learningplatform.ui.theme.LocalAppDarkTheme.current
     val textColor = if (dark) "#E8EAF0" else "#1A1A1A"
-    val bgColor = if (dark) "#1E2536" else "#FFFFFF"
+    val borderColor = if (dark) "#353B4D" else "#DDD"
+    val preBg = if (dark) "#28304A" else "#F5F5F5"
+    val quoteColor = if (dark) "#9AA3B5" else "#666666"
+    val linkColor = if (dark) "#B8CCFF" else "#1A73E8"
 
-    val document = remember(html, dark) {
+    // 正文是发布页写入的 markdown 源文（插图存成 ![](url)），先做最小转换再注入 WebView，
+    // 否则图片语法会当成文字整段铺成 URL
+    val rendered = remember(html) { renderArticleMarkdown(html) }
+
+    val document = remember(rendered, dark) {
         """
         <!DOCTYPE html>
         <html><head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <style>
-          body { margin:0; padding:0; background:$bgColor; color:$textColor;
+          /* 正文高度由外层 Compose 控制：折叠时只露出截断部分，
+             所以页面自身不允许滚动，否则手势能在 WebView 内部滚出被裁掉的正文 */
+          html, body { overflow:hidden; }
+          body { margin:0; padding:0; background:transparent; color:$textColor;
                  font-size:16px; line-height:1.75; word-break:break-word;
                  font-family:-apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
-          img, video { max-width:100%; height:auto; border-radius:8px; }
+          /* 正文插图单独成行，避免和上下文字挤在一起 */
+          img, video { display:block; max-width:100%; height:auto; border-radius:8px; margin:8px 0; }
+          h1, h2, h3, h4 { margin:12px 0 6px; font-weight:700; line-height:1.4; color:$textColor; }
+          h1 { font-size:20px; } h2 { font-size:18px; } h3 { font-size:17px; } h4 { font-size:16px; }
           table { width:100%; border-collapse:collapse; }
-          td, th { border:1px solid #DDD; padding:6px; }
-          pre { background:#F5F5F5; padding:10px; border-radius:8px; overflow-x:auto; }
+          td, th { border:1px solid $borderColor; padding:6px; }
+          pre { background:$preBg; color:$textColor; padding:10px; border-radius:8px; overflow-x:auto; }
           code { font-family:Consolas, monospace; }
-          blockquote { margin:0; padding-left:12px; border-left:3px solid #1A73E8; color:#666; }
-          a { color:#1A73E8; text-decoration:none; }
+          blockquote { margin:0; padding-left:12px; border-left:3px solid $linkColor; color:$quoteColor; }
+          a { color:$linkColor; text-decoration:none; }
         </style></head>
-        <body>$html</body></html>
+        <body>$rendered</body></html>
         """.trimIndent()
     }
 
-    val density = androidx.compose.ui.platform.LocalDensity.current
     // 初始给一个可见的最小高度，测量完成后按真实内容高度替换；
-    // 初始值不宜过大，避免正文还没测出来就撑出一大块空白
-    var contentHeightDp by remember { mutableIntStateOf(120) }
+    // 初始值压到一行左右，避免正文还没测出来就撑出一大块空白
+    var contentHeightDp by remember { mutableIntStateOf(48) }
+    // 首次测到真实高度前先不显示正文：否则 48dp 的裁切态会先闪一下再撑开
+    var measured by remember { mutableStateOf(false) }
 
+    // 超长正文折叠：正文连同下方的「查看全部内容」共占「详情页可视区」的 2/3，
+    // 超出部分截断，点按钮再展开全文；预留 48dp 给按钮，避免按钮被底部输入栏挤掉
+    val maxContentDp = ((viewportDp * 2f / 3f).toInt() - 48).coerceAtLeast(160)
+    // contentHeightDp 里含 16dp 底部安全余量，判断是否超长时先扣掉，
+    // 避免余量把刚好处在 2/3 的正文顶出阈值，冒出一个多余的「查看全部内容」
+    val contentOnlyDp = (contentHeightDp - 16).coerceAtLeast(0)
+    val overflow = contentOnlyDp > maxContentDp
+    val displayedDp = if (expanded) contentHeightDp else minOf(contentHeightDp, maxContentDp)
+
+    // 折叠态底部渐隐色：取正文区域（页面渐变中段）的底色，深色单独给一支
+    val fadeColor = if (dark) Color(0xFF191F2C) else Color(0xFFFBF2F1)
+
+    Column(modifier = modifier) {
+    // 正文与底部渐隐叠在同一层：渐隐只盖住被截断的最后一段，让裁切不生硬
+    Box(modifier = Modifier.fillMaxWidth()) {
     AndroidView(
-        modifier = modifier.height(contentHeightDp.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(displayedDp.dp)
+            // WebView 是原生视图，内容再高也会照旧绘制，必须显式裁到容器高度内，
+            // 否则带图的长正文会溢出盖住下方的评论标题
+            .clipToBounds()
+            .clip(RoundedCornerShape(0.dp))
+            .then(if (measured) Modifier else Modifier.alpha(0f)),
         factory = { context ->
             WebView(context).apply {
                 // 只开 JS 用于内容高度回传，页面本身不执行任何脚本
@@ -484,7 +612,35 @@ private fun RichContent(html: String, modifier: Modifier = Modifier) {
                     @Suppress("DEPRECATION")
                     settings.forceDark = android.webkit.WebSettings.FORCE_DARK_AUTO
                 }
+                // 正文背景透明，跟随页面渐变底色，不再贴一张白卡
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 isVerticalScrollBarEnabled = false
+                // 折叠时正文被裁断，禁止 WebView 自己吞手势滚出按钮下面的内容，
+                // 滚动一律交给外层 LazyColumn
+                isScrollContainer = false
+                overScrollMode = android.view.View.OVER_SCROLL_NEVER
+
+                fun measureHeight() {
+                    // 用 body 的真实高度：WebView 的 contentHeight 在内容比视口短时会回落到视口高度，
+                    // 拿它当正文高度会让容器自己把自己撑高（一行文字会被一步步推到 144dp），
+                    // 评论区跟着往下挪，就是用户看到的「评论慢慢下移」
+                    evaluateJavascript(
+                        "(function(){var b=document.body;return b?Math.round(b.getBoundingClientRect().height):0;})()"
+                    ) { value ->
+                        val px = value?.trim()?.trim('"')?.toFloatOrNull() ?: return@evaluateJavascript
+                        if (px <= 0f) return@evaluateJavascript
+                        val next = (px + 16).toInt().coerceAtLeast(48)
+                        // 加载过程中的像素级抖动不写回，避免带动下方评论区反复挪位置
+                        if (!measured || kotlin.math.abs(next - contentHeightDp) >= 4) {
+                            contentHeightDp = next
+                        }
+                        if (!measured) {
+                            measured = true
+                            onReady()
+                        }
+                    }
+                }
+
                 webViewClient = object : WebViewClient() {
                     override fun shouldOverrideUrlLoading(
                         view: WebView,
@@ -493,15 +649,15 @@ private fun RichContent(html: String, modifier: Modifier = Modifier) {
 
                     override fun onPageFinished(view: WebView, url: String?) {
                         super.onPageFinished(view, url)
-                        view.evaluateJavascript(
-                            "(function(){return Math.ceil(document.body.scrollHeight);})()"
-                        ) { value ->
-                            val px = value?.trim()?.trim('"')?.toFloatOrNull() ?: return@evaluateJavascript
-                            if (px > 0f) {
-                                val dp = with(density) { px.toDp().value }.toInt()
-                                if (dp > 0) contentHeightDp = dp.coerceAtLeast(60)
-                            }
-                        }
+                        measureHeight()
+                        // 图片/字体异步加载完成后再补测几次，避免长文带图底部被裁；
+                        // 正文里的插图是 OSS 网络图，加载比文字慢，末尾再拉两档长延时
+                        view.postDelayed({ measureHeight() }, 120)
+                        view.postDelayed({ measureHeight() }, 400)
+                        view.postDelayed({ measureHeight() }, 900)
+                        view.postDelayed({ measureHeight() }, 1500)
+                        view.postDelayed({ measureHeight() }, 2500)
+                        view.postDelayed({ measureHeight() }, 4000)
                     }
                 }
                 loadDataWithBaseURL(null, document, "text/html", "UTF-8", null)
@@ -516,6 +672,79 @@ private fun RichContent(html: String, modifier: Modifier = Modifier) {
             }
         }
     )
+
+    // 折叠态在正文底部压一层渐隐，把被裁断的半行淡进背景，避免生硬的横向切口
+    if (!expanded && overflow) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(28.dp)
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Transparent,
+                        1f to fadeColor
+                    )
+                )
+        )
+    }
+    }
+
+    // 折叠时给「查看全部内容」，展开后给「收起」，长文随时能在两种状态间切换
+    if (overflow) {
+        TextButton(
+            onClick = { if (expanded) onCollapse() else onExpand() },
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        ) {
+            Text(
+                if (expanded) "收起" else "查看全部内容",
+                style = MaterialTheme.typography.bodySmall,
+                color = Primary
+            )
+        }
+    }
+    }
+}
+
+/**
+ * 正文 markdown 的最小转换，只覆盖发布页会写进去的语法：
+ *  - `![说明](图片地址)` → `<img src="地址" alt="说明">`（插图）
+ *  - 行首 `#` 到 `######` → h1..h4（标题）
+ *  - 普通换行 → `<br>`，空行 → `<br>`
+ *
+ * 刻意不做完整 markdown 解析，也不做整体 HTML 转义，
+ * 避免把正文里原有的英文/符号/已有标签误伤。
+ */
+private fun renderArticleMarkdown(src: String): String {
+    val img = Regex("""!\[([^\]]*)]\(([^)\s]+)\)""")
+    fun imgTag(alt: String, url: String): String =
+        "<img src=\"$url\" alt=\"${alt.replace("\"", "&quot;")}\">"
+
+    return buildString {
+        for (raw in src.lines()) {
+            val line = raw.trim()
+            if (line.isEmpty()) {
+                append("<br>")
+                continue
+            }
+            // 整行就是一张图：直接出图，不补 <br>，避免图后多一截空白
+            val whole = img.matchEntire(line)
+            if (whole != null) {
+                append(imgTag(whole.groupValues[1], whole.groupValues[2]))
+                continue
+            }
+            // 行首标题
+            val hashes = line.takeWhile { it == '#' }.length
+            if (hashes in 1..6 && line.length > hashes) {
+                val level = hashes.coerceAtMost(4)
+                append("<h$level>").append(line.drop(hashes).trim()).append("</h$level>")
+                continue
+            }
+            // 其余按普通段落：行内图片照样转，行尾补换行
+            append(img.replace(line) { imgTag(it.groupValues[1], it.groupValues[2]) })
+                .append("<br>")
+        }
+    }
 }
 
 @Composable
@@ -538,6 +767,11 @@ private fun CommentItem(
             .background(if (highlighted) HighlightWash else Color.Transparent)
             .padding(horizontal = if (highlighted) 8.dp else 0.dp)
     ) {
+        // 评论正文点击即回复：默认 ripple 波纹保留，再补一个按压浅底，透明背景下反馈更可见
+        val replyInteraction = remember { MutableInteractionSource() }
+        val replyPressed by replyInteraction.collectIsPressedAsState()
+        // 二级回复默认折叠，只露第一条，点入口再展开全部（同视频评论区）
+        var repliesExpanded by remember { mutableStateOf(false) }
         Row(verticalAlignment = Alignment.Top) {
             Avatar(url = comment.userAvatar, name = comment.userName, size = 32.dp)
             Spacer(Modifier.width(8.dp))
@@ -550,13 +784,6 @@ private fun CommentItem(
                         color = TextPrimary,
                         modifier = Modifier.weight(1f)
                     )
-                    if (comment.likeCount > 0) {
-                        Text(
-                            text = "${formatCount(comment.likeCount)} 赞",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextHint
-                        )
-                    }
                 }
                 MetaText(comment.createTime)
                 Spacer(Modifier.height(6.dp))
@@ -565,7 +792,11 @@ private fun CommentItem(
                     text = comment.content,
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextPrimary,
-                    modifier = Modifier.clickable(onClick = onReply)
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (replyPressed) surfaceWashBrush() else SolidColor(Color.Transparent))
+                        .clickable(interactionSource = replyInteraction) { onReply() }
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 )
             }
             if (isMine) {
@@ -581,13 +812,17 @@ private fun CommentItem(
 
         if (comment.hotReplies.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
+            val replies = comment.hotReplies
+            // 通知定位高亮的回复若不在第一条，自动展开，避免目标被折叠藏住
+            val highlightReply = replies.any { it.commentId == highlightReplyId }
+            val visibleReplies = if (repliesExpanded || replies.size <= 1 || highlightReply) replies else replies.take(1)
             Column(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
                     .background(surfaceWashBrush())
                     .padding(10.dp)
             ) {
-                comment.hotReplies.forEach { reply ->
+                visibleReplies.forEach { reply ->
                     val replyHighlighted = reply.commentId == highlightReplyId
                     Row(
                         verticalAlignment = Alignment.Top,
@@ -599,17 +834,20 @@ private fun CommentItem(
                             .clickable { onReplyReply(reply) }
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Row {
+                            Row(verticalAlignment = Alignment.Top) {
                                 Text(
                                     text = reply.userName + if (reply.replyToName != null) " 回复 ${reply.replyToName}：" else "：",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = Primary,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1
                                 )
+                                Spacer(Modifier.width(4.dp))
                                 Text(
                                     text = reply.content,
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = TextSecondary
+                                    color = TextSecondary,
+                                    modifier = Modifier.weight(1f)
                                 )
                             }
                         }
@@ -624,10 +862,20 @@ private fun CommentItem(
                         }
                     }
                 }
+                if (replies.size > 1) {
+                    Text(
+                        text = if (repliesExpanded) "收起 ▴" else "查看全部 ${replies.size} 条回复 ▾",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Primary,
+                        modifier = Modifier
+                            .padding(vertical = 4.dp)
+                            .clickable { repliesExpanded = !repliesExpanded }
+                    )
+                }
             }
         }
 
-        // 二级回复已在上面的缩进块里全部展示，这里不再重复「共 N 条回复」
+        // 二级回复默认折叠为第一条，点入口展开全部
     }
     Box(
         modifier = Modifier
@@ -652,8 +900,14 @@ private fun ArticleBottomBar(
     onSendComment: () -> Unit,
     onToggleLike: () -> Unit,
     onToggleFavorite: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    /** false = 文章还没过审，评论框换成只读提示（后端评论接口只认已发布内容） */
+    commentEnabled: Boolean = true
 ) {
+    val barContext = androidx.compose.ui.platform.LocalContext.current
+    val toast: (String) -> Unit = { msg ->
+        android.widget.Toast.makeText(barContext, msg, android.widget.Toast.LENGTH_SHORT).show()
+    }
     Surface(shadowElevation = 8.dp) {
         Column {
             // 正在回复某人时给出明确提示，避免误以为还在发顶级评论
@@ -682,6 +936,31 @@ private fun ArticleBottomBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                if (!commentEnabled) {
+                    // 审核中：不给输入框，避免用户敲完点发送再被后端打回
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(surfaceWashBrush())
+                            .padding(horizontal = 14.dp)
+                            .clickable { toast("文章审核通过后才能评论") },
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        Text(
+                            text = "文章审核中，暂不能评论",
+                            color = TextHint,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    Button(
+                        onClick = { toast("文章审核通过后才能评论") },
+                        shape = RoundedCornerShape(50)
+                    ) {
+                        Text("发送")
+                    }
+                } else {
                 BasicTextField(
                     value = commentInput,
                     onValueChange = onCommentChange,
@@ -710,6 +989,7 @@ private fun ArticleBottomBar(
                     shape = RoundedCornerShape(50)
                 ) {
                     Text("发送")
+                }
                 }
             }
 
@@ -805,4 +1085,26 @@ private fun ReportDialog(onDismiss: () -> Unit, onSubmit: (String) -> Unit) {
             TextButton(onClick = onDismiss) { Text("取消") }
         }
     )
+}
+
+/** 本人文章的审核状态条：作者能看到正文，这里说明为什么社区里搜不到 */
+@Composable
+private fun ArticleStatusNotice(status: Int) {
+    val (text, color) = when (status) {
+        PostStatus.PENDING -> "文章审核中，仅自己可见；审核通过后才会出现在社区" to Color(0xFFE08A1E)
+        PostStatus.REJECTED -> "文章未通过审核，仅自己可见；修改后可重新提交" to MaterialTheme.colorScheme.error
+        PostStatus.DRAFT -> "这篇文章还是草稿，仅自己可见" to TextSecondary
+        else -> "文章已下架，仅自己可见" to TextSecondary
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(color.copy(alpha = 0.10f))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = text, fontSize = 12.sp, color = color)
+    }
 }

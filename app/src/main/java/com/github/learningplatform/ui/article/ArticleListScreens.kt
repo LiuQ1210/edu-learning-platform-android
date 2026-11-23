@@ -59,23 +59,23 @@ import com.github.learningplatform.ui.theme.TextHint
 import com.github.learningplatform.ui.theme.TextPrimary
 import com.github.learningplatform.ui.theme.TextSecondary
 
-/** 我的发布状态：0草稿 1待审核 2已发布 3已驳回 4已下架（接口 7.6） */
+/** 我的发布状态：0已发布 1草稿 2已下架 3待审核 4已驳回（见后端 Post.java） */
 private val myArticleTabs = listOf(
     null to "全部",
-    2 to "已发布",
-    1 to "待审核",
-    0 to "草稿",
-    3 to "已驳回"
+    0 to "已发布",
+    3 to "待审核",
+    1 to "草稿",
+    4 to "已驳回"
 )
 
 /** 状态标签与其颜色（TextHint 是 @Composable getter，本函数也得是） */
 @androidx.compose.runtime.Composable
 private fun statusLabel(status: Int): Pair<String, Color> = when (status) {
-    0 -> "草稿" to TextHint
-    1 -> "待审核" to Color(0xFFF57C00)
-    2 -> "已发布" to Success
-    3 -> "已驳回" to Color(0xFFE53935)
-    else -> "已下架" to TextHint
+    0 -> "已发布" to Success
+    1 -> "草稿" to TextHint
+    2 -> "已下架" to TextHint
+    3 -> "审核中" to Color(0xFFF57C00)
+    else -> "未通过" to Color(0xFFE53935)
 }
 
 /**

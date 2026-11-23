@@ -8,6 +8,7 @@ import com.github.learningplatform.data.remote.dto.ArticleDetailDto
 import com.github.learningplatform.data.remote.dto.CommentDto
 import com.github.learningplatform.data.remote.dto.CreateCommentRequest
 import com.github.learningplatform.data.remote.dto.CreateNoteRequest
+import com.github.learningplatform.data.remote.dto.PostStatus
 import com.github.learningplatform.data.remote.dto.ReportRequest
 import com.github.learningplatform.data.repository.ArticleRepository
 import com.github.learningplatform.data.repository.ContentWatchRepository
@@ -37,6 +38,11 @@ data class ArticleDetailUiState(
     val detail: ArticleDetailDto? = null,
     /** 当前文章是否属于本人（决定是否显示「编辑」入口） */
     val isMine: Boolean = false,
+    /**
+     * 本人文章的审核状态，取值见 [PostStatus]。
+     * 详情接口不返回 status，只能从左表 `/post/myList` 里对上；非本人文章恒为已发布。
+     */
+    val mineStatus: Int = PostStatus.PUBLISHED,
     val isLiked: Boolean = false,
     val isFavorited: Boolean = false,
     val comments: List<CommentDto> = emptyList(),
@@ -85,11 +91,14 @@ class ArticleDetailViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
                 val detail = articleRepository.getArticleDetail(id)
-                // 是否有「编辑」权限：用 7.6 我的发布列表判断（7.2 未返回作者与当前用户的关系）
-                val isMine = runCatching {
+                // 是否有「编辑」权限 + 审核状态：都用 7.6 我的发布列表判断
+                // （7.2 未返回作者与当前用户的关系，也没返回 status）
+                val mineArticle = runCatching {
                     articleRepository.getMyArticles(pageNum = 1, pageSize = 50)
-                        .list.any { it.articleId == id }
-                }.getOrDefault(false)
+                        .list.firstOrNull { it.articleId == id }
+                }.getOrNull()
+                val isMine = mineArticle != null
+                val mineStatus = mineArticle?.status ?: PostStatus.PUBLISHED
 
                 // 详情接口可能不返回 isLiked/isFavorited，用 activeIds 兜底查一次
                 val likeIds = runCatching {
@@ -103,13 +112,20 @@ class ArticleDetailViewModel @Inject constructor(
                     isLoading = false,
                     detail = detail,
                     isMine = isMine,
+                    mineStatus = mineStatus,
                     isLiked = id in likeIds,
                     isFavorited = id in favIds,
                     myUserId = runCatching { userPreferences.currentUserId().toLong() }.getOrDefault(0L)
                 )
                 // 上报观看历史（文章）
                 userRepository.reportView(Constants.TARGET_ARTICLE, id)
-                loadComments(reset = true)
+                // 评论接口的 existsPost 要求 status='0'，待审核/草稿/下架文章一定报错，
+                // 所以本人查非已发布文章时直接不拉评论，避免弹「内容不存在或已被删除」
+                if (mineStatus == PostStatus.PUBLISHED) {
+                    loadComments(reset = true)
+                } else {
+                    _uiState.value = _uiState.value.copy(commentsLoading = false)
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {

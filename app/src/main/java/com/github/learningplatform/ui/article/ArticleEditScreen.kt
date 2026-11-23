@@ -1,5 +1,7 @@
 package com.github.learningplatform.ui.article
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -19,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -29,14 +33,21 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
 import com.github.learningplatform.ui.common.BackTopBar
 import com.github.learningplatform.ui.nav.NavIcons
 import com.github.learningplatform.ui.theme.Primary
@@ -82,23 +93,29 @@ fun ArticleEditScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
+            // 后端只有 POST /post/add（无草稿、无编辑），顶栏不再放存草稿
             BackTopBar(
-                title = if (articleId > 0L) "编辑文章" else "发布文章",
+                title = "发布文章",
                 onBack = onBack
             )
         },
         bottomBar = {
             Surface(shadowElevation = 8.dp) {
-                Button(
-                    onClick = { viewModel.submit() },
-                    enabled = !uiState.submitting && uiState.canPublish,
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-                    shape = RoundedCornerShape(50),
-                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Primary)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(if (uiState.submitting) "提交中..." else "发布")
+                    Button(
+                        onClick = { viewModel.submit() },
+                        enabled = !uiState.submitting && uiState.canPublish,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(50),
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Primary)
+                    ) {
+                        Text(if (uiState.submitting) "提交中..." else "发布")
+                    }
                 }
             }
         }
@@ -124,26 +141,6 @@ fun ArticleEditScreen(
                 decorationBox = { inner ->
                     if (uiState.title.isEmpty()) {
                         Text("请输入标题", color = TextHint, style = MaterialTheme.typography.titleMedium)
-                    }
-                    inner()
-                }
-            )
-
-            Spacer(Modifier.height(16.dp))
-            FieldLabel("摘要（选填）")
-            BasicTextField(
-                value = uiState.summary,
-                onValueChange = viewModel::onSummaryChange,
-                textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 60.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(surfaceWashBrush())
-                    .padding(14.dp),
-                decorationBox = { inner ->
-                    if (uiState.summary.isEmpty()) {
-                        Text("一句话概括本文内容", color = TextHint, style = MaterialTheme.typography.bodyMedium)
                     }
                     inner()
                 }
@@ -198,14 +195,71 @@ fun ArticleEditScreen(
             }
 
             Spacer(Modifier.height(16.dp))
-            FieldLabel("正文")
+            // 正文：插图按钮放标题行右侧，选图后上传并在光标处插入 ![](url)
+            val imagePicker = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.GetContent()
+            ) { uri -> uri?.let { viewModel.onImagePicked(it) } }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FieldLabel("正文")
+                TextButton(
+                    onClick = { imagePicker.launch("image/*") },
+                    enabled = !uiState.imageUploading
+                ) {
+                    if (uiState.imageUploading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(12.dp),
+                            strokeWidth = 1.5.dp,
+                            color = Primary
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "上传中…",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = TextHint
+                        )
+                    } else {
+                        Text(
+                            "插入图片",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Primary
+                        )
+                    }
+                }
+            }
             BodyEditor(
                 value = uiState.content,
-                onValueChange = viewModel::onContentChange
+                onValueChange = viewModel::onContentChange,
+                pendingInsert = uiState.pendingImageMarkdown,
+                onInsertConsumed = viewModel::consumePendingImage
             )
+            // 已插入的图片按顺序预览，跟详情页里正文图片的位置一一对应
+            if (uiState.imageUrls.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(uiState.imageUrls) { url ->
+                        AsyncImage(
+                            model = url,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(72.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                        )
+                    }
+                }
+            }
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "${uiState.content.length} 字 · 空行分段",
+                text = if (uiState.imageUrls.isEmpty()) {
+                    "${uiState.content.length} 字 · 空行分段"
+                } else {
+                    "${uiState.content.length} 字 · ${uiState.imageUrls.size} 张图 · 空行分段"
+                },
                 style = MaterialTheme.typography.labelSmall,
                 color = TextHint
             )
@@ -225,10 +279,40 @@ private fun FieldLabel(text: String) {
 }
 
 @Composable
-private fun BodyEditor(value: String, onValueChange: (String) -> Unit) {
+private fun BodyEditor(
+    value: String,
+    onValueChange: (String) -> Unit,
+    pendingInsert: String?,
+    onInsertConsumed: () -> Unit
+) {
+    // 用 TextFieldValue 才能知道光标位置，插图时才插得准；
+    // 外部只传纯文本，这里自己维护选区
+    var field by remember { mutableStateOf(TextFieldValue(value)) }
+
+    // 正文被外部整体替换（编辑旧文章回填）时同步，用户正常输入不会触发
+    LaunchedEffect(value) {
+        if (value != field.text) {
+            field = field.copy(text = value, selection = TextRange(value.length))
+        }
+    }
+
+    // 图片上传完成：插到光标处，光标跟到片段末尾，方便继续往下写
+    LaunchedEffect(pendingInsert) {
+        val insert = pendingInsert ?: return@LaunchedEffect
+        val start = field.selection.start
+        val end = field.selection.end
+        val newText = field.text.replaceRange(start, end, insert)
+        field = field.copy(text = newText, selection = TextRange(start + insert.length))
+        onValueChange(newText)
+        onInsertConsumed()
+    }
+
     BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
+        value = field,
+        onValueChange = {
+            field = it
+            onValueChange(it.text)
+        },
         textStyle = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary),
         modifier = Modifier
             .fillMaxWidth()
@@ -237,7 +321,7 @@ private fun BodyEditor(value: String, onValueChange: (String) -> Unit) {
             .background(surfaceWashBrush())
             .padding(14.dp),
         decorationBox = { inner ->
-            if (value.isEmpty()) {
+            if (field.text.isEmpty()) {
                 Row {
                     Icon(
                         NavIcons.Edit,

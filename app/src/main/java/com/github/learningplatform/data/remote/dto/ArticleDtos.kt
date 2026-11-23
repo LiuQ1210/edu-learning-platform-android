@@ -38,6 +38,7 @@ object PostStatus {
     const val DRAFT = 1
     const val OFFLINE = 2
     const val PENDING = 3
+    const val REJECTED = 4
 }
 
 /** 7.2 文章详情 */
