@@ -140,33 +140,26 @@ class ArticleEditViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(message = null)
     }
 
-    /** @param publish 0-存草稿 1-提交发布 */
-    fun submit(publish: Int) {
+    fun submit() {
         val state = _uiState.value
         if (state.submitting) return
         if (state.title.isBlank()) {
             _uiState.value = state.copy(message = "标题不能为空")
             return
         }
-        // categoryId 在 7.3/7.4 都是必填，草稿也不例外，否则后端直接 400
         if (state.categoryId == null) {
             _uiState.value = state.copy(message = "请选择分类")
             return
         }
-        if (publish == 1 && state.content.isBlank()) {
+        if (state.content.isBlank()) {
             _uiState.value = state.copy(message = "正文不能为空")
             return
         }
 
-        // 后端目前只有发布接口（POST /post/add），没有 post/edit，也没有草稿接口：
-        //  - 编辑已有文章 → 直接提示，避免走假成功
-        //  - 存草稿      → 后端不支持，提示用户直接发布
+        // 后端目前只有发布接口（POST /post/add），没有 post/edit：
+        // 编辑已有文章直接提示，避免走假成功
         if (articleId > 0L) {
             _uiState.value = state.copy(message = "后端暂不支持编辑文章")
-            return
-        }
-        if (publish == 0) {
-            _uiState.value = state.copy(message = "后端暂不支持保存草稿，请直接发布")
             return
         }
 
@@ -181,7 +174,7 @@ class ArticleEditViewModel @Inject constructor(
                         content = html,
                         categoryId = state.categoryId ?: 0L,
                         tagIds = state.selectedTagIds.toList(),
-                        publish = publish
+                        publish = 1
                     )
                 )
                 _uiState.value = _uiState.value.copy(

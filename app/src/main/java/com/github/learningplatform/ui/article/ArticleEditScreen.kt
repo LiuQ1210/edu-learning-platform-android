@@ -21,13 +21,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -86,37 +84,21 @@ fun ArticleEditScreen(
         topBar = {
             BackTopBar(
                 title = if (articleId > 0L) "编辑文章" else "发布文章",
-                onBack = onBack,
-                actions = {
-                    TextButton(
-                        onClick = { viewModel.submit(publish = 0) },
-                        enabled = !uiState.submitting && uiState.title.isNotBlank() && uiState.categoryId != null
-                    ) { Text("存草稿", color = TextSecondary) }
-                }
+                onBack = onBack
             )
         },
         bottomBar = {
             Surface(shadowElevation = 8.dp) {
-                Row(
+                Button(
+                    onClick = { viewModel.submit() },
+                    enabled = !uiState.submitting && uiState.canPublish,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    shape = RoundedCornerShape(50),
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Primary)
                 ) {
-                    OutlinedButton(
-                        onClick = { viewModel.submit(publish = 0) },
-                        enabled = !uiState.submitting && uiState.title.isNotBlank() && uiState.categoryId != null,
-                        modifier = Modifier.weight(1f)
-                    ) { Text("保存草稿") }
-                    Button(
-                        onClick = { viewModel.submit(publish = 1) },
-                        enabled = !uiState.submitting && uiState.canPublish,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(50),
-                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Primary)
-                    ) {
-                        Text(if (uiState.submitting) "提交中..." else "发布")
-                    }
+                    Text(if (uiState.submitting) "提交中..." else "发布")
                 }
             }
         }
