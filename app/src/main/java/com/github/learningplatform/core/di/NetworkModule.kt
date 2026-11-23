@@ -1,7 +1,6 @@
 package com.github.learningplatform.core.di
 
 import com.github.learningplatform.core.network.RetrofitClient
-import com.github.learningplatform.data.remote.AppApi
 import com.github.learningplatform.data.remote.AgreementApi
 import com.github.learningplatform.data.remote.ArticleApi
 import com.github.learningplatform.data.remote.AuthApi
@@ -16,11 +15,9 @@ import com.github.learningplatform.data.remote.NoteApi
 import com.github.learningplatform.data.remote.NotificationApi
 import com.github.learningplatform.data.remote.PointsApi
 import com.github.learningplatform.data.remote.RatingApi
-import com.github.learningplatform.data.remote.ResourceApi
 import com.github.learningplatform.data.remote.SearchApi
 import com.github.learningplatform.data.remote.ShopApi
 import com.github.learningplatform.data.remote.StudyApi
-import com.github.learningplatform.data.remote.TodoApi
 import com.github.learningplatform.data.remote.TopicApi
 import com.github.learningplatform.data.remote.UserApi
 import com.github.learningplatform.data.remote.VideoApi
@@ -65,16 +62,6 @@ object NetworkModule {
 
     @Provides @Singleton
     fun provideNoteApi(client: RetrofitClient): NoteApi = client.create()
-
-    @Provides @Singleton
-    fun provideTodoApi(client: RetrofitClient): TodoApi = client.create()
-
-    @Provides @Singleton
-    fun provideAppApi(client: RetrofitClient): AppApi = client.create()
-
-    /** 资源下载（12.1）*/
-    @Provides @Singleton
-    fun provideResourceApi(client: RetrofitClient): ResourceApi = client.create()
 
     /** 文件上传（v3.1 增补 15.1 / 15.2）*/
     @Provides @Singleton

@@ -297,7 +297,15 @@ fun CategoryTabs(
     selectedId: Long?,
     onSelect: (Long?) -> Unit,
     modifier: Modifier = Modifier,
-    selectedColor: Color = Primary
+    selectedColor: Color = Primary,
+    /**
+     * 分类还在加载时，在「全部」后面铺几个等尺寸的骨架胶囊。
+     *
+     * 目的不是省请求，而是让首帧就保持「全部 + 一排胶囊」的稳定形态：
+     * 数据回来后占位被原位替换，行高和位置不变，不会出现「先只有一个全部、
+     * 过一会儿又慢慢长出一排」的跳变。传 0 表示不铺（数据已就绪的场景）。
+     */
+    placeholderCount: Int = 0
 ) {
     LazyRow(
         modifier = modifier.fillMaxWidth(),
@@ -325,6 +333,19 @@ fun CategoryTabs(
                     maxLines = 1,
                     modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)
                 )
+            }
+        }
+        if (placeholderCount > 0) {
+            // 骨架与真实胶囊同高同圆角，宽度按分类名长度交替，看起来像「在加载」而不是「缺一块」
+            items(count = placeholderCount, key = { "category_placeholder_$it" }) { index ->
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Divider),
+                    modifier = Modifier
+                        .width(if (index % 2 == 0) 76.dp else 94.dp)
+                        .height(36.dp)
+                ) {}
             }
         }
     }

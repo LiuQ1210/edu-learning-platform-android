@@ -70,6 +70,7 @@ import com.github.learningplatform.ui.mine.SettingsScreen
 import com.github.learningplatform.ui.mine.ShippingAddressScreen
 import com.github.learningplatform.ui.mine.WatchHistoryScreen
 import com.github.learningplatform.ui.mall.ExchangeRecordsScreen
+import com.github.learningplatform.ui.mall.PointsLogScreen
 import com.github.learningplatform.ui.mall.PointsMallScreen
 import com.github.learningplatform.ui.mall.PrizeExchangeScreen
 import com.github.learningplatform.ui.mall.PrizeExchangeSuccessScreen
@@ -180,8 +181,14 @@ private fun RootNavHost(navController: NavHostController, startDestination: Stri
                     navController.navigate(Routes.prizeExchange(prize.id, balance))
                 },
                 onOpenRecords = { navController.navigate(Routes.EXCHANGE_RECORDS) },
+                onOpenPointsLog = { navController.navigate(Routes.POINTS_LOG) },
                 onBack = { navController.popBackStack() }
             )
+        }
+
+        // 积分明细：商城积分卡右上角「积分明细 >」进入
+        composable(Routes.POINTS_LOG) {
+            PointsLogScreen(onBack = { navController.popBackStack() })
         }
 
         // 奖品兑换：商品详情与默认地址来自后端，确认后调用兑换接口
@@ -557,7 +564,14 @@ fun MainScaffold(
             }
 
             composable(Routes.STUDY_STATS) {
-                StudyStatsScreen(onBack = { navController.popBackStack() })
+                StudyStatsScreen(
+                    onBack = { navController.popBackStack() },
+                    // 课程统一进课程详情页（与首页 / 我的课程一致），再从详情页选小节播放
+                    onOpenCourse = { courseId -> navController.navigate(Routes.courseDetail(courseId)) },
+                    // 阅读数据点进去看「读过哪些文章」：观看历史默认落文章 tab
+                    onOpenReadingHistory = { navController.navigate(Routes.watchHistory(1)) },
+                    onOpenNotes = { navController.navigate(Routes.NOTES) }
+                )
             }
 
             composable(Routes.MY_FAVORITES) {
@@ -607,7 +621,15 @@ fun MainScaffold(
                 )
             }
 
-            composable(Routes.WATCH_HISTORY) {
+            composable(
+                route = Routes.WATCH_HISTORY_PATTERN,
+                arguments = listOf(
+                    navArgument("targetType") {
+                        type = NavType.IntType
+                        defaultValue = 2
+                    }
+                )
+            ) {
                 WatchHistoryScreen(
                     onBack = { navController.popBackStack() },
                     onOpenTarget = { type, id ->

@@ -159,7 +159,7 @@ fun NotesScreen(
 
 private val noteSourceTabs = listOf(
     1 to "文章笔记",
-    2 to "视频笔记"
+    2 to "课程笔记"
 )
 
 @Composable

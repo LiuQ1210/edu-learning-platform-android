@@ -13,7 +13,7 @@ import javax.inject.Singleton
  *
  * 后端目前**没有**待办相关接口（无 /api/v1/todo*），
  * 按约定先用本地样例数据渲染，不发网络请求，避免 404 把页面变成错误态。
- * 后端补齐待办接口后，把这里替换成 [com.github.learningplatform.data.remote.TodoApi] 调用即可。
+ * 后端补齐待办接口后，在这里换成真实网络请求即可。
  */
 @Singleton
 class TodoRepository @Inject constructor() {

@@ -1,11 +1,13 @@
 package com.github.learningplatform.data.remote
 
+import com.github.learningplatform.core.network.RawTableData
 import kotlinx.serialization.json.JsonObject
 import retrofit2.Response
 import retrofit2.http.Field
 import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Query
 
 /**
  * 学习数据接口（对齐后端 ApiV1StudyController）。
@@ -38,4 +40,18 @@ interface StudyApi {
     /** 学习数据总览（今日 / 连续天数 / 本周时长 / 已完成课程 / 笔记 / 待办） */
     @GET("api/v1/learn/stats")
     suspend fun getStudyStats(): Response<JsonObject>
+
+    /**
+     * 我的课程（按学习状态）。
+     *
+     * @param status `learning`（在学）/ `completed`（已完成）；后端没有默认值，必须显式传
+     * @param pageNum 页码，从 1 开始
+     * @param pageSize 每页条数，1~50
+     */
+    @GET("api/v1/learn/courses")
+    suspend fun getLearningCourses(
+        @Query("status") status: String,
+        @Query("pageNum") pageNum: Int = 1,
+        @Query("pageSize") pageSize: Int = 20
+    ): Response<RawTableData>
 }

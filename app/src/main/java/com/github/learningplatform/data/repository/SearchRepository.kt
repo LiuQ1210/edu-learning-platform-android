@@ -4,7 +4,9 @@ import com.github.learningplatform.core.network.ApiException
 import com.github.learningplatform.core.network.double
 import com.github.learningplatform.core.network.int
 import com.github.learningplatform.core.network.long
+import com.github.learningplatform.core.network.okBody
 import com.github.learningplatform.core.network.okTable
+import com.github.learningplatform.core.network.payload
 import com.github.learningplatform.core.network.str
 import com.github.learningplatform.data.demo.DemoData
 import com.github.learningplatform.data.remote.SearchApi
@@ -12,6 +14,8 @@ import com.github.learningplatform.data.remote.dto.ContentItemDto
 import com.github.learningplatform.data.remote.dto.CourseDto
 import com.github.learningplatform.data.remote.dto.HotWordDto
 import com.github.learningplatform.data.remote.dto.PageData
+import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -24,7 +28,7 @@ import javax.inject.Singleton
  *  - `type=2` 视频课程：GET /api/v1/search/course
  *  - 分类页点进来（有关键词为空 + categoryId）：走课程列表接口按分类浏览
  *
- * 搜索热词后端未提供，仍用本地样例。
+ * 搜索热词走 /api/v1/search/hot-words；后端暂无采集数据时回退本地样例。
  */
 @Singleton
 class SearchRepository @Inject constructor(
@@ -87,8 +91,26 @@ class SearchRepository @Inject constructor(
         return PageData(total = body.total, list = body.rows.map { it.toContentItem() })
     }
 
-    /** 搜索热词：后端未提供，使用本地样例 */
-    suspend fun getHotWords(size: Int = 10): List<HotWordDto> = DemoData.hotWords
+    /**
+     * 搜索热词：优先调后端 `GET /api/v1/search/hot-words`。
+     *
+     * 后端目前没有搜索日志采集表，`hotWordList` 返回空数组；
+     * 空数组或接口异常时回退本地样例，保证搜索页热词区不留白。
+     */
+    suspend fun getHotWords(size: Int = 10): List<HotWordDto> {
+        return try {
+            val d = searchApi.getHotWords(size).okBody().payload()
+            val words = ((d["hotWordList"] as? JsonArray) ?: JsonArray(emptyList()))
+                .mapNotNull { it as? JsonObject }
+                .map { HotWordDto(keyword = it.str("keyword"), count = it.long("count")) }
+                .filter { it.keyword.isNotBlank() }
+            words.ifEmpty { DemoData.hotWords }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            DemoData.hotWords
+        }
+    }
 }
 
 /**

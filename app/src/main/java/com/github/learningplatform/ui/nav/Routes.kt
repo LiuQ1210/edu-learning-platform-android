@@ -44,6 +44,8 @@ object Routes {
     const val MY_LIKES = "my_likes"
     const val MY_DOWNLOADS = "my_downloads"
     const val WATCH_HISTORY = "watch_history"
+    /** 可指定默认筛选的观看历史：1 文章 / 2 课程 / 3 视频（缺省 2 课程，与原入口一致） */
+    const val WATCH_HISTORY_PATTERN = "watch_history?targetType={targetType}"
     const val NOTES = "notes"
     const val NOTE_DETAIL = "note_detail/{noteId}"
     const val TODOS = "todos"
@@ -66,6 +68,7 @@ object Routes {
     const val PRIZE_EXCHANGE = "prize_exchange/{prizeId}?balance={balance}"
     const val PRIZE_EXCHANGE_SUCCESS = "prize_exchange_success/{prizeId}?remaining={remaining}&code={code}"
     const val EXCHANGE_RECORDS = "exchange_records"
+    const val POINTS_LOG = "points_log"
 
     // ---- 播放（全屏）----
     const val PLAYER = "player/{courseId}?lessonId={lessonId}"
@@ -90,6 +93,9 @@ object Routes {
 
     fun courseDetail(courseId: Long) = "course_detail/$courseId"
     fun articleDetail(articleId: Long) = "article_detail/$articleId"
+
+    /** 观看历史：默认落哪个 tab（1 文章 / 2 课程 / 3 视频） */
+    fun watchHistory(targetType: Int = 2) = "$WATCH_HISTORY?targetType=$targetType"
     fun video(focusId: Long? = null) = "$VIDEO?focusId=${focusId ?: 0L}"
     fun articleEdit(articleId: Long) = "article_edit/$articleId"
     fun noteDetail(noteId: Long) = "note_detail/$noteId"
