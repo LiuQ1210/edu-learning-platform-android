@@ -43,9 +43,3 @@ data class UpdateTodoRequest(
     val remindTime: String? = null,
     val priority: Int? = null
 )
-
-@Serializable
-data class CreateTodoResponse(val todoId: Long)
-
-@Serializable
-data class TodoStatusRequest(val status: Int)

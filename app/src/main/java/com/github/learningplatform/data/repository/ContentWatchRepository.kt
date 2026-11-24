@@ -39,7 +39,14 @@ class ContentWatchRepository @Inject constructor(
         return body.toResult()
     }
 
-    /** 上报帖子本次新增阅读秒数，满 30 秒由服务端发分。 */
+    /**
+     * 上报帖子本次新增阅读秒数。
+     *
+     * 后端 `/points/watch`（targetType=post）会同时做两件事：
+     *  - 把这批秒数累加进当天学习时长（`learning_study_record.seconds` / `article_seconds`）；
+     *  - 当天累计满 30 秒结算一次积分。
+     * 所以帖子阅读只需要调这一个接口，不要再走 `/learn/report`，否则学习时长会重复。
+     */
     suspend fun reportPost(postId: Long, seconds: Int): ContentWatchResult {
         val body = pointsApi.reportWatch(
             targetType = TARGET_POST,

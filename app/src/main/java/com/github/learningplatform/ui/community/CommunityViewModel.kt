@@ -23,6 +23,8 @@ data class CommunityUiState(
     val isLoadingMore: Boolean = false,
     val error: String? = null,
     val categories: List<Pair<Long?, String>> = emptyList(),
+    /** 分类请求是否已结束（成功或失败都置 true）。false 时 UI 先铺骨架，避免先只出现「全部」 */
+    val categoriesLoaded: Boolean = false,
     val selectedCategoryId: Long? = null,
     val sort: Int = 1,
     val articles: List<ArticleDto> = emptyList(),
@@ -50,7 +52,11 @@ class CommunityViewModel @Inject constructor(
         load(reset = true)
     }
 
-    fun refresh() = load(reset = true)
+    fun refresh() {
+        // 分类也一起强制回源：分类树缓存 24h，不失效的话后台新增分类要等一天才出现
+        loadCategories(forceRefresh = true)
+        load(reset = true)
+    }
 
     fun selectCategory(categoryId: Long?) {
         if (categoryId == _uiState.value.selectedCategoryId) return
@@ -70,17 +76,19 @@ class CommunityViewModel @Inject constructor(
         load(reset = false)
     }
 
-    private fun loadCategories() {
+    private fun loadCategories(forceRefresh: Boolean = false) {
         viewModelScope.launch {
             try {
-                val tree = categoryRepository.getTree(CATEGORY_TYPE_ARTICLE)
+                val tree = categoryRepository.getTree(CATEGORY_TYPE_ARTICLE, forceRefresh)
                 _uiState.value = _uiState.value.copy(
-                    categories = tree.map { it.categoryId to it.categoryName }
+                    categories = tree.map { it.categoryId to it.categoryName },
+                    categoriesLoaded = true
                 )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                // 分类失败不阻塞文章流
+                // 失败也要标记「加载结束」：否则骨架胶囊会一直挂着，看起来像卡死
+                _uiState.value = _uiState.value.copy(categoriesLoaded = true)
             }
         }
     }

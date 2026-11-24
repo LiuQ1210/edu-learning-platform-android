@@ -37,6 +37,8 @@ data class HomeUiState(
     val isLoadingMore: Boolean = false,
     val error: String? = null,
     val categories: List<Pair<Long?, String>> = emptyList(),
+    /** 分类请求是否已结束（成功或失败都置 true）。false 时 UI 铺骨架，避免整行分类突然出现把列表顶下去 */
+    val categoriesLoaded: Boolean = false,
     val selectedCategoryId: Long? = null,
     val hotCourses: List<CourseDto> = emptyList(),
     val rankCourses: List<CourseDto> = emptyList(),
@@ -103,7 +105,8 @@ class HomeViewModel @Inject constructor(
      * 下拉刷新是用户明确表达「我要最新数据」的动作，必须真的去请求。
      */
     fun refresh() {
-        loadCategories()
+        // 分类树有 24h 缓存，下拉刷新必须强制回源，否则后台新增的分类要等一天才出现
+        loadCategories(forceRefresh = true)
         loadBanners()
         loadCourses(reset = true, forceRefresh = true)
     }
@@ -122,17 +125,20 @@ class HomeViewModel @Inject constructor(
         loadCourses(reset = false)
     }
 
-    private fun loadCategories() {
+    private fun loadCategories(forceRefresh: Boolean = false) {
         viewModelScope.launch {
             try {
-                val tree = categoryRepository.getTree(CATEGORY_TYPE_COURSE)
+                val tree = categoryRepository.getTree(CATEGORY_TYPE_COURSE, forceRefresh)
                 _uiState.value = _uiState.value.copy(
-                    categories = tree.map { it.categoryId to it.categoryName }
+                    categories = tree.map { it.categoryId to it.categoryName },
+                    categoriesLoaded = true
                 )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                // 分类树失败不阻塞首页主内容，静默降级为「仅全部」
+                // 分类树失败不阻塞首页主内容，静默降级为「仅全部」。
+                // 但仍要标记「加载结束」，否则骨架会一直挂着。
+                _uiState.value = _uiState.value.copy(categoriesLoaded = true)
             }
         }
     }

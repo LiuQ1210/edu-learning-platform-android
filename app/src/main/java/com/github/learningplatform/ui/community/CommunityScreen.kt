@@ -88,7 +88,9 @@ fun CommunityScreen(
                 items = listOf(null to "全部") + uiState.categories,
                 selectedId = uiState.selectedCategoryId,
                 onSelect = viewModel::selectCategory,
-                selectedColor = com.github.learningplatform.ui.theme.CommunityPrimary
+                selectedColor = com.github.learningplatform.ui.theme.CommunityPrimary,
+                // 分类数据回来之前先铺两个骨架胶囊，避免首帧只显示孤零零一个「全部」
+                placeholderCount = if (uiState.categoriesLoaded) 0 else 2
             )
 
             Spacer(Modifier.height(8.dp))
@@ -114,6 +116,7 @@ fun CommunityScreen(
                     items(uiState.articles.take(3), key = { it.articleId }) { article ->
                         ArticleCard(
                             article = article,
+                            showCategory = uiState.selectedCategoryId == null,
                             onClick = { onOpenArticle(article.articleId) },
                         )
                     }
@@ -129,6 +132,7 @@ fun CommunityScreen(
                     items(uiState.articles.drop(3), key = { it.articleId }) { article ->
                         ArticleCard(
                             article = article,
+                            showCategory = uiState.selectedCategoryId == null,
                             onClick = { onOpenArticle(article.articleId) },
                         )
                     }
@@ -256,6 +260,8 @@ private fun SortTabs(selected: Int, onSelect: (Int) -> Unit) {
 @Composable
 private fun ArticleCard(
     article: ArticleDto,
+    /** 「全部」tab 下才显示分类标签：切到某个分类后每张卡都是同一个名字，重复没意义 */
+    showCategory: Boolean,
     onClick: () -> Unit
 ) {
     Row(
@@ -293,6 +299,11 @@ private fun ArticleCard(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
+                // 分类标签：后端 /post/list 已返回 categoryName，空值（未分类）不占位
+                if (showCategory && article.categoryName.isNotBlank()) {
+                    Spacer(Modifier.width(6.dp))
+                    TagChip(article.categoryName)
+                }
             }
             if (article.summary.isNotBlank()) {
                 Spacer(Modifier.height(4.dp))

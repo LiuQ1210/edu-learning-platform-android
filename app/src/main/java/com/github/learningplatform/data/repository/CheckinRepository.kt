@@ -19,6 +19,7 @@ import com.github.learningplatform.data.remote.dto.DailySignResultDto
 import com.github.learningplatform.data.remote.dto.DailySignStatusDto
 import com.github.learningplatform.data.remote.dto.PageData
 import com.github.learningplatform.data.remote.dto.PointsAccountDto
+import com.github.learningplatform.data.remote.dto.PointsLogDto
 import com.github.learningplatform.domain.model.TaskCenterRules
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -29,7 +30,7 @@ import javax.inject.Singleton
  * 每日签到 / 积分仓库（全部对接后端）。
  *
  * 签到：`/api/v1/checkin/{status,sign,calendar,records,rules}`
- * 积分：`/api/v1/points/account`（免广告兑换已下线，积分改由积分商城兑换奖品）
+ * 积分：`/api/v1/points/account`；积分统一走积分商城兑换奖品，免广告兑换已下线。
  *
  * 所有「今天」「是否已签」都由服务端算好返回，客户端不做本地时间推算（手机时间可改）。
  */
@@ -105,14 +106,40 @@ class CheckinRepository @Inject constructor(
     }
 
     /**
-     * 积分账户（暂不使用）。
+     * 积分账户：余额（`GET /api/v1/points/account`）。
      *
-     * 当前后端没有暴露 `/api/v1/points/account`，任务中心总积分统一取
-     * `/checkin/status` 的 `balance`；此方法保留，等后端补齐接口后再启用。
+     * 任务中心总积分目前仍取 `/checkin/status` 的 `balance`，这里保留账户接口备用。
      */
     suspend fun getAccount(): PointsAccountDto {
         val d = pointsApi.getAccount().okBody().payload()
         return PointsAccountDto(balance = d.int("balance"))
+    }
+
+    /**
+     * 积分明细（`GET /api/v1/points/logs`，分页）。
+     *
+     * 用户 ID 由 Token 决定，这里不传；`type` 为空表示全部来源。
+     * 后端已按时间倒序返回，前端直接追加，不要再二次排序（同秒多条靠 logId 稳定）。
+     */
+    suspend fun getPointsLogs(
+        pageNum: Int = 1,
+        pageSize: Int = 20,
+        type: String? = null
+    ): PageData<PointsLogDto> {
+        val table: RawTableData = pointsApi.getLogs(pageNum, pageSize, type).okTable()
+        val list = table.rows.map {
+            PointsLogDto(
+                logId = it.long("logId"),
+                changeAmount = it.int("changeAmount"),
+                balance = it.int("balance"),
+                type = it.str("type"),
+                sourceLabel = it.str("sourceLabel"),
+                remark = it.str("remark"),
+                refId = it.long("refId"),
+                createTime = it.str("createTime")
+            )
+        }
+        return PageData(total = table.total, list = list)
     }
 
     /**

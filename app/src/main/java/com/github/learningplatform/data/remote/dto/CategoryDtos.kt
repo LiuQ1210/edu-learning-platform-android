@@ -17,9 +17,6 @@ data class CategoryNodeDto(
 // 4.2 / 5.1 的列表项统一为 ContentItemDto，已按 v3.1 增补 1.2 节独立定义于
 // data/remote/dto/ContentItemDto.kt（主键固定 id，且必须回传 type）。
 
-/** 5.2 搜索热词 */
+/** 5.2 搜索热词（后端暂无接口，搜索页用本地样例兜底） */
 @Serializable
 data class HotWordDto(val keyword: String = "", val count: Long = 0)
-
-@Serializable
-data class HotWordListDto(val hotWordList: List<HotWordDto> = emptyList())

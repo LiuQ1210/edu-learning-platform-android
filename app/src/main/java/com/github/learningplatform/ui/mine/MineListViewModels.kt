@@ -1,5 +1,6 @@
 package com.github.learningplatform.ui.mine
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.learningplatform.data.remote.dto.MyCourseDto
@@ -172,10 +173,18 @@ data class WatchHistoryUiState(
 
 @HiltViewModel
 class WatchHistoryViewModel @Inject constructor(
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(WatchHistoryUiState())
+    /**
+     * 首屏默认筛选跟着路由参数走：
+     * 从「观看历史」入口进是课程（2），从学习数据「阅读」入口进直接落文章（1），
+     * 这样不用先进页面再切一次 tab，也避免多打一次无用请求。
+     */
+    private val _uiState = MutableStateFlow(
+        WatchHistoryUiState(targetType = savedStateHandle.get<Int>("targetType") ?: 2)
+    )
     val uiState: StateFlow<WatchHistoryUiState> = _uiState.asStateFlow()
 
     init { load(reset = true) }

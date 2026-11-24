@@ -33,8 +33,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -42,7 +40,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -70,7 +67,6 @@ import com.github.learningplatform.ui.theme.TextHint
 import com.github.learningplatform.ui.theme.TextPrimary
 import com.github.learningplatform.ui.theme.TextSecondary
 import com.github.learningplatform.ui.theme.pageGradientBrush
-import kotlinx.coroutines.launch
 
 /**
  * 积分商城。
@@ -84,12 +80,11 @@ fun PointsMallScreen(
     todayPoints: Int,
     onExchangePrize: (MallPrize) -> Unit,
     onOpenRecords: () -> Unit,
+    onOpenPointsLog: () -> Unit,
     onBack: () -> Unit,
     viewModel: MallViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
     var query by rememberSaveable { mutableStateOf("") }
@@ -118,14 +113,9 @@ fun PointsMallScreen(
         }
     }
 
-    fun notify(message: String) {
-        scope.launch { snackbarHostState.showSnackbar(message) }
-    }
-
     Scaffold(
         containerColor = Color.Transparent,
         modifier = Modifier.background(pageGradientBrush(strong = true)),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             BackTopBar(
                 title = "积分商城",
@@ -155,7 +145,7 @@ fun PointsMallScreen(
                     PointsSummaryCard(
                         balance = balance,
                         todayPoints = todayPoints,
-                        onDetails = { notify("积分明细功能开发中") }
+                        onDetails = onOpenPointsLog
                     )
                 }
 

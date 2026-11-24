@@ -143,9 +143,13 @@ class ArticleDetailViewModel @Inject constructor(
      *
      * 只累计正文加载成功后的前台时间；详情未加载成功时不计数，
      * 避免把失败页算成浏览。满一个上报间隔后触发一次增量上报。
+     *
+     * 后端 `/points/watch` 只认已发布帖子（`countPublishedPost`），
+     * 本人看自己的待审核 / 草稿 / 下架文章会被拒绝，这类页面不累计、不上报。
      */
     fun onForegroundSecond() {
         if (articleId == 0L || _uiState.value.detail == null) return
+        if (_uiState.value.mineStatus != PostStatus.PUBLISHED) return
         if (watchAccumulator.addSecond()) {
             flushReading()
         }
@@ -154,11 +158,14 @@ class ArticleDetailViewModel @Inject constructor(
     /**
      * 上报累计的前台阅读秒数，并把服务端结算结果写入任务中心展示缓存。
      *
+     * 后端会同时把这批秒数累加进当天学习时长（总时长 + 文章阅读时长），
+     * 前端只上报一次即可，不需要再调 `/learn/report`，否则会重复计时。
+     *
      * 请求挂在 appScope 上：退出文章页时 ViewModel 可能立即清理，
      * 挂在 viewModelScope 上的请求会被取消，最后一批秒数就丢了。
      */
     fun flushReading(force: Boolean = false) {
-        if (articleId == 0L) return
+        if (articleId == 0L || _uiState.value.mineStatus != PostStatus.PUBLISHED) return
         val report = watchAccumulator.takeForReport(force) ?: return
         val postId = articleId
         appScope.launch {

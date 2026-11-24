@@ -5,7 +5,6 @@ import com.github.learningplatform.data.local.CacheKeys
 import com.github.learningplatform.data.local.CacheStore
 import com.github.learningplatform.data.local.CacheTtl
 import com.github.learningplatform.data.local.cachedList
-import com.github.learningplatform.data.remote.AppApi
 import com.github.learningplatform.data.remote.dto.AdSlotDto
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -13,12 +12,11 @@ import javax.inject.Singleton
 /**
  * 广告位仓库。
  *
- * 后端目前没有 App 端的 /ad-slots 接口，按约定先用本地样例渲染
- * （仍走缓存，避免每次重复构造）。后端补齐后把 DemoData 换回 appApi 调用即可。
+ * 后端没有 App 端的 `/ad-slots` 接口，广告位用本地样例渲染
+ * （走缓存，避免每次重复构造）。以后后端补齐接口，在这里换成网络请求即可。
  */
 @Singleton
 class AppRepository @Inject constructor(
-    @Suppress("unused") private val appApi: AppApi,
     private val cache: CacheStore
 ) {
 

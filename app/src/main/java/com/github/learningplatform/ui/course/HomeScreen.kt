@@ -96,16 +96,18 @@ fun HomeScreen(
     ) {
         HomeTopBar(onOpenSearch = onOpenSearch, onOpenMenu = onOpenAllCategories, onOpenNotifications = onOpenNotifications)
 
-        if (uiState.categories.isNotEmpty()) {
-            CategoryTabs(
-                items = listOf(null to "全部") + uiState.categories,
-                selectedId = uiState.selectedCategoryId,
-                onSelect = viewModel::selectCategory,
-                modifier = Modifier.padding(bottom = 4.dp),
-                // 用随主题切换的 TabHomeInk：浅色藏青、深色亮蓝，避免深色下深紫黑文字看不见
-                selectedColor = com.github.learningplatform.ui.theme.TabHomeInk
-            )
-        }
+        // 分类行始终占位：分类接口回来之前先渲染「全部 + 骨架胶囊」，
+        // 数据到了原位替换。之前是 categories 非空才渲染整行，导致首屏没有分类、
+        // 数据回来后整行插入，把下面的课程列表整体顶下去。
+        CategoryTabs(
+            items = listOf(null to "全部") + uiState.categories,
+            selectedId = uiState.selectedCategoryId,
+            onSelect = viewModel::selectCategory,
+            modifier = Modifier.padding(bottom = 4.dp),
+            // 用随主题切换的 TabHomeInk：浅色藏青、深色亮蓝，避免深色下深紫黑文字看不见
+            selectedColor = com.github.learningplatform.ui.theme.TabHomeInk,
+            placeholderCount = if (uiState.categoriesLoaded) 0 else 2
+        )
 
         when {
             uiState.isLoading && uiState.hotCourses.isEmpty() -> LoadingState()
