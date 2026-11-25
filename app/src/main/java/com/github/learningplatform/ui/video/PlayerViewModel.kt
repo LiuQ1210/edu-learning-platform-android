@@ -28,6 +28,10 @@ data class PlayerUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val title: String = "",
+    /** 课程标题：播放页顶栏显示小节标题，问阿星要把课程名带过去 */
+    val courseTitle: String = "",
+    /** 实际播放的小节 ID：视频总结按小节发起，未就绪时为空 */
+    val resolvedLessonId: Long? = null,
     val playInfo: PlayInfoDto? = null,
     /** 写笔记弹窗是否可见 */
     val showNoteDialog: Boolean = false,
@@ -83,6 +87,8 @@ class PlayerViewModel @Inject constructor(
                 _uiState.value = PlayerUiState(
                     isLoading = false,
                     title = currentLesson?.title ?: detail.title,
+                    courseTitle = detail.title,
+                    resolvedLessonId = info.lessonId.takeIf { it > 0L },
                     playInfo = info
                 )
             } catch (e: CancellationException) {

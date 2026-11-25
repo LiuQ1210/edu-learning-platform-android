@@ -29,6 +29,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.github.learningplatform.ui.ad.rememberSplashAdGate
 import com.github.learningplatform.ui.article.ArticleDetailScreen
+import com.github.learningplatform.ui.axing.AxingAssistantScreen
 import com.github.learningplatform.ui.theme.BottomNavContainer
 import com.github.learningplatform.ui.theme.BottomNavUnselected
 import com.github.learningplatform.ui.theme.TabHomeInk
@@ -138,6 +139,10 @@ private fun RootNavHost(navController: NavHostController, startDestination: Stri
                 },
                 // 收货信息属于账号资料，设置页在 main 图内，需由根图打开
                 onOpenShippingAddress = { navController.navigate(Routes.SHIPPING_ADDRESS) },
+                // 阿星是全屏页（无底栏），从主框架向上冒泡到根图
+                onOpenAxing = { courseId, courseTitle ->
+                    navController.navigate(Routes.axing(courseId, courseTitle))
+                },
                 // 退出登录必须回到根图的登录页，并清掉整条主框架回退栈
                 onLoggedOut = {
                     navController.navigate(Routes.LOGIN) {
@@ -264,6 +269,32 @@ private fun RootNavHost(navController: NavHostController, startDestination: Stri
             com.github.learningplatform.ui.checkin.PointsRulesScreen(onBack = { navController.popBackStack() })
         }
 
+        // 阿星助手：全屏（自带历史抽屉与课程选择弹层）
+        composable(
+            route = Routes.AXING,
+            arguments = listOf(
+                navArgument("courseId") {
+                    type = NavType.LongType
+                    defaultValue = 0L
+                },
+                navArgument("courseTitle") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("videoId") {
+                    type = NavType.LongType
+                    defaultValue = 0L
+                }
+            )
+        ) { entry ->
+            AxingAssistantScreen(
+                courseId = entry.arguments?.getLong("courseId") ?: 0L,
+                courseTitle = entry.arguments?.getString("courseTitle").orEmpty(),
+                videoId = entry.arguments?.getLong("videoId") ?: 0L,
+                onClose = { navController.popBackStack() }
+            )
+        }
+
         // 播放器：全屏 + 横竖屏自适应
         composable(
             route = Routes.PLAYER,
@@ -280,7 +311,10 @@ private fun RootNavHost(navController: NavHostController, startDestination: Stri
             PlayerScreen(
                 courseId = courseId,
                 lessonId = lessonId,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onOpenAxing = { axingCourseId, courseTitle, videoId ->
+                    navController.navigate(Routes.axing(axingCourseId, courseTitle, videoId))
+                }
             )
         }
     }
@@ -298,6 +332,8 @@ fun MainScaffold(
     onOpenPlayer: (Long, Long?) -> Unit,
     /** 设置页的「收货信息」：页面注册在根图，需由这里向上透传 */
     onOpenShippingAddress: () -> Unit,
+    /** 阿星助手：全屏页注册在根图，课程上下文一并带过去 */
+    onOpenAxing: (Long, String) -> Unit,
     /**
      * 退出登录：必须由根 NavHost 处理。
      * 内层 navController 的图里没有登录页，用它 navigate(LOGIN) 会直接抛异常。
@@ -395,6 +431,7 @@ fun MainScaffold(
                     onOpenNotifications = { navController.navigate(Routes.NOTIFICATIONS) },
                     onOpenAllCategories = { navController.navigate(Routes.CATEGORY_ALL) },
                     onOpenCourse = { navController.navigate(Routes.courseDetail(it)) },
+                    onOpenAxing = { onOpenAxing(0L, "") }
                 )
             }
 
@@ -454,7 +491,8 @@ fun MainScaffold(
                 CourseDetailScreen(
                     courseId = entry.arguments?.getLong("courseId") ?: 0L,
                     onBack = { navController.popBackStack() },
-                    onOpenPlayer = onOpenPlayer
+                    onOpenPlayer = onOpenPlayer,
+                    onOpenAxing = onOpenAxing
                 )
             }
 

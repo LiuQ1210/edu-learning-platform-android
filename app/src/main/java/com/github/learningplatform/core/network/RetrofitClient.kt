@@ -44,5 +44,22 @@ class RetrofitClient @Inject constructor(
         .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
         .build()
 
+    /**
+     * 智能体接口单独一份：问答要走大模型，30 秒的全局读超时不够用，
+     * 这里把读超时放宽到 120 秒（异步任务仍然走「提交 + 轮询」，不受影响）。
+     */
+    @PublishedApi
+    internal val agentRetrofit: Retrofit = Retrofit.Builder()
+        .baseUrl(Constants.BASE_URL)
+        .client(
+            okHttpClient.newBuilder()
+                .readTimeout(120, TimeUnit.SECONDS)
+                .build()
+        )
+        .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+        .build()
+
     inline fun <reified T> create(): T = retrofit.create(T::class.java)
+
+    inline fun <reified T> createAgent(): T = agentRetrofit.create(T::class.java)
 }

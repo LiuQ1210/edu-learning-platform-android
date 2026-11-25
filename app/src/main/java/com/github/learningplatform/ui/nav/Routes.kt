@@ -73,6 +73,9 @@ object Routes {
     // ---- 播放（全屏）----
     const val PLAYER = "player/{courseId}?lessonId={lessonId}"
 
+    // ---- AI 阿星（全屏）----
+    const val AXING = "axing?courseId={courseId}&courseTitle={courseTitle}&videoId={videoId}"
+
     /** 显示底部导航的 route 集合 */
     val barRoutes: Set<String> = setOf(HOME, VIDEO, COMMUNITY, PROFILE)
 
@@ -106,6 +109,13 @@ object Routes {
     fun agreement(type: String) = "agreement/$type"
     fun player(courseId: Long, lessonId: Long? = null) =
         "player/$courseId?lessonId=${lessonId ?: 0L}"
+
+    /**
+     * 阿星助手：courseId/courseTitle 用于课程详情进入时带上上下文；
+     * videoId 由播放页传入，视频总结需要用它定位小节。
+     */
+    fun axing(courseId: Long = 0L, courseTitle: String = "", videoId: Long = 0L) =
+        "axing?courseId=$courseId&courseTitle=${android.net.Uri.encode(courseTitle)}&videoId=$videoId"
 
     /** 积分商城：把任务中心已加载的余额 / 今日任务积分带过去，避免商城再请求一次账户 */
     fun pointsMall(balance: Int, todayPoints: Int) =

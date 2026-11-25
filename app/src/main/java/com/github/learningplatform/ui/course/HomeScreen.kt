@@ -52,6 +52,7 @@ import com.github.learningplatform.data.remote.dto.BannerDto
 import com.github.learningplatform.data.remote.dto.CourseDto
 import com.github.learningplatform.BuildConfig
 import com.github.learningplatform.ui.ad.TakuNativeAdCard
+import com.github.learningplatform.ui.axing.AxingFloatingEntry
 import com.github.learningplatform.ui.common.CategoryTabs
 import com.github.learningplatform.ui.common.ErrorState
 import com.github.learningplatform.ui.common.LoadingState
@@ -84,10 +85,12 @@ fun HomeScreen(
     onOpenNotifications: () -> Unit,
     onOpenAllCategories: () -> Unit,
     onOpenCourse: (Long) -> Unit,
+    onOpenAxing: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -125,6 +128,15 @@ fun HomeScreen(
                 )
             }
         }
+    }
+
+    // 右下角阿星入口：浮在列表之上、底栏之上方
+    AxingFloatingEntry(
+        onClick = onOpenAxing,
+        modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .padding(end = 16.dp, bottom = 10.dp)
+    )
     }
 }
 
@@ -182,7 +194,7 @@ private fun CourseFeed(
         modifier = Modifier
             .fillMaxSize()
             .background(pageGradientBrush(strong = false, theme = "home")),
-        contentPadding = PaddingValues(bottom = 24.dp)
+        contentPadding = PaddingValues(bottom = 96.dp)
     ) {
         item { Spacer(Modifier.height(8.dp)) }
         item {

@@ -69,6 +69,8 @@ import com.github.learningplatform.data.remote.dto.ArticleDetailDto
 import com.github.learningplatform.data.remote.dto.CommentDto
 import com.github.learningplatform.data.remote.dto.HotReplyDto
 import com.github.learningplatform.data.remote.dto.PostStatus
+import com.github.learningplatform.ui.axing.AxingAvatar
+import com.github.learningplatform.ui.axing.AxingPostSheet
 import com.github.learningplatform.ui.common.Avatar
 import com.github.learningplatform.ui.common.BackTopBar
 import com.github.learningplatform.ui.common.WriteNoteDialog
@@ -124,6 +126,8 @@ fun ArticleDetailScreen(
     // 回复目标：parentId 决定「挂到哪条评论下」，name 只用于输入框上方的提示
     var replyToCommentId by remember { mutableStateOf<Long?>(null) }
     var replyToName by remember { mutableStateOf<String?>(null) }
+    // 问阿星弹层：内容按当前文章上下文提问
+    var showAskAxing by remember { mutableStateOf(false) }
 
     // 只读态给一句轻提示（评论/点赞/收藏后端都要求已发布）
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -187,6 +191,42 @@ fun ArticleDetailScreen(
                 title = "文章详情",
                 onBack = onBack,
                 actions = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(end = 2.dp)
+                    ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .clickable {
+                                if (uiState.detail != null) showAskAxing = true
+                                else toast("文章还在加载，请稍候")
+                            }
+                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                    ) {
+                        AxingAvatar(size = 22.dp)
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = "问阿星",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Primary
+                        )
+                    }
+                    Text(
+                        text = "记笔记",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Primary,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .clickable {
+                                if (published) viewModel.showNoteDialog()
+                                else toast("文章审核通过后才能记笔记")
+                            }
+                            .padding(horizontal = 6.dp, vertical = 6.dp)
+                    )
                     Box {
                         IconButton(onClick = { menuExpanded = true }) {
                             Icon(NavIcons.MoreVert, contentDescription = "更多")
@@ -214,6 +254,7 @@ fun ArticleDetailScreen(
                             // 发布后需走审核，后端没有 post/edit，本人也只能看不能改，
                             // 所以右上角菜单不再提供「编辑」
                         }
+                    }
                     }
                 }
             )
@@ -440,6 +481,13 @@ fun ArticleDetailScreen(
             saving = uiState.noteSaving,
             onDismiss = viewModel::dismissNoteDialog,
             onSave = viewModel::createNote
+        )
+    }
+
+    if (showAskAxing) {
+        AxingPostSheet(
+            articleTitle = uiState.detail?.title.orEmpty(),
+            onDismiss = { showAskAxing = false }
         )
     }
 }
@@ -1020,6 +1068,7 @@ private fun ArticleBottomBar(
             }
         }
     }
+
 }
 
 @Composable

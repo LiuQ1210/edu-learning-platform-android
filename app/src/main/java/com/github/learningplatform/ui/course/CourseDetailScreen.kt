@@ -53,6 +53,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.learningplatform.data.remote.dto.CourseChapterDto
 import com.github.learningplatform.data.remote.dto.CourseLessonDto
+import com.github.learningplatform.ui.axing.AxingCourseEntryCard
 import com.github.learningplatform.ui.common.EmptyState
 import com.github.learningplatform.ui.common.ErrorState
 import com.github.learningplatform.ui.common.LoadingState
@@ -86,6 +87,7 @@ fun CourseDetailScreen(
     courseId: Long,
     onBack: () -> Unit,
     onOpenPlayer: (Long, Long?) -> Unit,
+    onOpenAxing: (Long, String) -> Unit,
     viewModel: CourseDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -203,6 +205,14 @@ fun CourseDetailScreen(
                             isFavorited = uiState.isFavorited,
                             onToggleLike = viewModel::toggleLike,
                             onToggleFavorite = viewModel::toggleFavorite
+                        )
+                    }
+
+                    // 阿星入口：带着课程上下文进入助手
+                    item {
+                        AxingCourseEntryCard(
+                            onClick = { onOpenAxing(courseId, detail.title) },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                         )
                     }
 
