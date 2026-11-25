@@ -1,6 +1,7 @@
 package com.github.learningplatform.core.di
 
 import com.github.learningplatform.core.network.RetrofitClient
+import com.github.learningplatform.data.remote.AgentApi
 import com.github.learningplatform.data.remote.AgreementApi
 import com.github.learningplatform.data.remote.ArticleApi
 import com.github.learningplatform.data.remote.AuthApi
@@ -106,4 +107,8 @@ object NetworkModule {
     /** 平台协议：用户协议 / 隐私政策 / 关于我们 */
     @Provides @Singleton
     fun provideAgreementApi(client: RetrofitClient): AgreementApi = client.create()
+
+    /** 阿星智能体：问答 / 会话 / 异步任务（读超时单独放宽） */
+    @Provides @Singleton
+    fun provideAgentApi(client: RetrofitClient): AgentApi = client.createAgent()
 }

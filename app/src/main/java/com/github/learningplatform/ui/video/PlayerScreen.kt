@@ -51,9 +51,8 @@ import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.github.learningplatform.core.constants.Constants
-import com.github.learningplatform.ui.ad.AdSlot
+import com.github.learningplatform.ui.axing.AxingIcons
 import com.github.learningplatform.ui.common.ErrorState
-import com.github.learningplatform.ui.common.AdSlotPlaceholder
 import com.github.learningplatform.ui.common.LoadingState
 import com.github.learningplatform.ui.common.WriteNoteDialog
 import com.github.learningplatform.ui.nav.NavIcons
@@ -81,6 +80,8 @@ fun PlayerScreen(
     courseId: Long,
     lessonId: Long?,
     onBack: () -> Unit,
+    /** 打开阿星：带上课程标题和当前小节，视频总结按小节发起 */
+    onOpenAxing: (courseId: Long, courseTitle: String, videoId: Long) -> Unit,
     viewModel: PlayerViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -260,28 +261,6 @@ fun PlayerScreen(
                     modifier = Modifier.fillMaxSize()
                 )
 
-                // 【广告位预留】播放页暂停广告位：仅在暂停且无错误时显示，接入 Taku 时替换内部
-                if (!isPlaying && playbackError == null) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .fillMaxWidth()
-                            .background(Color.Black.copy(alpha = 0.35f))
-                            .padding(horizontal = 24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        AdSlotPlaceholder(
-                            slotCode = "player_pause",
-                            height = 96.dp
-                        )
-                    }
-                }
-
-                // 暂停时显示广告位（预留）
-                if (!isPlaying) {
-                    AdSlot(slotId = "video_pause_banner", modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 50.dp))
-                }
-
                 // 底部进度条
                 Row(
                     modifier = Modifier
@@ -297,7 +276,7 @@ fun PlayerScreen(
                 ) {
                     IconButton(onClick = { if (player.isPlaying) player.pause() else player.play() }) {
                         Icon(
-                            NavIcons.Play,
+                            if (isPlaying) NavIcons.Pause else NavIcons.Play,
                             contentDescription = if (isPlaying) "暂停" else "播放",
                             tint = Color.White,
                             modifier = Modifier.size(20.dp)
@@ -462,6 +441,19 @@ fun PlayerScreen(
                     Icon(
                         NavIcons.Note,
                         contentDescription = "写笔记",
+                        tint = Color.White
+                    )
+                }
+            }
+
+            // 问阿星：带上当前小节，进去就能直接做「视频总结」
+            uiState.resolvedLessonId?.let { videoId ->
+                IconButton(onClick = {
+                    onOpenAxing(courseId, uiState.courseTitle, videoId)
+                }) {
+                    Icon(
+                        AxingIcons.Sparkle,
+                        contentDescription = "问阿星",
                         tint = Color.White
                     )
                 }

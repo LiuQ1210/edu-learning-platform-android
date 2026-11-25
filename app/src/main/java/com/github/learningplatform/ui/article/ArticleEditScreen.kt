@@ -25,7 +25,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -110,7 +109,7 @@ fun ArticleEditScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Button(
-                        onClick = { viewModel.submit(publish = 1) },
+                        onClick = { viewModel.submit() },
                         enabled = !uiState.submitting && uiState.canPublish,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(50),
