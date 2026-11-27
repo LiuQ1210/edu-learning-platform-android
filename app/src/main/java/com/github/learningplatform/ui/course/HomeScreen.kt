@@ -39,9 +39,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -204,13 +206,14 @@ private fun CourseFeed(
                 BannerCarousel(
                     banners = uiState.banners,
                     onOpenCourse = onOpenCourse,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                    // 水平留白交给 LazyRow 的 contentPadding 处理，才能左右对称
+                    modifier = Modifier.padding(vertical = 4.dp)
                 )
             } else {
                 FeaturedCourseCarousel(
                     courses = uiState.featuredCourses,
                     onOpenCourse = onOpenCourse,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                    modifier = Modifier.padding(vertical = 4.dp)
                 )
             }
         }
@@ -491,7 +494,18 @@ private fun FeaturedCourseCarousel(
     // 原因：HorizontalPager 在这个 foundation 版本上页宽明显小于容器
     // （指定 PageSize.Fill 也无效），结果是「右侧露出下一张、标题被裁字」。
     // LazyRow 的 fillParentMaxWidth() 能精确等于视口宽度，行为可控。
-    val listState = rememberLazyListState()
+    /*
+     * 虚拟无限列表：item 数量给 Int.MAX_VALUE，起始位置对齐到 size 的整数倍。
+     * 这样自动播放永远是「当前 +1」，不会出现「从最后一页动画滑回第一页」的长距离倒带
+     * —— 那个回绕既慢，看起来也像卡住。
+     */
+    val virtualStart = remember(courses.size) {
+        if (courses.size > 1) {
+            val mid = Int.MAX_VALUE / 2
+            mid - mid % courses.size
+        } else 0
+    }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = virtualStart)
     val scope = rememberCoroutineScope()
     var autoScrollSuspended by remember { mutableStateOf(false) }
 
@@ -499,7 +513,7 @@ private fun FeaturedCourseCarousel(
     // 直接读会在滚动期间触发整页重组；用 derivedStateOf 只在「页码变化」时才通知 UI。
     val currentPage by remember(courses.size) {
         derivedStateOf {
-            if (courses.isEmpty()) 0 else listState.firstVisibleItemIndex.coerceIn(0, courses.lastIndex)
+            if (courses.isEmpty()) 0 else listState.firstVisibleItemIndex % courses.size
         }
     }
 
@@ -516,27 +530,25 @@ private fun FeaturedCourseCarousel(
     LaunchedEffect(courses.size, autoScrollSuspended) {
         if (courses.size <= 1 || autoScrollSuspended) return@LaunchedEffect
         while (true) {
-            delay(4000)
-            val next = (listState.firstVisibleItemIndex + 1) % courses.size
-            runCatching { listState.animateScrollToItem(next) }
+            delay(5000)
+            // 永远向前翻一页；虚拟列表没有边界，不存在回绕
+            runCatching { listState.animateScrollToItem(listState.firstVisibleItemIndex + 1) }
         }
     }
 
     Column(modifier = modifier) {
         /*
-         * 版式：当前卡占 88% 宽，右侧留出下一张的边缘 —— 这是轮播的常规做法，
-         * 给用户「可以左右滑」的提示。
+         * 版式：每「页」宽度 = 视口宽，卡片在页内水平居中，占 92% 宽。
+         * 左右各留 4% 作为视觉间隙，相邻两页的露出宽度因此恒等 ——
+         * 旧版靠 contentPadding / spacedBy 做间距时，第一页贴左、后面的页宽度不一，
+         * 翻页就会左右跳动，看起来像卡顿。
          *
-         * 之前我把它当 bug 追了很久（试过 HorizontalPager 的 PageSize.Fill、
-         * LazyRow 的 fillParentMaxWidth、BoxWithConstraints 给死宽度），
-         * 都没能让卡片撑满。后来想清楚：撑满反而不好 —— 满宽卡片看不出还能滑。
-         * 所以这里明确按「露出下一张」来做，宽度和间距都写死，行为可预期。
+         * 注意：LazyRow 给 item 的横向约束是无界的，item 里不能用 fillMaxWidth
+         * （会退化成 wrap-content，卡片宽随图片原始尺寸变化），必须显式 width(maxWidth)。
          *
-         * 卡片用 RoundedCornerShape 单独圆角，比给整个容器加 clip 更好：
-         * 容器不裁剪，下一张才能自然露出边缘。
+         * 卡片用 RoundedCornerShape 单独圆角，容器不裁剪，相邻卡片才能露出边缘。
          */
-        val cardWidthRatio = 0.88f
-        val cardSpacing = 10.dp
+        val cardWidthRatio = 0.92f
 
         BoxWithConstraints(
             modifier = Modifier
@@ -544,93 +556,128 @@ private fun FeaturedCourseCarousel(
                 .height(168.dp)
         ) {
             val cardWidth = maxWidth * cardWidthRatio
+            // 每页占满视口宽、卡片在页内居中：snap 对齐整页后左右留白始终相等，
+            // 不会出现「第一页贴左、翻页后又贴左」的间距跳变
+            val sideInset = (maxWidth - cardWidth) / 2
             LazyRow(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.spacedBy(cardSpacing),
-                // 滑动结束对齐到整页，等价于 pager 的翻页手感
+                // 页与页之间不加额外间距，视觉间距由每页内部两侧留白组成
                 flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
             ) {
-                items(courses, key = { it.courseId }) { course ->
-                    Column(
+                items(
+                    count = if (courses.size > 1) Int.MAX_VALUE else 1,
+                    key = { it }
+                ) { index ->
+                    val course = courses[index % courses.size]
+                    Box(
+                        // 页宽 = 视口宽，卡片靠左右 padding 居中；snap 以整页为单位
+                        // LazyRow 给 item 的横向约束是「无界」，fillMaxWidth 会退化成
+                        // wrap-content（卡片宽随图片原始尺寸变化，间距就不等）；
+                        // 必须显式给页宽 = 视口宽，snap 才能按整页对齐
                         modifier = Modifier
-                            .width(cardWidth)
+                            .width(maxWidth)
+                            .padding(horizontal = sideInset)
                             .fillMaxHeight()
                             .clip(RoundedCornerShape(16.dp))
+                            // 图还没解出来之前先铺一层浅灰蓝，滑动时不会白闪
+                            .background(Color(0xFFE7ECF5))
                             .clickable { onOpenCourse(course.courseId) }
                     ) {
+                        NetImage(
+                            url = course.coverUrl,
+                            modifier = Modifier.fillMaxSize(),
+                            radius = 0.dp
+                        )
+
+                        // 去掉黑色实心信息条：改成图片底部的渐变压暗。
+                        // 文字依旧压得住，但视觉上不再是「图上切一块黑」。
                         Box(
                             modifier = Modifier
+                                .align(Alignment.BottomCenter)
                                 .fillMaxWidth()
-                                .weight(1f)
-                        ) {
-                            NetImage(
-                                url = course.coverUrl,
-                                modifier = Modifier.fillMaxSize(),
-                                radius = 0.dp
-                            )
-                        }
-
-                        // 信息条：固定高度、纯色底，文字落在卡片安全区内
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Color.Black.copy(alpha = 0.72f))
-                                .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 8.dp)
-                        ) {
-                            Text(
-                                text = course.title,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                text = buildString {
-                                    if (course.instructorName.isNotBlank()) {
-                                        append(course.instructorName)
-                                    }
-                                    if (course.studentCount > 0) {
-                                        if (isNotEmpty()) append(" · ")
-                                        append(formatCount(course.studentCount))
-                                        append(" 人在学")
-                                    }
-                                },
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.82f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
-            }
-
-            // 指示器压在图内底部居中
-            if (courses.size > 1) {
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 46.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    repeat(courses.size) { index ->
-                        val active = index == currentPage
-                        Box(
-                            modifier = Modifier
-                                .height(4.dp)
-                                .width(if (active) 16.dp else 6.dp)
-                                .clip(RoundedCornerShape(2.dp))
+                                .height(104.dp)
                                 .background(
-                                    if (active) Color.White
-                                    else Color.White.copy(alpha = 0.45f)
+                                    Brush.verticalGradient(
+                                        0.00f to Color.Transparent,
+                                        0.40f to Color.Black.copy(alpha = 0.42f),
+                                        1.00f to Color.Black.copy(alpha = 0.90f)
+                                    )
                                 )
                         )
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .padding(start = 14.dp, end = 14.dp, bottom = 12.dp),
+                            verticalAlignment = Alignment.Bottom
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    text = course.title,
+                                    style = MaterialTheme.typography.titleSmall.copy(
+                                        shadow = Shadow(
+                                            color = Color.Black.copy(alpha = 0.55f),
+                                            offset = Offset(0f, 2f),
+                                            blurRadius = 8f
+                                        )
+                                    ),
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(Modifier.height(3.dp))
+                                Text(
+                                    text = buildString {
+                                        if (course.instructorName.isNotBlank()) {
+                                            append(course.instructorName)
+                                        }
+                                        if (course.studentCount > 0) {
+                                            if (isNotEmpty()) append(" · ")
+                                            append(formatCount(course.studentCount))
+                                            append(" 人在学")
+                                        }
+                                    },
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        shadow = Shadow(
+                                            color = Color.Black.copy(alpha = 0.45f),
+                                            offset = Offset(0f, 1f),
+                                            blurRadius = 6f
+                                        )
+                                    ),
+                                    color = Color.White.copy(alpha = 0.80f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            // 指示器移到文字行右侧，不再压在图中间
+                            if (courses.size > 1) {
+                                Row(
+                                    modifier = Modifier.padding(start = 10.dp, bottom = 3.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    repeat(courses.size) { i ->
+                                        val active = i == currentPage
+                                        Box(
+                                            modifier = Modifier
+                                                .height(4.dp)
+                                                .width(if (active) 14.dp else 5.dp)
+                                                .clip(RoundedCornerShape(2.dp))
+                                                .background(
+                                                    if (active) Color.White
+                                                    else Color.White.copy(alpha = 0.45f)
+                                                )
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
+
+            // 指示器已经移进每张卡的文字行，这里不再需要覆盖层
         }
     }
 }
@@ -652,12 +699,19 @@ private fun BannerCarousel(
 ) {
     if (banners.isEmpty()) return
 
-    val listState = rememberLazyListState()
+    // 与课程轮播一致的虚拟无限列表：翻页永远向前，不回绕
+    val virtualStart = remember(banners.size) {
+        if (banners.size > 1) {
+            val mid = Int.MAX_VALUE / 2
+            mid - mid % banners.size
+        } else 0
+    }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = virtualStart)
     var autoScrollSuspended by remember { mutableStateOf(false) }
 
     val currentPage by remember(banners.size) {
         derivedStateOf {
-            if (banners.isEmpty()) 0 else listState.firstVisibleItemIndex.coerceIn(0, banners.lastIndex)
+            if (banners.isEmpty()) 0 else listState.firstVisibleItemIndex % banners.size
         }
     }
 
@@ -674,14 +728,12 @@ private fun BannerCarousel(
     LaunchedEffect(banners.size, autoScrollSuspended) {
         if (banners.size <= 1 || autoScrollSuspended) return@LaunchedEffect
         while (true) {
-            delay(4000)
-            val next = (listState.firstVisibleItemIndex + 1) % banners.size
-            runCatching { listState.animateScrollToItem(next) }
+            delay(5000)
+            runCatching { listState.animateScrollToItem(listState.firstVisibleItemIndex + 1) }
         }
     }
 
-    val cardWidthRatio = 0.88f
-    val cardSpacing = 10.dp
+    val cardWidthRatio = 0.92f
 
     BoxWithConstraints(
         modifier = modifier
@@ -689,84 +741,115 @@ private fun BannerCarousel(
             .height(168.dp)
     ) {
         val cardWidth = maxWidth * cardWidthRatio
+        // 每页占满视口宽、卡片在页内居中，翻页后左右留白始终相等
+        val sideInset = (maxWidth - cardWidth) / 2
         LazyRow(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.spacedBy(cardSpacing),
             flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
         ) {
-            items(banners, key = { it.bannerId }) { banner ->
-                Column(
+            items(
+                count = if (banners.size > 1) Int.MAX_VALUE else 1,
+                key = { it }
+            ) { index ->
+                val banner = banners[index % banners.size]
+                Box(
+                    // 页宽 = 视口宽，卡片靠左右 padding 居中；snap 以整页为单位
+                    // 横向无界约束下 fillMaxWidth 无效，显式给页宽 = 视口宽
                     modifier = Modifier
-                        .width(cardWidth)
+                        .width(maxWidth)
+                        .padding(horizontal = sideInset)
                         .fillMaxHeight()
                         .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xFFE7ECF5))
                         .clickable(enabled = banner.courseId > 0) {
                             onOpenCourse(banner.courseId)
                         }
                 ) {
+                    NetImage(
+                        url = banner.imageUrl,
+                        modifier = Modifier.fillMaxSize(),
+                        radius = 0.dp
+                    )
+
+                    // 黑色实心条 → 图片底部渐变压暗，和课程轮播同一套语言
                     Box(
                         modifier = Modifier
+                            .align(Alignment.BottomCenter)
                             .fillMaxWidth()
-                            .weight(1f)
-                    ) {
-                        NetImage(
-                            url = banner.imageUrl,
-                            modifier = Modifier.fillMaxSize(),
-                            radius = 0.dp
-                        )
-                    }
-
-                    Column(
+                            .height(104.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    0.00f to Color.Transparent,
+                                    0.40f to Color.Black.copy(alpha = 0.42f),
+                                    1.00f to Color.Black.copy(alpha = 0.90f)
+                                )
+                            )
+                    )
+                    Row(
                         modifier = Modifier
+                            .align(Alignment.BottomCenter)
                             .fillMaxWidth()
-                            .background(Color.Black.copy(alpha = 0.72f))
-                            .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 8.dp)
+                            .padding(start = 14.dp, end = 14.dp, bottom = 12.dp),
+                        verticalAlignment = Alignment.Bottom
                     ) {
-                        Text(
-                            text = banner.title.ifBlank { banner.courseName },
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (banner.courseName.isNotBlank()) {
-                            Spacer(Modifier.height(2.dp))
+                        Column(Modifier.weight(1f)) {
                             Text(
-                                text = banner.courseName,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.82f),
+                                text = banner.title.ifBlank { banner.courseName },
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    shadow = Shadow(
+                                        color = Color.Black.copy(alpha = 0.55f),
+                                        offset = Offset(0f, 2f),
+                                        blurRadius = 8f
+                                    )
+                                ),
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
+                            if (banner.courseName.isNotBlank()) {
+                                Spacer(Modifier.height(3.dp))
+                                Text(
+                                    text = banner.courseName,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        shadow = Shadow(
+                                            color = Color.Black.copy(alpha = 0.45f),
+                                            offset = Offset(0f, 1f),
+                                            blurRadius = 6f
+                                        )
+                                    ),
+                                    color = Color.White.copy(alpha = 0.80f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                        if (banners.size > 1) {
+                            Row(
+                                modifier = Modifier.padding(start = 10.dp, bottom = 3.dp),
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                repeat(banners.size) { i ->
+                                    val active = i == currentPage
+                                    Box(
+                                        modifier = Modifier
+                                            .height(4.dp)
+                                            .width(if (active) 14.dp else 5.dp)
+                                            .clip(RoundedCornerShape(2.dp))
+                                            .background(
+                                                if (active) Color.White
+                                                else Color.White.copy(alpha = 0.45f)
+                                            )
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
         }
 
-        if (banners.size > 1) {
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 46.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                repeat(banners.size) { index ->
-                    val active = index == currentPage
-                    Box(
-                        modifier = Modifier
-                            .height(4.dp)
-                            .width(if (active) 16.dp else 6.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(
-                                if (active) Color.White
-                                else Color.White.copy(alpha = 0.45f)
-                            )
-                    )
-                }
-            }
-        }
+        // 指示器已移进卡片文字行，这里不再需要覆盖层
     }
 }

@@ -37,7 +37,9 @@ android {
         // （Android 16 起 10.0.2.2 会被「本地网络访问限制」拦截，回环地址不受影响）。
         // Retrofit 要求 baseUrl 必须以 / 结尾，这里统一补齐。
         val rawBaseUrl = (project.findProperty("baseUrl") as String?)?.trim()
-            ?.takeIf { it.isNotEmpty() } ?: "http://192.168.100.3:1000/"
+            ?.takeIf { it.isNotEmpty() }
+            ?: localProperties.getProperty("baseUrl")?.trim()?.takeIf { it.isNotEmpty() }
+            ?: "http://192.168.100.3:1000/"
         val baseUrl = if (rawBaseUrl.endsWith("/")) rawBaseUrl else "$rawBaseUrl/"
         buildConfigField("String", "BASE_URL", "\"$baseUrl\"")
 

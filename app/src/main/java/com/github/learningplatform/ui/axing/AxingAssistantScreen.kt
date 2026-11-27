@@ -248,13 +248,13 @@ private fun AxingTopBar(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "阿星",
-                fontSize = 19.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 color = TextPrimary
             )
             Text(
                 text = subtitle,
-                fontSize = 12.sp,
+                fontSize = 11.sp,
                 color = TextHint
             )
         }
@@ -309,19 +309,19 @@ private fun AxingEmptyState(
         Spacer(Modifier.height(18.dp))
         Text(
             text = "试试这样问",
-            fontSize = 18.sp,
+            fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             color = TextPrimary
         )
         Spacer(Modifier.height(14.dp))
         AxingSuggestions.forEach { suggestion ->
             SuggestionCard(suggestion = suggestion, onClick = { onSuggestion(suggestion) })
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
         }
         Spacer(Modifier.height(4.dp))
         Text(
             text = "点一下会填进输入框，阿星会自动判断用哪种能力。",
-            fontSize = 13.sp,
+            fontSize = 11.sp,
             color = TextHint
         )
         Spacer(Modifier.height(24.dp))
@@ -339,13 +339,13 @@ private fun SuggestionCard(suggestion: AxingSuggestion, onClick: () -> Unit) {
             .clickable(onClick = onClick)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(11.dp))
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(10.dp))
                     .background(suggestion.tint.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -353,13 +353,13 @@ private fun SuggestionCard(suggestion: AxingSuggestion, onClick: () -> Unit) {
                     suggestion.icon,
                     contentDescription = null,
                     tint = suggestion.tint,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             }
             Spacer(Modifier.width(12.dp))
             Text(
                 text = suggestion.text,
-                fontSize = 15.sp,
+                fontSize = 13.sp,
                 color = TextPrimary,
                 modifier = Modifier.weight(1f)
             )
@@ -367,7 +367,7 @@ private fun SuggestionCard(suggestion: AxingSuggestion, onClick: () -> Unit) {
                 AxingIcons.PlusCircle,
                 contentDescription = null,
                 tint = TextHint,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
     }
@@ -1052,7 +1052,7 @@ private fun AxingInputBar(
                 BasicTextField(
                     value = input,
                     onValueChange = onInputChange,
-                    textStyle = TextStyle(fontSize = 15.sp, color = TextPrimary, lineHeight = 22.sp),
+                    textStyle = TextStyle(fontSize = 13.sp, color = TextPrimary, lineHeight = 19.sp),
                     cursorBrush = SolidColor(Primary),
                     maxLines = 3,
                     modifier = Modifier
@@ -1061,7 +1061,7 @@ private fun AxingInputBar(
                     decorationBox = { inner ->
                         Box {
                             if (input.isBlank()) {
-                                Text(text = placeholder, fontSize = 15.sp, color = TextHint)
+                                Text(text = placeholder, fontSize = 13.sp, color = TextHint)
                             }
                             inner()
                         }
