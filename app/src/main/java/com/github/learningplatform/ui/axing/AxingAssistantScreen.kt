@@ -57,6 +57,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -119,12 +120,22 @@ fun AxingAssistantScreen(
         viewModel.initCourse(courseId, courseTitle, videoId)
     }
 
+    // 一次性提示（记忆保存 / 会话重命名等）
+    LaunchedEffect(state.notice) {
+        state.notice?.let { message ->
+            toast(context, message)
+            viewModel.consumeNotice()
+        }
+    }
+
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri -> uri?.let { viewModel.attachImage(it.toString()) } }
 
-    // 新消息 / 思考态出现时滚到底部
-    LaunchedEffect(state.messages.size, state.isThinking) {
+    // 新消息 / 思考态出现时滚到底部；流式每约 120 字跟一次，向上翻历史时 lastMessage 不变
+    val lastMessage = state.messages.lastOrNull()
+    val streamedBlocks = state.streamingText.length / 120
+    LaunchedEffect(lastMessage, state.isThinking, streamedBlocks) {
         val last = state.messages.size + if (state.isThinking) 1 else 0 - 1
         if (last >= 0) listState.animateScrollToItem(last)
     }
@@ -155,16 +166,46 @@ fun AxingAssistantScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
+                    if (state.hasEarlier || state.loadingEarlier) {
+                        item {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(enabled = !state.loadingEarlier) {
+                                        viewModel.loadEarlier()
+                                    }
+                                    .padding(vertical = 6.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (state.loadingEarlier) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("正在加载更早的消息…", fontSize = 12.sp, color = TextHint)
+                                } else {
+                                    Text("加载更早的消息", fontSize = 12.sp, color = Primary)
+                                }
+                            }
+                        }
+                    }
                     itemsIndexed(state.messages) { index, message ->
                         when (message) {
                             is AxingMessage.User -> UserBubble(message)
                             is AxingMessage.Assistant -> {
                                 AnswerSection(
                                     answer = message.answer,
+                                    candidateStates = state.candidateStates,
                                     onOpenCoursePicker = viewModel::openCoursePicker,
                                     onRegenerate = viewModel::regenerate,
                                     onMakePpt = viewModel::makePpt,
-                                    onOpenDeck = viewModel::openDeck
+                                    onOpenDeck = viewModel::openDeck,
+                                    onSaveMemory = { option ->
+                                        viewModel.saveMemoryCandidate(option.candidateId, option.content)
+                                    },
+                                    onIgnoreMemory = viewModel::ignoreMemoryCandidate
                                 )
                             }
                             is AxingMessage.Error -> ErrorCard(
@@ -174,7 +215,17 @@ fun AxingAssistantScreen(
                         }
                     }
                     if (state.isThinking) {
-                        item { ThinkingBubble(label = state.thinkingLabel) }
+                        item {
+                            ThinkingBubble(
+                                label = state.thinkingLabel,
+                                streamingText = state.streamingText,
+                                steps = state.liveSteps,
+                                note = state.liveNote,
+                                cancellable = state.activeTaskId > 0,
+                                cancelling = state.cancelling,
+                                onCancel = viewModel::cancelRunningTask
+                            )
+                        }
                     }
                 }
             }
@@ -215,8 +266,51 @@ fun AxingAssistantScreen(
             onDismiss = viewModel::closeDrawer,
             onNewChat = viewModel::newChat,
             onOpenHistory = viewModel::openHistory,
-            onOpenMemory = { toast(context, "记忆管理暂未接入后端") }
+            onSessionMenu = viewModel::openSessionMenu,
+            onOpenMemory = viewModel::openMemories,
+            streamingReply = state.streamingReply,
+            onToggleStreaming = viewModel::toggleStreamingReply,
+            hasMoreSessions = state.sessions.size < state.sessionTotal,
+            onLoadMoreSessions = viewModel::loadMoreSessions
         )
+
+        AxingMemorySheet(
+            state = state.memory,
+            onDismiss = viewModel::closeMemories,
+            onRetry = viewModel::retryMemories,
+            onDraftChange = viewModel::setMemoryDraft,
+            onSave = viewModel::saveMemoryDraft,
+            onEdit = viewModel::editMemory,
+            onCancelEdit = viewModel::cancelMemoryEdit,
+            onDelete = viewModel::deleteMemory
+        )
+
+        state.sessionMenu?.let { item ->
+            AxingSessionMenuDialog(
+                item = item,
+                onRename = { viewModel.startRename(item) },
+                onDelete = { viewModel.startDelete(item) },
+                onDismiss = viewModel::closeSessionMenu
+            )
+        }
+
+        state.renameTarget?.let { item ->
+            AxingRenameDialog(
+                item = item,
+                draft = state.renameDraft,
+                onDraftChange = viewModel::setRenameDraft,
+                onConfirm = viewModel::confirmRename,
+                onDismiss = viewModel::cancelRename
+            )
+        }
+
+        state.deleteTarget?.let { item ->
+            AxingDeleteDialog(
+                item = item,
+                onConfirm = viewModel::confirmDelete,
+                onDismiss = viewModel::cancelDelete
+            )
+        }
     }
 
     state.fullscreenDeck?.let { deck ->
@@ -416,10 +510,13 @@ private fun UserBubble(message: AxingMessage.User) {
 @Composable
 private fun AnswerSection(
     answer: AxingAnswer,
+    candidateStates: Map<String, String>,
     onOpenCoursePicker: () -> Unit,
     onRegenerate: () -> Unit,
     onMakePpt: () -> Unit,
-    onOpenDeck: (AxingDeck) -> Unit
+    onOpenDeck: (AxingDeck) -> Unit,
+    onSaveMemory: (AxingMemoryOption) -> Unit,
+    onIgnoreMemory: (String) -> Unit
 ) {
     val context = LocalContext.current
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -457,6 +554,19 @@ private fun AnswerSection(
                             deck = block.deck,
                             onOpenDeck = { onOpenDeck(block.deck) },
                             onExport = { shareDeck(context, block.deck) }
+                        )
+                        is AxingBlock.Steps -> AxingStepsCard(
+                            steps = block.items,
+                            note = block.note
+                        )
+                        is AxingBlock.Table -> AxingTableCard(block.table)
+                        is AxingBlock.SubtitleCard -> AxingSubtitleCard(block.subtitle)
+                        is AxingBlock.TaskCard -> AxingTaskCard(block.info)
+                        is AxingBlock.MemoryOptions -> AxingMemoryOptions(
+                            items = block.items,
+                            states = candidateStates,
+                            onSave = onSaveMemory,
+                            onIgnore = onIgnoreMemory
                         )
                     }
                 }
@@ -637,19 +747,57 @@ private fun AnswerActionChip(label: String, icon: ImageVector, onClick: () -> Un
 }
 
 @Composable
-private fun ThinkingBubble(label: String) {
+private fun ThinkingBubble(
+    label: String,
+    streamingText: String = "",
+    steps: List<AxingStepUi> = emptyList(),
+    note: String? = null,
+    cancellable: Boolean = false,
+    cancelling: Boolean = false,
+    onCancel: () -> Unit = {}
+) {
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-            Spacer(Modifier.width(10.dp))
-            Text(label, fontSize = 13.sp, color = TextSecondary)
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = label,
+                    fontSize = 13.sp,
+                    color = TextSecondary,
+                    modifier = Modifier.weight(1f)
+                )
+                if (cancellable) {
+                    TextButton(onClick = onCancel, enabled = !cancelling) {
+                        Text(
+                            text = if (cancelling) "停止中…" else "停止",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+            if (streamingText.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = streamingText,
+                    fontSize = 14.sp,
+                    lineHeight = 22.sp,
+                    color = TextPrimary
+                )
+            }
+            if (steps.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                AxingStepsCard(steps = steps, note = note, compact = true)
+            } else if (!note.isNullOrBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(text = note, fontSize = 12.sp, color = TextHint)
+            }
         }
     }
 }
@@ -1090,7 +1238,7 @@ private fun AxingInputBar(
                         modifier = Modifier.weight(1f),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        items(listOf(AxingCapability.SUMMARY, AxingCapability.QA, AxingCapability.VIDEO, AxingCapability.PPT)) { cap ->
+                        items(AxingInputCapabilities) { cap ->
                             CapabilityChip(
                                 capability = cap,
                                 selected = capability == cap,
@@ -1128,13 +1276,7 @@ private fun CapabilityChip(
     onClick: () -> Unit,
     onClear: () -> Unit
 ) {
-    val (icon, tint) = when (capability) {
-        AxingCapability.SUMMARY -> AxingIcons.Summarize to Primary
-        AxingCapability.QA -> AxingIcons.PostAsk to Primary
-        AxingCapability.VIDEO -> AxingIcons.VideoSummary to Color(0xFF2AA7B8)
-        AxingCapability.PPT -> AxingIcons.Slideshow to Color(0xFF2E9FD4)
-        AxingCapability.STUDY -> AxingIcons.DataStack to Color(0xFF22A9B8)
-    }
+    val (icon, tint) = capabilityIcon(capability)
     Surface(
         shape = RoundedCornerShape(50),
         color = if (selected) Primary else MaterialTheme.colorScheme.surface,
@@ -1300,7 +1442,12 @@ private fun AxingHistoryDrawer(
     onDismiss: () -> Unit,
     onNewChat: () -> Unit,
     onOpenHistory: (AxingHistoryItem) -> Unit,
-    onOpenMemory: () -> Unit
+    onSessionMenu: (AxingHistoryItem) -> Unit,
+    onOpenMemory: () -> Unit,
+    streamingReply: Boolean,
+    onToggleStreaming: () -> Unit,
+    hasMoreSessions: Boolean,
+    onLoadMoreSessions: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut()) {
@@ -1405,32 +1552,98 @@ private fun AxingHistoryDrawer(
                             )
                             else -> items.forEach { item ->
                                 val selected = item.sessionId == activeSessionId
-                                Column(
+                                Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(10.dp))
                                         .background(if (selected) PrimaryContainer else Color.Transparent)
                                         .clickable { onOpenHistory(item) }
-                                        .padding(horizontal = 8.dp, vertical = 10.dp)
+                                        .padding(start = 8.dp, end = 2.dp, top = 6.dp, bottom = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = item.title,
-                                        fontSize = 16.sp,
-                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                        color = if (selected) Primary else TextPrimary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Spacer(Modifier.height(3.dp))
-                                    Text(
-                                        text = item.meta,
-                                        fontSize = 12.sp,
-                                        color = if (selected) Primary.copy(alpha = 0.7f) else TextHint
-                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = item.title,
+                                            fontSize = 16.sp,
+                                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                            color = if (selected) Primary else TextPrimary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Spacer(Modifier.height(3.dp))
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                sceneIcon(item.scene),
+                                                contentDescription = null,
+                                                tint = sceneTint(item.scene),
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                            Spacer(Modifier.width(4.dp))
+                                            Text(
+                                                text = item.meta,
+                                                fontSize = 12.sp,
+                                                color = if (selected) {
+                                                    Primary.copy(alpha = 0.7f)
+                                                } else {
+                                                    TextHint
+                                                }
+                                            )
+                                        }
+                                    }
+                                    IconButton(
+                                        onClick = { onSessionMenu(item) },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            NavIcons.MoreVert,
+                                            contentDescription = "会话操作",
+                                            tint = if (selected) Primary else TextHint,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
                                 }
                                 Spacer(Modifier.height(2.dp))
                             }
                         }
+                        if (hasMoreSessions) {
+                            TextButton(
+                                onClick = onLoadMoreSessions,
+                                enabled = !loading,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = if (loading) "正在加载更多…" else "加载更多历史",
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                    }
+                    HorizontalDivider(color = Divider)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            AxingIcons.Act,
+                            contentDescription = null,
+                            tint = TextSecondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "流式回答", fontSize = 15.sp, color = TextPrimary)
+                            Text(
+                                text = "逐字返回；关闭时提供记忆候选",
+                                fontSize = 11.sp,
+                                color = TextHint
+                            )
+                        }
+                        Switch(
+                            checked = streamingReply,
+                            onCheckedChange = { onToggleStreaming() }
+                        )
                     }
                     HorizontalDivider(color = Divider)
                     Row(

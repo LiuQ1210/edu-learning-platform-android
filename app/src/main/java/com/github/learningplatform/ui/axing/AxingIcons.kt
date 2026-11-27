@@ -147,4 +147,51 @@ object AxingIcons {
         "AxingAttach",
         "M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"
     )
+
+    /** 执行任务：闪电 */
+    val Act: ImageVector = fillIcon(
+        "AxingAct",
+        "M13 2 3 14h7l-1 8 10-12h-7l1-8z"
+    )
+
+    /** 数据查询：表格 */
+    val Table: ImageVector = lineIcon(
+        "AxingTable",
+        "M4 4.8h16v14.4H4zM4 9.6h16M4 14.4h16M9.6 9.6v9.6M15.2 9.6v9.6",
+        width = 1.6f
+    )
+
+    /** 视频字幕：带字幕的屏幕 */
+    val Subtitle: ImageVector = lineIcon(
+        "AxingSubtitle",
+        "M3.8 5.6h16.4v12.8H3.8zM7 13.4h4.4M13.6 13.4H17M7 10.4h10",
+        width = 1.6f
+    )
+
+    /** 停止 / 取消任务 */
+    val Stop: ImageVector = fillIcon(
+        "AxingStop",
+        "M7 7h10v10H7z"
+    )
+
+    /** 步骤时间线：对勾 */
+    val StepDone: ImageVector = lineIcon(
+        "AxingStepDone",
+        "M4 12.5 9 17.5 20 6.5",
+        width = 2f
+    )
+
+    /** 步骤失败 */
+    val StepError: ImageVector = lineIcon(
+        "AxingStepError",
+        "M6 6l12 12M18 6 6 18",
+        width = 2f
+    )
+
+    /** 步骤进行中：空心圆 */
+    val StepPending: ImageVector = lineIcon(
+        "AxingStepPending",
+        "M12 4.5a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15z",
+        width = 1.8f
+    )
 }
