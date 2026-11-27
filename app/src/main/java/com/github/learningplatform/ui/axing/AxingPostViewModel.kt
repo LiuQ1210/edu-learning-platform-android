@@ -78,8 +78,8 @@ class AxingPostViewModel @Inject constructor(
                     paragraphs = paragraphsOf(result.answer),
                     quotes = result.refs.map {
                         AxingQuote(
-                            title = it.postTitle.ifBlank { "相关帖子" },
-                            excerpt = it.category.ifBlank { "社区帖子" }
+                            title = it.postTitle.ifBlank { it.title.ifBlank { "相关帖子" } },
+                            excerpt = it.excerpt.ifBlank { it.category.ifBlank { "社区帖子" } }
                         )
                     }
                 )
